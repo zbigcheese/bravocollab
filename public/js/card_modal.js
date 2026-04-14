@@ -28,7 +28,7 @@ const CardModal = {
         overlay.className = 'modal-overlay card-detail-modal';
 
         overlay.innerHTML = `
-            <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal">
                 <div class="modal-header">
                     <textarea class="card-detail-title" id="cardTitle" rows="1">${App.escapeHtml(c.title)}</textarea>
                     <button class="modal-close" id="closeCardModal">&times;</button>
