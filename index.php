@@ -18,7 +18,7 @@ Auth::init();
 $page = $_GET['page'] ?? '';
 
 // Public pages (no auth required)
-$publicPages = ['login', 'register'];
+$publicPages = ['login', 'register', 'forgot_password', 'reset_password'];
 
 // Redirect to login if not authenticated
 if (!Auth::isLoggedIn() && !in_array($page, $publicPages, true)) {
@@ -34,11 +34,13 @@ if (Auth::isLoggedIn() && ($page === 'login' || $page === '')) {
 
 // Page routing
 $pageMap = [
-    'login'      => 'auth/login.php',
-    'register'   => 'auth/register.php',
-    'dashboard'  => 'dashboard/index.php',
-    'board'      => 'board/view.php',
-    'admin_users'=> 'admin/users.php',
+    'login'           => 'auth/login.php',
+    'register'        => 'auth/register.php',
+    'forgot_password' => 'auth/forgot_password.php',
+    'reset_password'  => 'auth/reset_password.php',
+    'dashboard'       => 'dashboard/index.php',
+    'board'           => 'board/view.php',
+    'admin_users'     => 'admin/users.php',
 ];
 
 if (!isset($pageMap[$page])) {

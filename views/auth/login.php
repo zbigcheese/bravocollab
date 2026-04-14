@@ -27,6 +27,9 @@
                 <div class="form-error" id="loginError" style="display:none;"></div>
                 <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign In</button>
             </form>
+            <p style="text-align:center;margin-top:16px;font-size:13px;">
+                <a href="index.php?page=forgot_password" style="color:var(--color-text-light);">Forgot your password?</a>
+            </p>
         </div>
     </div>
     <script>

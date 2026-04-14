@@ -25,6 +25,27 @@ class Mailer
         return self::send($toEmail, $subject, $body);
     }
 
+    public static function sendPasswordReset(string $toEmail, string $token): bool
+    {
+        $config = require __DIR__ . '/../config/config.php';
+        $resetUrl = $config['base_url'] . '/index.php?page=reset_password&token=' . urlencode($token);
+
+        $subject = "Reset your password — " . $config['app_name'];
+
+        $body = self::buildHtml(
+            $config['app_name'],
+            "Password Reset",
+            "<p>We received a request to reset your password. Click the button below to choose a new one:</p>"
+            . "<p style=\"text-align:center;margin:30px 0;\">"
+            . "<a href=\"{$resetUrl}\" style=\"background-color:#0079BF;color:#fff;padding:12px 32px;text-decoration:none;border-radius:4px;font-weight:bold;display:inline-block;\">Reset Password</a>"
+            . "</p>"
+            . "<p style=\"color:#666;font-size:13px;\">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>"
+            . "<p style=\"color:#999;font-size:12px;\">If the button doesn't work, copy this link:<br>{$resetUrl}</p>"
+        );
+
+        return self::send($toEmail, $subject, $body);
+    }
+
     public static function send(string $to, string $subject, string $htmlBody): bool
     {
         $config = require __DIR__ . '/../config/config.php';
