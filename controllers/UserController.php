@@ -163,4 +163,22 @@ class UserController extends Controller
 
         $this->json(['success' => true]);
     }
+
+    public function invitations(): void
+    {
+        $this->requireAdmin();
+        $this->requireGet();
+
+        $db = Database::get();
+        $stmt = $db->prepare(
+            'SELECT i.*, u.display_name as invited_by_name
+             FROM invitations i
+             JOIN users u ON i.invited_by = u.id
+             WHERE i.accepted_at IS NULL AND i.expires_at > NOW()
+             ORDER BY i.created_at DESC'
+        );
+        $stmt->execute();
+
+        $this->json(['invitations' => $stmt->fetchAll()]);
+    }
 }

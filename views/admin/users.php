@@ -102,6 +102,31 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     await loadUsers();
 
+    // Load pending invitations
+    async function loadInvitations() {
+        const container = document.getElementById('invitationsList');
+        try {
+            const res = await App.api('users.invitations', {}, 'GET');
+            const invitations = res.invitations || [];
+            if (invitations.length === 0) {
+                container.innerHTML = '<p class="text-muted text-sm">No pending invitations.</p>';
+                return;
+            }
+            container.innerHTML = invitations.map(inv => `
+                <div class="invite-item">
+                    <div>
+                        <strong>${App.escapeHtml(inv.email)}</strong>
+                        <span class="text-muted text-sm" style="margin-left:8px;">Invited by ${App.escapeHtml(inv.invited_by_name)} &middot; Expires ${App.formatDate(inv.expires_at)}</span>
+                    </div>
+                    <span class="role-badge role-${inv.role}">${inv.role}</span>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = '<p class="text-muted text-sm">Failed to load invitations.</p>';
+        }
+    }
+    await loadInvitations();
+
     // Invite user
     document.getElementById('inviteUserBtn').addEventListener('click', () => {
         App.createModal('inviteModal', 'Invite User', `
@@ -132,6 +157,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     prompt('Email failed. Share this link manually:', res.invite_url);
                 }
                 App.closeModal('inviteModal');
+                loadInvitations();
             } catch (e) {
                 App.showToast(e.message, 'error');
             }
