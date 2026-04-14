@@ -5,6 +5,16 @@ const CardModal = {
     currentCard: null,
     boardMembers: [],
     boardLabels: [],
+    // Suppression: ignore SSE events for this card for a short window after local action
+    _suppressUntil: 0,
+
+    suppressSSE() {
+        this._suppressUntil = Date.now() + 3000; // 3 second window
+    },
+
+    isSuppressed() {
+        return Date.now() < this._suppressUntil;
+    },
 
     async open(cardId) {
         try {
@@ -67,9 +77,7 @@ const CardModal = {
 
     renderMembersSection() {
         const c = this.currentCard;
-        if (!c.assignees || c.assignees.length === 0) return '';
-
-        const chips = c.assignees.map(a => `
+        const chips = (c.assignees || []).map(a => `
             <span class="card-member-chip" data-user-id="${a.id}">
                 ${App.avatarHtml(a.display_name, 'sm')}
                 ${App.escapeHtml(a.display_name)}
@@ -83,16 +91,14 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <h3>Members</h3>
                 </div>
-                <div class="card-members">${chips}</div>
+                <div class="card-members" id="cardMembersList">${chips}</div>
             </div>
         `;
     },
 
     renderLabelsSection() {
         const c = this.currentCard;
-        if (!c.labels || c.labels.length === 0) return '';
-
-        const pills = c.labels.map(l => `
+        const pills = (c.labels || []).map(l => `
             <span class="card-label-pill" style="background:${l.color}">${App.escapeHtml(l.name || '')}</span>
         `).join('');
 
@@ -102,14 +108,14 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                     <h3>Labels</h3>
                 </div>
-                <div class="card-labels-list">${pills}</div>
+                <div class="card-labels-list" id="cardLabelsList">${pills}</div>
             </div>
         `;
     },
 
     renderDueDateSection() {
         const c = this.currentCard;
-        if (!c.due_date) return '';
+        if (!c.due_date) return '<div id="dueDateSection"></div>';
 
         const due = App.formatDueDate(c.due_date);
         const cls = c.due_complete ? 'complete' : due.class;
@@ -153,64 +159,45 @@ const CardModal = {
 
     renderChecklistsSection() {
         const c = this.currentCard;
-        if (!c.checklists || c.checklists.length === 0) return '';
+        if (!c.checklists || c.checklists.length === 0) return '<div id="checklistsContainer"></div>';
 
-        return c.checklists.map(cl => {
-            const total = cl.items.length;
-            const checked = cl.items.filter(i => i.is_checked).length;
-            const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+        const html = c.checklists.map(cl => this.renderSingleChecklist(cl)).join('');
+        return `<div id="checklistsContainer">${html}</div>`;
+    },
 
-            const items = cl.items.map(item => `
-                <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
-                    <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
-                    <span class="checklist-item-content">${App.escapeHtml(item.content)}</span>
-                    <button class="delete-item" data-item-id="${item.id}" data-checklist-id="${cl.id}">&times;</button>
+    renderSingleChecklist(cl) {
+        const total = cl.items.length;
+        const checked = cl.items.filter(i => i.is_checked).length;
+        const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+
+        const items = cl.items.map(item => `
+            <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
+                <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
+                <span class="checklist-item-content">${App.escapeHtml(item.content)}</span>
+                <button class="delete-item" data-item-id="${item.id}" data-checklist-id="${cl.id}">&times;</button>
+            </div>
+        `).join('');
+
+        return `
+            <div class="card-section checklist-section" data-checklist-id="${cl.id}">
+                <div class="card-section-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <h3>${App.escapeHtml(cl.title)}</h3>
+                    <button class="btn btn-sm btn-secondary delete-checklist" data-checklist-id="${cl.id}" style="margin-left:auto;">Delete</button>
                 </div>
-            `).join('');
-
-            return `
-                <div class="card-section checklist-section" data-checklist-id="${cl.id}">
-                    <div class="card-section-header">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                        <h3>${App.escapeHtml(cl.title)}</h3>
-                        <button class="btn btn-sm btn-secondary delete-checklist" data-checklist-id="${cl.id}" style="margin-left:auto;">Delete</button>
-                    </div>
-                    <div class="checklist-progress-bar"><div class="checklist-progress-fill" style="width:${pct}%"></div></div>
-                    ${items}
-                    <div class="add-checklist-item">
-                        <input type="text" placeholder="Add an item..." data-checklist-id="${cl.id}" class="add-item-input">
-                        <button class="btn btn-primary btn-sm add-item-btn" data-checklist-id="${cl.id}">Add</button>
-                    </div>
+                <div class="checklist-progress-bar"><div class="checklist-progress-fill" style="width:${pct}%"></div></div>
+                <div class="checklist-items-list" data-checklist-id="${cl.id}">${items}</div>
+                <div class="add-checklist-item">
+                    <input type="text" placeholder="Add an item..." data-checklist-id="${cl.id}" class="add-item-input">
+                    <button class="btn btn-primary btn-sm add-item-btn" data-checklist-id="${cl.id}">Add</button>
                 </div>
-            `;
-        }).join('');
+            </div>
+        `;
     },
 
     renderAttachmentsSection() {
         const c = this.currentCard;
-        if (!c.attachments || c.attachments.length === 0) return '';
-
-        const items = c.attachments.map(a => {
-            const thumb = a.is_image && a.thumbnail_path
-                ? `<img class="attachment-thumb lightbox-trigger" src="api.php?action=attachments.download&id=${a.id}&thumb=1" data-attachment-id="${a.id}" alt="">`
-                : `<div class="attachment-icon">${this.getFileExt(a.original_name)}</div>`;
-
-            const size = this.formatFileSize(a.file_size);
-
-            return `
-                <div class="attachment-item" data-attachment-id="${a.id}">
-                    ${thumb}
-                    <div class="attachment-info">
-                        <div class="attachment-name">${App.escapeHtml(a.original_name)}</div>
-                        <div class="attachment-meta">${size} &middot; ${App.formatDate(a.created_at)} &middot; ${App.escapeHtml(a.uploader_name)}</div>
-                    </div>
-                    <div class="attachment-actions">
-                        <a href="api.php?action=attachments.download&id=${a.id}" class="btn btn-sm btn-secondary" download>Download</a>
-                        <button class="btn btn-sm btn-danger delete-attachment" data-attachment-id="${a.id}">&times;</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        const items = (c.attachments || []).map(a => this.renderSingleAttachment(a)).join('');
 
         return `
             <div class="card-section" id="attachmentsSection">
@@ -218,14 +205,34 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                     <h3>Attachments</h3>
                 </div>
-                <div class="attachment-list">${items}</div>
+                <div class="attachment-list" id="attachmentsList">${items}</div>
             </div>
         `;
     },
 
-    renderCommentsSection() {
-        const c = this.currentCard;
-        const comments = (c.comments || []).map(cm => `
+    renderSingleAttachment(a) {
+        const thumb = a.is_image && a.thumbnail_path
+            ? `<img class="attachment-thumb lightbox-trigger" src="api.php?action=attachments.download&id=${a.id}&thumb=1" data-attachment-id="${a.id}" alt="">`
+            : `<div class="attachment-icon">${this.getFileExt(a.original_name)}</div>`;
+        const size = this.formatFileSize(a.file_size);
+
+        return `
+            <div class="attachment-item" data-attachment-id="${a.id}">
+                ${thumb}
+                <div class="attachment-info">
+                    <div class="attachment-name">${App.escapeHtml(a.original_name)}</div>
+                    <div class="attachment-meta">${size} &middot; ${App.formatDate(a.created_at)} &middot; ${App.escapeHtml(a.uploader_name || '')}</div>
+                </div>
+                <div class="attachment-actions">
+                    <a href="api.php?action=attachments.download&id=${a.id}" class="btn btn-sm btn-secondary" download>Download</a>
+                    <button class="btn btn-sm btn-danger delete-attachment" data-attachment-id="${a.id}">&times;</button>
+                </div>
+            </div>
+        `;
+    },
+
+    renderSingleComment(cm) {
+        return `
             <div class="comment-item" data-comment-id="${cm.id}">
                 ${App.avatarHtml(cm.author_name)}
                 <div class="comment-body">
@@ -240,7 +247,12 @@ const CardModal = {
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+    },
+
+    renderCommentsSection() {
+        const c = this.currentCard;
+        const comments = (c.comments || []).map(cm => this.renderSingleComment(cm)).join('');
 
         return `
             <div class="card-section" id="commentsSection">
@@ -267,7 +279,6 @@ const CardModal = {
         document.getElementById('closeCardModal').addEventListener('click', () => overlay.remove());
         document.addEventListener('keydown', function handler(e) {
             if (e.key === 'Escape' && document.getElementById('cardDetailModal')) {
-                // Don't close if lightbox is open
                 if (document.querySelector('.lightbox-overlay')) return;
                 overlay.remove();
                 document.removeEventListener('keydown', handler);
@@ -279,6 +290,7 @@ const CardModal = {
         titleEl.addEventListener('blur', async () => {
             const newTitle = titleEl.value.trim();
             if (newTitle && newTitle !== c.title) {
+                this.suppressSSE();
                 await App.api('cards.update', { id: c.id, title: newTitle });
                 c.title = newTitle;
                 this.refreshBoardCard();
@@ -307,6 +319,7 @@ const CardModal = {
 
         document.getElementById('saveDesc')?.addEventListener('click', async () => {
             const desc = descEdit.value.trim();
+            this.suppressSSE();
             await App.api('cards.update', { id: c.id, description: desc });
             c.description = desc;
             descEdit.style.display = 'none';
@@ -336,6 +349,7 @@ const CardModal = {
         // Due complete toggle
         document.getElementById('dueCompleteCheck')?.addEventListener('change', async (e) => {
             const complete = e.target.checked;
+            this.suppressSSE();
             await App.api('cards.update', { id: c.id, due_complete: complete });
             c.due_complete = complete;
             this.refreshBoardCard();
@@ -347,49 +361,36 @@ const CardModal = {
             if (e.key === 'Enter' && e.ctrlKey) this.addComment();
         });
 
-        // Delegated comment actions
+        // Delegated actions
         overlay.addEventListener('click', (e) => {
             const editBtn = e.target.closest('.edit-comment');
-            if (editBtn) this.editComment(parseInt(editBtn.dataset.commentId));
+            if (editBtn) { this.editComment(parseInt(editBtn.dataset.commentId)); return; }
 
             const deleteBtn = e.target.closest('.delete-comment');
-            if (deleteBtn) this.deleteComment(parseInt(deleteBtn.dataset.commentId));
+            if (deleteBtn) { this.deleteComment(parseInt(deleteBtn.dataset.commentId)); return; }
 
-            // Checklist item toggle
             const checkbox = e.target.closest('.checklist-item input[type="checkbox"]');
-            if (checkbox) this.toggleChecklistItem(parseInt(checkbox.dataset.itemId), parseInt(checkbox.dataset.checklistId), checkbox.checked);
+            if (checkbox) { this.toggleChecklistItem(parseInt(checkbox.dataset.itemId), parseInt(checkbox.dataset.checklistId), checkbox.checked); return; }
 
-            // Delete checklist item
             const delItem = e.target.closest('.delete-item');
-            if (delItem) this.deleteChecklistItem(parseInt(delItem.dataset.itemId), parseInt(delItem.dataset.checklistId));
+            if (delItem) { this.deleteChecklistItem(parseInt(delItem.dataset.itemId), parseInt(delItem.dataset.checklistId)); return; }
 
-            // Add checklist item
             const addItemBtn = e.target.closest('.add-item-btn');
-            if (addItemBtn) this.addChecklistItem(parseInt(addItemBtn.dataset.checklistId));
+            if (addItemBtn) { this.addChecklistItem(parseInt(addItemBtn.dataset.checklistId)); return; }
 
-            // Delete checklist
             const delCl = e.target.closest('.delete-checklist');
-            if (delCl) this.deleteChecklist(parseInt(delCl.dataset.checklistId));
+            if (delCl) { this.deleteChecklist(parseInt(delCl.dataset.checklistId)); return; }
 
-            // Delete attachment
             const delAtt = e.target.closest('.delete-attachment');
-            if (delAtt) this.deleteAttachment(parseInt(delAtt.dataset.attachmentId));
+            if (delAtt) { this.deleteAttachment(parseInt(delAtt.dataset.attachmentId)); return; }
 
-            // Lightbox trigger
             const lightboxTrigger = e.target.closest('.lightbox-trigger');
-            if (lightboxTrigger) {
-                e.preventDefault();
-                this.openLightbox(parseInt(lightboxTrigger.dataset.attachmentId));
-            }
+            if (lightboxTrigger) { e.preventDefault(); this.openLightbox(parseInt(lightboxTrigger.dataset.attachmentId)); return; }
 
-            // Remove member
             const removeMember = e.target.closest('.card-member-chip .remove');
-            if (removeMember) {
-                this.unassignMember(parseInt(removeMember.dataset.userId));
-            }
+            if (removeMember) { this.unassignMember(parseInt(removeMember.dataset.userId)); return; }
         });
 
-        // Add checklist item on Enter
         overlay.addEventListener('keydown', (e) => {
             if (e.target.matches('.add-item-input') && e.key === 'Enter') {
                 e.preventDefault();
@@ -406,20 +407,32 @@ const CardModal = {
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
     },
 
-    // ---- Comments ----
+    // ---- Comments (local DOM updates) ----
     async addComment() {
         const textarea = document.getElementById('newComment');
         const body = textarea.value.trim();
         if (!body) return;
 
+        this.suppressSSE();
         try {
-            const res = await App.api('comments.create', {
-                card_id: this.currentCard.id,
-                body: body,
-            });
+            const res = await App.api('comments.create', { card_id: this.currentCard.id, body });
             if (res.success) {
+                const newComment = {
+                    id: res.comment_id,
+                    body: body,
+                    author_name: document.querySelector('.user-name')?.textContent || 'You',
+                    created_at: new Date().toISOString(),
+                    is_edited: false,
+                };
+                this.currentCard.comments = this.currentCard.comments || [];
+                this.currentCard.comments.unshift(newComment);
+                // Insert into DOM
+                const list = document.getElementById('commentsList');
+                const emptyMsg = list.querySelector('.text-muted');
+                if (emptyMsg) emptyMsg.remove();
+                list.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment));
                 textarea.value = '';
-                this.open(this.currentCard.id); // Refresh
+                this.refreshBoardCard();
             }
         } catch (e) {
             App.showToast(e.message, 'error');
@@ -441,15 +454,18 @@ const CardModal = {
             </div>
         `;
 
-        const textarea = commentEl.querySelector('textarea');
-        textarea.focus();
+        const editArea = commentEl.querySelector('textarea');
+        editArea.focus();
 
         commentEl.querySelector('.save-edit-comment').addEventListener('click', async () => {
-            const newBody = textarea.value.trim();
+            const newBody = editArea.value.trim();
             if (!newBody) return;
+            this.suppressSSE();
             try {
                 await App.api('comments.update', { id: commentId, body: newBody });
-                this.open(this.currentCard.id);
+                comment.body = newBody;
+                comment.is_edited = true;
+                commentEl.textContent = newBody;
             } catch (e) {
                 App.showToast(e.message, 'error');
             }
@@ -461,48 +477,58 @@ const CardModal = {
     },
 
     async deleteComment(commentId) {
+        this.suppressSSE();
         try {
             await App.api('comments.delete', { id: commentId });
-            this.open(this.currentCard.id);
+            this.currentCard.comments = this.currentCard.comments.filter(cm => cm.id !== commentId);
+            document.querySelector(`.comment-item[data-comment-id="${commentId}"]`)?.remove();
+            this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
-    // ---- Checklists ----
+    // ---- Checklists (local DOM updates) ----
     async addChecklist() {
         const title = prompt('Checklist title:', 'Checklist');
         if (!title) return;
 
+        this.suppressSSE();
         try {
-            await App.api('checklists.create', { card_id: this.currentCard.id, title });
-            this.open(this.currentCard.id);
+            const res = await App.api('checklists.create', { card_id: this.currentCard.id, title });
+            if (res.success) {
+                const newCl = { id: res.checklist_id, title, items: [], position: (this.currentCard.checklists || []).length };
+                this.currentCard.checklists = this.currentCard.checklists || [];
+                this.currentCard.checklists.push(newCl);
+                const container = document.getElementById('checklistsContainer');
+                container.insertAdjacentHTML('beforeend', this.renderSingleChecklist(newCl));
+                this.refreshBoardCard();
+            }
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
     async deleteChecklist(checklistId) {
+        this.suppressSSE();
         try {
             await App.api('checklists.delete', { id: checklistId });
-            this.open(this.currentCard.id);
+            this.currentCard.checklists = this.currentCard.checklists.filter(cl => cl.id !== checklistId);
+            document.querySelector(`.checklist-section[data-checklist-id="${checklistId}"]`)?.remove();
+            this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
     async toggleChecklistItem(itemId, checklistId, checked) {
+        this.suppressSSE();
         try {
             await App.api('checklists.toggle_item', { id: itemId, is_checked: checked });
-            // Update local state
             for (const cl of this.currentCard.checklists) {
                 const item = cl.items.find(i => i.id === itemId);
-                if (item) {
-                    item.is_checked = checked ? 1 : 0;
-                    break;
-                }
+                if (item) { item.is_checked = checked ? 1 : 0; break; }
             }
-            // Update progress bar
             const section = document.querySelector(`.checklist-section[data-checklist-id="${checklistId}"]`);
             if (section) {
                 const items = section.querySelectorAll('.checklist-item input[type="checkbox"]');
@@ -510,7 +536,6 @@ const CardModal = {
                 const done = Array.from(items).filter(i => i.checked).length;
                 const pct = total > 0 ? Math.round((done / total) * 100) : 0;
                 section.querySelector('.checklist-progress-fill').style.width = pct + '%';
-                // Toggle line-through
                 const itemEl = section.querySelector(`.checklist-item[data-item-id="${itemId}"]`);
                 if (itemEl) itemEl.classList.toggle('checked', checked);
             }
@@ -525,25 +550,65 @@ const CardModal = {
         const content = input.value.trim();
         if (!content) return;
 
+        this.suppressSSE();
         try {
-            await App.api('checklists.add_item', { checklist_id: checklistId, content });
-            input.value = '';
-            this.open(this.currentCard.id);
+            const res = await App.api('checklists.add_item', { checklist_id: checklistId, content });
+            if (res.success) {
+                const newItem = { id: res.item_id, content, is_checked: 0, position: 0 };
+                const cl = this.currentCard.checklists.find(c => c.id === checklistId);
+                if (cl) cl.items.push(newItem);
+                // Insert into DOM
+                const itemsContainer = document.querySelector(`.checklist-items-list[data-checklist-id="${checklistId}"]`);
+                if (itemsContainer) {
+                    itemsContainer.insertAdjacentHTML('beforeend', `
+                        <div class="checklist-item" data-item-id="${newItem.id}">
+                            <input type="checkbox" data-item-id="${newItem.id}" data-checklist-id="${checklistId}">
+                            <span class="checklist-item-content">${App.escapeHtml(content)}</span>
+                            <button class="delete-item" data-item-id="${newItem.id}" data-checklist-id="${checklistId}">&times;</button>
+                        </div>
+                    `);
+                }
+                // Update progress bar
+                const section = document.querySelector(`.checklist-section[data-checklist-id="${checklistId}"]`);
+                if (section) {
+                    const items = section.querySelectorAll('.checklist-item input[type="checkbox"]');
+                    const total = items.length;
+                    const done = Array.from(items).filter(i => i.checked).length;
+                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                    section.querySelector('.checklist-progress-fill').style.width = pct + '%';
+                }
+                input.value = '';
+                input.focus();
+                this.refreshBoardCard();
+            }
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
     async deleteChecklistItem(itemId, checklistId) {
+        this.suppressSSE();
         try {
             await App.api('checklists.delete_item', { id: itemId });
-            this.open(this.currentCard.id);
+            const cl = this.currentCard.checklists.find(c => c.id === checklistId);
+            if (cl) cl.items = cl.items.filter(i => i.id !== itemId);
+            document.querySelector(`.checklist-item[data-item-id="${itemId}"]`)?.remove();
+            // Update progress bar
+            const section = document.querySelector(`.checklist-section[data-checklist-id="${checklistId}"]`);
+            if (section) {
+                const items = section.querySelectorAll('.checklist-item input[type="checkbox"]');
+                const total = items.length;
+                const done = Array.from(items).filter(i => i.checked).length;
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                section.querySelector('.checklist-progress-fill').style.width = pct + '%';
+            }
+            this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
-    // ---- Attachments ----
+    // ---- Attachments (local DOM updates) ----
     triggerAttachmentUpload() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -553,6 +618,7 @@ const CardModal = {
     },
 
     async uploadFiles(files) {
+        this.suppressSSE();
         for (const file of files) {
             const formData = new FormData();
             formData.append('file', file);
@@ -561,18 +627,30 @@ const CardModal = {
             try {
                 const res = await App.upload('attachments.upload', formData);
                 if (res.error) throw new Error(res.error);
+                if (res.attachment) {
+                    const a = res.attachment;
+                    a.uploader_name = document.querySelector('.user-name')?.textContent || 'You';
+                    a.created_at = new Date().toISOString();
+                    this.currentCard.attachments = this.currentCard.attachments || [];
+                    this.currentCard.attachments.unshift(a);
+                    const list = document.getElementById('attachmentsList');
+                    if (list) list.insertAdjacentHTML('afterbegin', this.renderSingleAttachment(a));
+                }
                 App.showToast('File uploaded', 'success');
             } catch (e) {
                 App.showToast(e.message || 'Upload failed', 'error');
             }
         }
-        this.open(this.currentCard.id);
+        this.refreshBoardCard();
     },
 
     async deleteAttachment(attachmentId) {
+        this.suppressSSE();
         try {
             await App.api('attachments.delete', { id: attachmentId });
-            this.open(this.currentCard.id);
+            this.currentCard.attachments = (this.currentCard.attachments || []).filter(a => a.id !== attachmentId);
+            document.querySelector(`.attachment-item[data-attachment-id="${attachmentId}"]`)?.remove();
+            this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
@@ -625,9 +703,9 @@ const CardModal = {
         document.addEventListener('keydown', keyHandler);
     },
 
-    // ---- Members ----
+    // ---- Members (local DOM updates) ----
     showMemberPicker() {
-        const assignedIds = this.currentCard.assignees.map(a => a.id);
+        const assignedIds = (this.currentCard.assignees || []).map(a => a.id);
 
         const items = this.boardMembers.map(m => `
             <div class="member-picker-item ${assignedIds.includes(m.id) ? 'selected' : ''}" data-user-id="${m.id}">
@@ -643,14 +721,20 @@ const CardModal = {
             el.addEventListener('click', async () => {
                 const userId = parseInt(el.dataset.userId);
                 const isAssigned = assignedIds.includes(userId);
+                this.suppressSSE();
                 try {
                     if (isAssigned) {
                         await App.api('cards.unassign', { card_id: this.currentCard.id, user_id: userId });
+                        this.currentCard.assignees = this.currentCard.assignees.filter(a => a.id !== userId);
                     } else {
                         await App.api('cards.assign', { card_id: this.currentCard.id, user_id: userId });
+                        const member = this.boardMembers.find(m => m.id === userId);
+                        if (member) this.currentCard.assignees.push({ id: member.id, display_name: member.display_name });
                     }
                     modal.remove();
-                    this.open(this.currentCard.id);
+                    // Update members DOM
+                    this.updateMembersDOM();
+                    this.refreshBoardCard();
                 } catch (e) {
                     App.showToast(e.message, 'error');
                 }
@@ -659,17 +743,33 @@ const CardModal = {
     },
 
     async unassignMember(userId) {
+        this.suppressSSE();
         try {
             await App.api('cards.unassign', { card_id: this.currentCard.id, user_id: userId });
-            this.open(this.currentCard.id);
+            this.currentCard.assignees = this.currentCard.assignees.filter(a => a.id !== userId);
+            this.updateMembersDOM();
+            this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
-    // ---- Labels ----
+    updateMembersDOM() {
+        const container = document.getElementById('cardMembersList');
+        if (!container) return;
+        const chips = (this.currentCard.assignees || []).map(a => `
+            <span class="card-member-chip" data-user-id="${a.id}">
+                ${App.avatarHtml(a.display_name, 'sm')}
+                ${App.escapeHtml(a.display_name)}
+                <span class="remove" data-user-id="${a.id}">&times;</span>
+            </span>
+        `).join('');
+        container.innerHTML = chips;
+    },
+
+    // ---- Labels (local DOM updates) ----
     showLabelPicker() {
-        const cardLabelIds = this.currentCard.labels.map(l => l.id);
+        const cardLabelIds = (this.currentCard.labels || []).map(l => l.id);
 
         const items = this.boardLabels.map(l => `
             <div class="label-picker-item" data-label-id="${l.id}">
@@ -686,19 +786,33 @@ const CardModal = {
             el.addEventListener('click', async () => {
                 const labelId = parseInt(el.dataset.labelId);
                 const isAttached = cardLabelIds.includes(labelId);
+                this.suppressSSE();
                 try {
                     if (isAttached) {
                         await App.api('labels.detach', { card_id: this.currentCard.id, label_id: labelId });
+                        this.currentCard.labels = this.currentCard.labels.filter(l => l.id !== labelId);
                     } else {
                         await App.api('labels.attach', { card_id: this.currentCard.id, label_id: labelId });
+                        const label = this.boardLabels.find(l => l.id === labelId);
+                        if (label) this.currentCard.labels.push({ ...label });
                     }
                     modal.remove();
-                    this.open(this.currentCard.id);
+                    this.updateLabelsDOM();
+                    this.refreshBoardCard();
                 } catch (e) {
                     App.showToast(e.message, 'error');
                 }
             });
         });
+    },
+
+    updateLabelsDOM() {
+        const container = document.getElementById('cardLabelsList');
+        if (!container) return;
+        const pills = (this.currentCard.labels || []).map(l => `
+            <span class="card-label-pill" style="background:${l.color}">${App.escapeHtml(l.name || '')}</span>
+        `).join('');
+        container.innerHTML = pills;
     },
 
     // ---- Due Date ----
@@ -718,28 +832,65 @@ const CardModal = {
         document.getElementById('saveDueDate').addEventListener('click', async () => {
             const val = document.getElementById('dueDateInput').value;
             if (!val) return;
+            this.suppressSSE();
             try {
                 await App.api('cards.update', { id: this.currentCard.id, due_date: val });
+                this.currentCard.due_date = val;
                 modal.remove();
-                this.open(this.currentCard.id);
+                this.updateDueDateDOM();
+                this.refreshBoardCard();
             } catch (e) {
                 App.showToast(e.message, 'error');
             }
         });
 
         document.getElementById('removeDueDate').addEventListener('click', async () => {
+            this.suppressSSE();
             try {
                 await App.api('cards.update', { id: this.currentCard.id, due_date: null });
+                this.currentCard.due_date = null;
                 modal.remove();
-                this.open(this.currentCard.id);
+                this.updateDueDateDOM();
+                this.refreshBoardCard();
             } catch (e) {
                 App.showToast(e.message, 'error');
             }
         });
     },
 
+    updateDueDateDOM() {
+        const section = document.getElementById('dueDateSection');
+        if (!section) return;
+        const c = this.currentCard;
+        if (!c.due_date) {
+            section.innerHTML = '';
+            return;
+        }
+        const due = App.formatDueDate(c.due_date);
+        const cls = c.due_complete ? 'complete' : due.class;
+        section.innerHTML = `
+            <div class="card-section-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+                <h3>Due Date</h3>
+            </div>
+            <label class="due-date-display ${cls}" style="cursor:pointer;">
+                <input type="checkbox" ${c.due_complete ? 'checked' : ''} id="dueCompleteCheck" style="margin-right:4px;">
+                ${new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </label>
+        `;
+        // Re-bind checkbox
+        document.getElementById('dueCompleteCheck')?.addEventListener('change', async (e) => {
+            const complete = e.target.checked;
+            this.suppressSSE();
+            await App.api('cards.update', { id: c.id, due_complete: complete });
+            c.due_complete = complete;
+            this.refreshBoardCard();
+        });
+    },
+
     // ---- Archive ----
     async archiveCard() {
+        this.suppressSSE();
         try {
             await App.api('cards.archive', { id: this.currentCard.id });
             document.getElementById('cardDetailModal')?.remove();
@@ -752,10 +903,9 @@ const CardModal = {
 
     // ---- Helpers ----
     refreshBoardCard() {
-        // Update the card in the board view
         if (Board.data) {
             for (const list of Board.data.lists) {
-                const idx = list.cards.findIndex(c => c.id === this.currentCard.id);
+                const idx = list.cards.findIndex(c => parseInt(c.id) === parseInt(this.currentCard.id));
                 if (idx !== -1) {
                     Object.assign(list.cards[idx], this.currentCard);
                     Board.renderLists();

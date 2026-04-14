@@ -5,7 +5,6 @@ const SSEClient = {
     source: null,
     boardId: null,
     reconnectAttempts: 0,
-    maxReconnectDelay: 30000,
 
     connect(boardId) {
         this.boardId = boardId;
@@ -18,13 +17,15 @@ const SSEClient = {
             this.reconnectAttempts = 0;
         });
 
-        // Board events
+        // Board-level events (always process — these affect the board view)
         this.source.addEventListener('card_created', (e) => {
             Board.handleCardCreated(JSON.parse(e.data));
         });
 
         this.source.addEventListener('card_updated', (e) => {
-            Board.handleCardUpdated(JSON.parse(e.data));
+            if (!CardModal.isSuppressed()) {
+                Board.handleCardUpdated(JSON.parse(e.data));
+            }
         });
 
         this.source.addEventListener('card_moved', (e) => {
@@ -51,33 +52,57 @@ const SSEClient = {
             Board.handleListArchived(JSON.parse(e.data));
         });
 
+        // Card sub-item events — only refresh modal if it's from another user (not suppressed)
         this.source.addEventListener('comment_added', (e) => {
-            // If the card modal is open for this card, refresh it
+            if (CardModal.isSuppressed()) return;
             const data = JSON.parse(e.data);
-            if (CardModal.currentCard && CardModal.currentCard.id === data.card_id) {
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
+                CardModal.open(data.card_id);
+            }
+        });
+
+        this.source.addEventListener('comment_updated', (e) => {
+            if (CardModal.isSuppressed()) return;
+            const data = JSON.parse(e.data);
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
+                CardModal.open(data.card_id);
+            }
+        });
+
+        this.source.addEventListener('comment_deleted', (e) => {
+            if (CardModal.isSuppressed()) return;
+            const data = JSON.parse(e.data);
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
                 CardModal.open(data.card_id);
             }
         });
 
         this.source.addEventListener('checklist_changed', (e) => {
+            if (CardModal.isSuppressed()) return;
             const data = JSON.parse(e.data);
-            if (CardModal.currentCard && CardModal.currentCard.id === data.card_id) {
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
                 CardModal.open(data.card_id);
             }
         });
 
         this.source.addEventListener('attachment_added', (e) => {
+            if (CardModal.isSuppressed()) return;
             const data = JSON.parse(e.data);
-            if (CardModal.currentCard && CardModal.currentCard.id === data.card_id) {
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
                 CardModal.open(data.card_id);
             }
         });
 
         this.source.addEventListener('attachment_deleted', (e) => {
+            if (CardModal.isSuppressed()) return;
             const data = JSON.parse(e.data);
-            if (CardModal.currentCard && CardModal.currentCard.id === data.card_id) {
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
                 CardModal.open(data.card_id);
             }
+        });
+
+        this.source.addEventListener('label_changed', (e) => {
+            if (CardModal.isSuppressed()) return;
         });
 
         // Notification count updates
@@ -87,7 +112,6 @@ const SSEClient = {
         });
 
         this.source.onerror = () => {
-            // EventSource auto-reconnects, but we track for exponential backoff logging
             this.reconnectAttempts++;
         };
     },
