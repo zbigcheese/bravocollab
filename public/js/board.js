@@ -245,23 +245,26 @@ const Board = {
     },
 
     findCardData(cardId) {
+        cardId = parseInt(cardId);
         for (const list of this.data.lists) {
-            const card = list.cards.find(c => c.id === cardId);
+            const card = list.cards.find(c => parseInt(c.id) === cardId);
             if (card) return card;
         }
         return null;
     },
 
     updateCardInData(cardId, newListId, newPosition) {
+        cardId = parseInt(cardId);
+        newListId = parseInt(newListId);
         // Remove from old list
         for (const list of this.data.lists) {
-            const idx = list.cards.findIndex(c => c.id === cardId);
+            const idx = list.cards.findIndex(c => parseInt(c.id) === cardId);
             if (idx !== -1) {
                 const [card] = list.cards.splice(idx, 1);
                 card.list_id = newListId;
                 card.position = newPosition;
                 // Add to new list
-                const targetList = this.data.lists.find(l => l.id === newListId);
+                const targetList = this.data.lists.find(l => parseInt(l.id) === newListId);
                 if (targetList) {
                     targetList.cards.push(card);
                     targetList.cards.sort((a, b) => a.position - b.position);
@@ -563,20 +566,26 @@ const Board = {
         }
     },
 
-    // SSE event handlers
+    // SSE event handlers — coerce IDs to int since SSE JSON may deliver strings
     handleCardCreated(data) {
-        const list = this.data.lists.find(l => l.id === data.card.list_id);
-        if (list && !list.cards.find(c => c.id === data.card.id)) {
+        const cardId = parseInt(data.card.id);
+        const listId = parseInt(data.card.list_id);
+        const list = this.data.lists.find(l => parseInt(l.id) === listId);
+        if (list && !list.cards.find(c => parseInt(c.id) === cardId)) {
+            data.card.id = cardId;
+            data.card.list_id = listId;
             list.cards.push(data.card);
             this.renderLists();
         }
     },
 
     handleCardUpdated(data) {
+        const cardId = parseInt(data.card?.id || data.card_id);
+        if (!cardId) return;
         for (const list of this.data.lists) {
-            const idx = list.cards.findIndex(c => c.id === data.card.id);
+            const idx = list.cards.findIndex(c => parseInt(c.id) === cardId);
             if (idx !== -1) {
-                Object.assign(list.cards[idx], data.card);
+                if (data.card) Object.assign(list.cards[idx], data.card);
                 this.renderLists();
                 break;
             }
@@ -584,19 +593,30 @@ const Board = {
     },
 
     handleCardMoved(data) {
-        this.updateCardInData(data.card_id, data.target_list_id, data.position);
+        const cardId = parseInt(data.card_id);
+        const targetListId = parseInt(data.target_list_id);
+        const position = parseInt(data.position);
+
+        // Skip if card is already in the target list at roughly the right position
+        const targetList = this.data.lists.find(l => parseInt(l.id) === targetListId);
+        const alreadyThere = targetList?.cards.find(c => parseInt(c.id) === cardId && parseInt(c.list_id) === targetListId);
+        if (alreadyThere) return;
+
+        this.updateCardInData(cardId, targetListId, position);
         this.renderLists();
     },
 
     handleCardArchived(data) {
+        const cardId = parseInt(data.card_id);
         for (const list of this.data.lists) {
-            list.cards = list.cards.filter(c => c.id !== data.card_id);
+            list.cards = list.cards.filter(c => parseInt(c.id) !== cardId);
         }
         this.renderLists();
     },
 
     handleListCreated(data) {
-        if (!this.data.lists.find(l => l.id === data.list.id)) {
+        const listId = parseInt(data.list.id);
+        if (!this.data.lists.find(l => parseInt(l.id) === listId)) {
             this.data.lists.push(data.list);
             this.renderLists();
         }
