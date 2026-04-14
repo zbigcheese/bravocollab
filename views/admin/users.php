@@ -42,7 +42,15 @@
 .role-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
 .role-admin { background: #E4F0F6; color: #0079BF; }
 .role-member { background: var(--color-bg); color: var(--color-text-light); }
-.invite-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-bg); font-size: 14px; }
+.invite-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+.invite-item:last-child { border-bottom: none; }
+.board-picker-list { display: flex; flex-direction: column; gap: 2px; }
+.board-picker-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.1s; user-select: none; }
+.board-picker-item:hover { background: var(--color-bg); }
+.board-picker-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--color-primary); }
+.board-picker-swatch { width: 24px; height: 18px; border-radius: 3px; flex-shrink: 0; }
+.board-picker-name { font-size: 14px; font-weight: 500; }
+.board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
 </style>
 
 <script>
@@ -110,14 +118,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch(e) {}
 
     function boardCheckboxes(selectedIds = []) {
-        if (allBoards.length === 0) return '<p class="text-muted text-sm">No boards yet.</p>';
-        return allBoards.map(b => `
-            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer;">
+        if (allBoards.length === 0) return '<p class="text-muted text-sm">No boards created yet.</p>';
+        return '<div class="board-picker-list">' + allBoards.map(b => `
+            <label class="board-picker-item">
                 <input type="checkbox" value="${b.id}" class="board-checkbox" ${selectedIds.includes(parseInt(b.id)) ? 'checked' : ''}>
-                <span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${App.escapeHtml(b.background_color)};flex-shrink:0;"></span>
-                ${App.escapeHtml(b.title)}
+                <span class="board-picker-swatch" style="background:${App.escapeHtml(b.background_color || '#0079BF')}"></span>
+                <span class="board-picker-name">${App.escapeHtml(b.title)}</span>
             </label>
-        `).join('');
+        `).join('') + '</div>';
     }
 
     function getCheckedBoardIds(container) {
@@ -135,20 +143,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 return;
             }
             container.innerHTML = invitations.map(inv => {
-                const boardNames = (inv.boards || []).map(b => App.escapeHtml(b.title));
-                const boardBadges = boardNames.length > 0
-                    ? boardNames.map(n => `<span style="display:inline-block;background:var(--color-primary-light);color:var(--color-primary);padding:1px 6px;border-radius:3px;font-size:11px;margin-right:4px;">${n}</span>`).join('')
-                    : '<span class="text-muted text-sm">No boards</span>';
+                const boards = inv.boards || [];
+                const boardBadges = boards.length > 0
+                    ? boards.map(b => `<span class="board-badge" style="background:${App.escapeHtml(b.background_color || '#0079BF')}">${App.escapeHtml(b.title)}</span>`).join('')
+                    : '<span class="text-muted text-sm">No boards assigned</span>';
                 return `
                     <div class="invite-item" style="flex-wrap:wrap;gap:8px;">
                         <div style="flex:1;min-width:200px;">
-                            <strong>${App.escapeHtml(inv.email)}</strong>
-                            <span class="text-muted text-sm" style="margin-left:8px;">by ${App.escapeHtml(inv.invited_by_name)}</span>
-                            <div style="margin-top:4px;">${boardBadges}</div>
+                            <div><strong>${App.escapeHtml(inv.email)}</strong> <span class="role-badge role-${inv.role}" style="margin-left:4px;">${inv.role}</span></div>
+                            <div class="text-muted text-sm" style="margin-top:2px;">Invited by ${App.escapeHtml(inv.invited_by_name)}</div>
+                            <div style="margin-top:6px;">${boardBadges}</div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <span class="role-badge role-${inv.role}">${inv.role}</span>
-                            <button class="btn btn-sm btn-secondary edit-inv-boards" data-inv-id="${inv.id}" data-board-ids="${(inv.boards||[]).map(b=>b.id).join(',')}">Boards</button>
+                        <div style="display:flex;align-items:flex-start;gap:6px;">
+                            <button class="btn btn-sm btn-secondary edit-inv-boards" data-inv-id="${inv.id}" data-board-ids="${boards.map(b=>b.id).join(',')}">Assign Boards</button>
                         </div>
                     </div>
                 `;
@@ -179,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 });
             });
         } catch (e) {
-            container.innerHTML = '<p class="text-muted text-sm">Failed to load invitations.</p>';
+            container.innerHTML = `<p class="text-muted text-sm">Failed to load invitations. ${App.escapeHtml(e.message || '')}</p>`;
         }
     }
     await loadInvitations();
@@ -200,7 +207,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>
             <div class="form-group">
                 <label>Assign to Boards</label>
-                <div id="inviteBoardCheckboxes" style="max-height:200px;overflow-y:auto;border:1px solid var(--color-border);border-radius:4px;padding:8px;">
+                <div id="inviteBoardCheckboxes" style="max-height:240px;overflow-y:auto;">
                     ${boardCheckboxes()}
                 </div>
             </div>

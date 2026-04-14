@@ -194,15 +194,19 @@ class UserController extends Controller
         $stmt->execute();
         $invitations = $stmt->fetchAll();
 
-        // Attach board names to each invitation
+        // Attach board names to each invitation (graceful if table doesn't exist yet)
         foreach ($invitations as &$inv) {
-            $bStmt = $db->prepare(
-                'SELECT b.id, b.title FROM invitation_boards ib
-                 JOIN boards b ON ib.board_id = b.id
-                 WHERE ib.invitation_id = :iid'
-            );
-            $bStmt->execute(['iid' => $inv['id']]);
-            $inv['boards'] = $bStmt->fetchAll();
+            try {
+                $bStmt = $db->prepare(
+                    'SELECT b.id, b.title, b.background_color FROM invitation_boards ib
+                     JOIN boards b ON ib.board_id = b.id
+                     WHERE ib.invitation_id = :iid'
+                );
+                $bStmt->execute(['iid' => $inv['id']]);
+                $inv['boards'] = $bStmt->fetchAll();
+            } catch (PDOException $e) {
+                $inv['boards'] = [];
+            }
         }
 
         $this->json(['invitations' => $invitations]);
