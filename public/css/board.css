@@ -420,6 +420,7 @@
     min-width: 280px;
     width: 280px;
     flex-shrink: 0;
+    margin-left: 12px;
 }
 
 .add-list-btn {
