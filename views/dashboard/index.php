@@ -13,7 +13,7 @@
 </div>
 
 <script>
-(async function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const grid = document.getElementById('boardGrid');
 
     try {
@@ -85,5 +85,5 @@
             }
         });
     });
-})();
+});
 </script>

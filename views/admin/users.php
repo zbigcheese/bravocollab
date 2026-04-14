@@ -46,7 +46,7 @@
 </style>
 
 <script>
-(async function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Load users
     async function loadUsers() {
         const res = await App.api('users.list', {}, 'GET');
@@ -137,5 +137,5 @@
             }
         });
     });
-})();
+});
 </script>
