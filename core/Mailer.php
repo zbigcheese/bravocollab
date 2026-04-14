@@ -34,7 +34,7 @@ class Mailer
             'Content-Type: text/html; charset=UTF-8',
             'From: ' . $config['mail_from_name'] . ' <' . $config['mail_from'] . '>',
             'Reply-To: ' . $config['mail_from'],
-            'X-Mailer: BravoOrganizer',
+            'X-Mailer: BravoCollab',
         ];
 
         return @mail($to, $subject, $htmlBody, implode("\r\n", $headers));

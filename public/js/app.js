@@ -1,5 +1,5 @@
 /**
- * BravoOrganizer - Global Utilities
+ * BravoCollab - Global Utilities
  */
 const App = {
     csrfToken: document.querySelector('meta[name="csrf-token"]')?.content || '',

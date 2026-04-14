@@ -1,5 +1,5 @@
 /**
- * BravoOrganizer - Card Detail Modal
+ * BravoCollab - Card Detail Modal
  */
 const CardModal = {
     currentCard: null,

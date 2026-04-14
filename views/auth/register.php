@@ -21,7 +21,7 @@ if (!$invitation) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - BravoOrganizer</title>
+    <title>Register - BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/auth.css">
 </head>
@@ -29,7 +29,7 @@ if (!$invitation) {
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <h1>BravoOrganizer</h1>
+                <h1>BravoCollab</h1>
                 <p>Create your account</p>
             </div>
             <?php if ($error): ?>

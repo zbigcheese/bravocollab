@@ -1,4 +1,4 @@
--- BravoOrganizer Database Schema
+-- BravoCollab Database Schema
 -- Run this in phpMyAdmin or MySQL CLI to set up the database
 
 SET NAMES utf8mb4;

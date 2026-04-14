@@ -1,6 +1,6 @@
 <?php
 /**
- * BravoOrganizer API Entry Point
+ * BravoCollab API Entry Point
  * All AJAX calls go through here: api.php?action=controller.method
  */
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - BravoOrganizer</title>
+    <title>Login - BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/auth.css">
 </head>
@@ -11,7 +11,7 @@
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <h1>BravoOrganizer</h1>
+                <h1>BravoCollab</h1>
                 <p>Sign in to your account</p>
             </div>
             <form id="loginForm" class="auth-form">

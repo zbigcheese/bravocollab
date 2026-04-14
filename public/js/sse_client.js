@@ -1,5 +1,5 @@
 /**
- * BravoOrganizer - SSE Client
+ * BravoCollab - SSE Client
  */
 const SSEClient = {
     source: null,

@@ -1,6 +1,6 @@
 <?php
 /**
- * BravoOrganizer - Server-Sent Events Endpoint
+ * BravoCollab - Server-Sent Events Endpoint
  * Usage: sse.php?board_id=X
  */
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * BravoOrganizer - Cron Job
+ * BravoCollab - Cron Job
  * Run every 15 minutes: */15 * * * * /usr/bin/php /path/to/cron.php
  *
  * Tasks:

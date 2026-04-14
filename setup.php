@@ -1,6 +1,6 @@
 <?php
 /**
- * BravoOrganizer - Setup Script
+ * BravoCollab - Setup Script
  * Run this once after importing schema.sql to create the initial admin user.
  * DELETE THIS FILE after setup is complete.
  *
@@ -65,7 +65,7 @@ if (!$isCli):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BravoOrganizer Setup</title>
+    <title>BravoCollab Setup</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/auth.css">
 </head>
@@ -73,7 +73,7 @@ if (!$isCli):
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
-                <h1>BravoOrganizer</h1>
+                <h1>BravoCollab</h1>
                 <p>Initial Setup</p>
             </div>
 

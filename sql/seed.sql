@@ -1,4 +1,4 @@
--- BravoOrganizer Seed Data
+-- BravoCollab Seed Data
 -- RECOMMENDED: Use setup.php instead to create the admin user with a proper password hash.
 -- This file is provided as a fallback only.
 --

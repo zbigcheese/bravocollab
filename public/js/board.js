@@ -1,5 +1,5 @@
 /**
- * BravoOrganizer - Board View
+ * BravoCollab - Board View
  */
 const Board = {
     boardId: null,

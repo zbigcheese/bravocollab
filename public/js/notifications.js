@@ -1,5 +1,5 @@
 /**
- * BravoOrganizer - Notifications
+ * BravoCollab - Notifications
  */
 const Notifications = {
     pollInterval: null,

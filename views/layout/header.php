@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php echo CSRF::metaTag(); ?>
-    <title>BravoOrganizer</title>
+    <title>BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/board.css">
     <link rel="stylesheet" href="public/css/modal.css">
@@ -12,7 +12,7 @@
 <body>
     <nav class="navbar">
         <div class="navbar-left">
-            <a href="index.php?page=dashboard" class="navbar-brand">BravoOrganizer</a>
+            <a href="index.php?page=dashboard" class="navbar-brand">BravoCollab</a>
         </div>
         <div class="navbar-right">
             <?php if (Auth::isAdmin()): ?>

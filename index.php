@@ -1,6 +1,6 @@
 <?php
 /**
- * BravoOrganizer Page Router
+ * BravoCollab Page Router
  * Serves HTML pages: index.php?page=dashboard, index.php?page=board&id=5, etc.
  */
 
