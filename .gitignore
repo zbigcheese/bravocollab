@@ -13,6 +13,9 @@ config/config.php
 Thumbs.db
 desktop.ini
 
+# Claude Code
+.claude/
+
 # IDE
 .idea/
 .vscode/
