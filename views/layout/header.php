@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php echo CSRF::metaTag(); ?>
+    <link rel="icon" type="image/png" href="public/img/favicon.png">
     <title>BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/board.css">

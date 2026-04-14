@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="public/img/favicon.png">
     <title>Login - BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/auth.css">
