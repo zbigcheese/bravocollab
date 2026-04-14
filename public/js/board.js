@@ -418,9 +418,12 @@ const Board = {
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());
 
+        // Board menu
+        document.getElementById('boardMenuBtn')?.addEventListener('click', () => this.showBoardMenu());
+
         // Close context menus on outside click
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.context-menu') && !e.target.closest('.list-menu-btn')) {
+            if (!e.target.closest('.context-menu') && !e.target.closest('.list-menu-btn') && !e.target.closest('#boardMenuBtn')) {
                 document.querySelectorAll('.context-menu').forEach(m => m.remove());
             }
         });
@@ -563,6 +566,107 @@ const Board = {
             });
         } catch (e) {
             App.showToast('Failed to load members', 'error');
+        }
+    },
+
+    showBoardMenu() {
+        document.querySelectorAll('.context-menu').forEach(m => m.remove());
+
+        const btn = document.getElementById('boardMenuBtn');
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.style.position = 'fixed';
+        const rect = btn.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.right = (window.innerWidth - rect.right) + 'px';
+        menu.innerHTML = `
+            <button class="context-menu-item" data-action="description">Edit Description</button>
+            <button class="context-menu-item" data-action="background">Change Background</button>
+            <button class="context-menu-item danger" data-action="archive">Archive Board</button>
+        `;
+        document.body.appendChild(menu);
+
+        menu.querySelector('[data-action="description"]').addEventListener('click', () => {
+            menu.remove();
+            this.showEditDescriptionModal();
+        });
+
+        menu.querySelector('[data-action="background"]').addEventListener('click', () => {
+            menu.remove();
+            this.showBackgroundPicker();
+        });
+
+        menu.querySelector('[data-action="archive"]').addEventListener('click', () => {
+            menu.remove();
+            this.archiveBoard();
+        });
+    },
+
+    showEditDescriptionModal() {
+        const modal = App.createModal('boardDescModal', 'Board Description', `
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="boardDescInput" rows="4" style="width:100%;padding:8px 12px;border:2px solid var(--color-border);border-radius:4px;font-size:14px;font-family:var(--font-family);resize:vertical;">${App.escapeHtml(this.data.description || '')}</textarea>
+            </div>
+        `, `<button class="btn btn-primary" id="saveBoardDesc">Save</button>`);
+
+        document.getElementById('boardDescInput').focus();
+
+        document.getElementById('saveBoardDesc').addEventListener('click', async () => {
+            const desc = document.getElementById('boardDescInput').value.trim();
+            try {
+                await App.api('boards.update', { id: this.boardId, description: desc });
+                this.data.description = desc;
+                App.showToast('Description updated', 'success');
+                modal.remove();
+            } catch (e) {
+                App.showToast(e.message, 'error');
+            }
+        });
+    },
+
+    showBackgroundPicker() {
+        const colors = ['#0079BF','#D29034','#519839','#B04632','#89609E','#CD5A91','#4BBF6B','#00AECC','#838C91'];
+        const colorOpts = colors.map(c =>
+            `<div class="bg-color-option ${c === this.data.background_color ? 'selected' : ''}" data-color="${c}" style="background:${c}"></div>`
+        ).join('');
+
+        const modal = App.createModal('boardBgModal', 'Board Background', `
+            <div class="bg-color-grid">${colorOpts}</div>
+            <style>
+                .bg-color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+                .bg-color-option { height: 56px; border-radius: 8px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; position: relative; }
+                .bg-color-option:hover { transform: scale(1.05); }
+                .bg-color-option.selected::after { content: '\\2713'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; }
+            </style>
+        `);
+
+        modal.querySelectorAll('.bg-color-option').forEach(el => {
+            el.addEventListener('click', async () => {
+                const color = el.dataset.color;
+                try {
+                    await App.api('boards.update', { id: this.boardId, background_color: color });
+                    this.data.background_color = color;
+                    document.getElementById('boardWrapper').style.backgroundColor = color;
+                    modal.querySelectorAll('.bg-color-option').forEach(o => o.classList.remove('selected'));
+                    el.classList.add('selected');
+                    App.showToast('Background updated', 'success');
+                    modal.remove();
+                } catch (e) {
+                    App.showToast(e.message, 'error');
+                }
+            });
+        });
+    },
+
+    async archiveBoard() {
+        if (!confirm('Archive this board? It will be hidden from the dashboard.')) return;
+        try {
+            await App.api('boards.archive', { id: this.boardId });
+            App.showToast('Board archived', 'info');
+            window.location.href = 'index.php?page=dashboard';
+        } catch (e) {
+            App.showToast(e.message, 'error');
         }
     },
 
