@@ -341,8 +341,10 @@ const Board = {
                 return;
             }
 
-            // Close any context menus
-            document.querySelectorAll('.context-menu').forEach(m => m.remove());
+            // Close any context menus (unless clicking board menu or list menu buttons)
+            if (!e.target.closest('#boardMenuBtn') && !e.target.closest('.list-menu-btn')) {
+                document.querySelectorAll('.context-menu').forEach(m => m.remove());
+            }
         });
 
         // Add card on Enter
