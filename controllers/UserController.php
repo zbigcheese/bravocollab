@@ -233,17 +233,22 @@ class UserController extends Controller
         }
 
         // Replace all board assignments
-        $db->prepare('DELETE FROM invitation_boards WHERE invitation_id = :iid')
-           ->execute(['iid' => $invitationId]);
+        try {
+            $db->prepare('DELETE FROM `invitation_boards` WHERE `invitation_id` = :iid')
+               ->execute(['iid' => $invitationId]);
 
-        if (is_array($boardIds)) {
-            $stmt = $db->prepare('INSERT INTO invitation_boards (invitation_id, board_id) VALUES (:iid, :bid)');
-            foreach ($boardIds as $bid) {
-                $bid = (int) $bid;
-                if ($bid > 0) {
-                    $stmt->execute(['iid' => $invitationId, 'bid' => $bid]);
+            if (is_array($boardIds) && !empty($boardIds)) {
+                $stmt = $db->prepare('INSERT INTO `invitation_boards` (`invitation_id`, `board_id`) VALUES (:iid, :bid)');
+                foreach ($boardIds as $bid) {
+                    $bid = (int) $bid;
+                    if ($bid > 0) {
+                        $stmt->execute(['iid' => $invitationId, 'bid' => $bid]);
+                    }
                 }
             }
+        } catch (PDOException $e) {
+            $this->json(['error' => 'Failed to update boards: ' . $e->getMessage()], 500);
+            return;
         }
 
         $this->json(['success' => true]);
