@@ -102,6 +102,28 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     await loadUsers();
 
+    // Load all boards for pickers
+    let allBoards = [];
+    try {
+        const bRes = await App.api('boards.list', {}, 'GET');
+        allBoards = bRes.boards || [];
+    } catch(e) {}
+
+    function boardCheckboxes(selectedIds = []) {
+        if (allBoards.length === 0) return '<p class="text-muted text-sm">No boards yet.</p>';
+        return allBoards.map(b => `
+            <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer;">
+                <input type="checkbox" value="${b.id}" class="board-checkbox" ${selectedIds.includes(parseInt(b.id)) ? 'checked' : ''}>
+                <span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${App.escapeHtml(b.background_color)};flex-shrink:0;"></span>
+                ${App.escapeHtml(b.title)}
+            </label>
+        `).join('');
+    }
+
+    function getCheckedBoardIds(container) {
+        return Array.from(container.querySelectorAll('.board-checkbox:checked')).map(cb => parseInt(cb.value));
+    }
+
     // Load pending invitations
     async function loadInvitations() {
         const container = document.getElementById('invitationsList');
@@ -112,15 +134,50 @@ document.addEventListener('DOMContentLoaded', async function() {
                 container.innerHTML = '<p class="text-muted text-sm">No pending invitations.</p>';
                 return;
             }
-            container.innerHTML = invitations.map(inv => `
-                <div class="invite-item">
-                    <div>
-                        <strong>${App.escapeHtml(inv.email)}</strong>
-                        <span class="text-muted text-sm" style="margin-left:8px;">Invited by ${App.escapeHtml(inv.invited_by_name)} &middot; Expires ${App.formatDate(inv.expires_at)}</span>
+            container.innerHTML = invitations.map(inv => {
+                const boardNames = (inv.boards || []).map(b => App.escapeHtml(b.title));
+                const boardBadges = boardNames.length > 0
+                    ? boardNames.map(n => `<span style="display:inline-block;background:var(--color-primary-light);color:var(--color-primary);padding:1px 6px;border-radius:3px;font-size:11px;margin-right:4px;">${n}</span>`).join('')
+                    : '<span class="text-muted text-sm">No boards</span>';
+                return `
+                    <div class="invite-item" style="flex-wrap:wrap;gap:8px;">
+                        <div style="flex:1;min-width:200px;">
+                            <strong>${App.escapeHtml(inv.email)}</strong>
+                            <span class="text-muted text-sm" style="margin-left:8px;">by ${App.escapeHtml(inv.invited_by_name)}</span>
+                            <div style="margin-top:4px;">${boardBadges}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span class="role-badge role-${inv.role}">${inv.role}</span>
+                            <button class="btn btn-sm btn-secondary edit-inv-boards" data-inv-id="${inv.id}" data-board-ids="${(inv.boards||[]).map(b=>b.id).join(',')}">Boards</button>
+                        </div>
                     </div>
-                    <span class="role-badge role-${inv.role}">${inv.role}</span>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+
+            // Bind board edit buttons
+            container.querySelectorAll('.edit-inv-boards').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const invId = parseInt(btn.dataset.invId);
+                    const currentIds = btn.dataset.boardIds ? btn.dataset.boardIds.split(',').map(Number).filter(Boolean) : [];
+
+                    const modal = App.createModal('editInvBoardsModal', 'Assign Boards', `
+                        <p class="text-sm text-muted" style="margin-bottom:12px;">Select boards this user will be added to when they accept the invitation.</p>
+                        <div id="invBoardCheckboxes">${boardCheckboxes(currentIds)}</div>
+                    `, `<button class="btn btn-primary" id="saveInvBoards">Save</button>`);
+
+                    document.getElementById('saveInvBoards').addEventListener('click', async () => {
+                        const boardIds = getCheckedBoardIds(document.getElementById('invBoardCheckboxes'));
+                        try {
+                            await App.api('users.update_invitation_boards', { invitation_id: invId, board_ids: boardIds });
+                            App.showToast('Boards updated', 'success');
+                            modal.remove();
+                            loadInvitations();
+                        } catch(e) {
+                            App.showToast(e.message, 'error');
+                        }
+                    });
+                });
+            });
         } catch (e) {
             container.innerHTML = '<p class="text-muted text-sm">Failed to load invitations.</p>';
         }
@@ -141,6 +198,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <option value="admin">Admin</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>Assign to Boards</label>
+                <div id="inviteBoardCheckboxes" style="max-height:200px;overflow-y:auto;border:1px solid var(--color-border);border-radius:4px;padding:8px;">
+                    ${boardCheckboxes()}
+                </div>
+            </div>
         `, `<button class="btn btn-primary" id="submitInvite">Send Invitation</button>`);
 
         document.getElementById('inviteEmail').focus();
@@ -148,10 +211,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('submitInvite').addEventListener('click', async () => {
             const email = document.getElementById('inviteEmail').value.trim();
             const role = document.getElementById('inviteRole').value;
+            const boardIds = getCheckedBoardIds(document.getElementById('inviteBoardCheckboxes'));
             if (!email) { App.showToast('Email is required', 'error'); return; }
 
             try {
-                const res = await App.api('users.invite', { email, role });
+                const res = await App.api('users.invite', { email, role, board_ids: boardIds });
                 App.showToast(res.message, 'success');
                 if (res.invite_url) {
                     prompt('Email failed. Share this link manually:', res.invite_url);

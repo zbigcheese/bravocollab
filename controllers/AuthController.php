@@ -113,6 +113,16 @@ class AuthController extends Controller
         $db->prepare('UPDATE `invitations` SET `accepted_at` = NOW() WHERE `id` = :id')
            ->execute(['id' => $invitation['id']]);
 
+        // Auto-add user to pre-assigned boards
+        $boardStmt = $db->prepare('SELECT board_id FROM invitation_boards WHERE invitation_id = :iid');
+        $boardStmt->execute(['iid' => $invitation['id']]);
+        $addMember = $db->prepare(
+            'INSERT IGNORE INTO board_members (board_id, user_id, role) VALUES (:bid, :uid, :role)'
+        );
+        foreach ($boardStmt->fetchAll() as $row) {
+            $addMember->execute(['bid' => $row['board_id'], 'uid' => $userId, 'role' => BOARD_ROLE_MEMBER]);
+        }
+
         // Auto-login
         Auth::login($invitation['email'], $password);
 

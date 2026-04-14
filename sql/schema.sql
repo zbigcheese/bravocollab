@@ -35,6 +35,15 @@ CREATE TABLE IF NOT EXISTS `invitations` (
     INDEX `idx_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `invitation_boards` (
+    `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `invitation_id` INT UNSIGNED NOT NULL,
+    `board_id`      INT UNSIGNED NOT NULL,
+    FOREIGN KEY (`invitation_id`) REFERENCES `invitations`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`board_id`) REFERENCES `boards`(`id`) ON DELETE CASCADE,
+    UNIQUE KEY `uk_invitation_board` (`invitation_id`, `board_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `login_attempts` (
     `id`            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `ip_address`    VARCHAR(45) NOT NULL,

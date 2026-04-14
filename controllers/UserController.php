@@ -100,6 +100,20 @@ class UserController extends Controller
             'days'       => $expiryDays,
         ]);
 
+        $invitationId = (int) $db->lastInsertId();
+
+        // Assign boards if provided
+        $boardIds = $data['board_ids'] ?? [];
+        if (!empty($boardIds) && is_array($boardIds)) {
+            $stmt = $db->prepare('INSERT INTO invitation_boards (invitation_id, board_id) VALUES (:iid, :bid)');
+            foreach ($boardIds as $bid) {
+                $bid = (int) $bid;
+                if ($bid > 0) {
+                    $stmt->execute(['iid' => $invitationId, 'bid' => $bid]);
+                }
+            }
+        }
+
         // Send email
         $sent = Mailer::sendInvitation($email, $token, Auth::userName());
 
@@ -178,7 +192,56 @@ class UserController extends Controller
              ORDER BY i.created_at DESC'
         );
         $stmt->execute();
+        $invitations = $stmt->fetchAll();
 
-        $this->json(['invitations' => $stmt->fetchAll()]);
+        // Attach board names to each invitation
+        foreach ($invitations as &$inv) {
+            $bStmt = $db->prepare(
+                'SELECT b.id, b.title FROM invitation_boards ib
+                 JOIN boards b ON ib.board_id = b.id
+                 WHERE ib.invitation_id = :iid'
+            );
+            $bStmt->execute(['iid' => $inv['id']]);
+            $inv['boards'] = $bStmt->fetchAll();
+        }
+
+        $this->json(['invitations' => $invitations]);
+    }
+
+    public function updateInvitationBoards(): void
+    {
+        $this->requireAdmin();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $invitationId = (int) ($data['invitation_id'] ?? 0);
+        $boardIds = $data['board_ids'] ?? [];
+
+        $db = Database::get();
+
+        // Verify invitation exists and is pending
+        $stmt = $db->prepare('SELECT id FROM invitations WHERE id = :id AND accepted_at IS NULL AND expires_at > NOW()');
+        $stmt->execute(['id' => $invitationId]);
+        if (!$stmt->fetch()) {
+            $this->json(['error' => 'Invitation not found or already accepted'], 404);
+            return;
+        }
+
+        // Replace all board assignments
+        $db->prepare('DELETE FROM invitation_boards WHERE invitation_id = :iid')
+           ->execute(['iid' => $invitationId]);
+
+        if (is_array($boardIds)) {
+            $stmt = $db->prepare('INSERT INTO invitation_boards (invitation_id, board_id) VALUES (:iid, :bid)');
+            foreach ($boardIds as $bid) {
+                $bid = (int) $bid;
+                if ($bid > 0) {
+                    $stmt->execute(['iid' => $invitationId, 'bid' => $bid]);
+                }
+            }
+        }
+
+        $this->json(['success' => true]);
     }
 }
