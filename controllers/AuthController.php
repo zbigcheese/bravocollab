@@ -31,7 +31,8 @@ class AuthController extends Controller
         $db->prepare('INSERT INTO `login_attempts` (`ip_address`, `email`) VALUES (:ip, :email)')
            ->execute(['ip' => $ip, 'email' => $email]);
 
-        $user = Auth::login($email, $password);
+        $remember = !empty($data['remember']);
+        $user = Auth::login($email, $password, $remember);
         if (!$user) {
             $this->json(['error' => 'Invalid email or password'], 401);
             return;

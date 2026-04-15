@@ -24,6 +24,10 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" required placeholder="Your password">
                 </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:12px;">
+                    <input type="checkbox" id="remember" style="width:16px;height:16px;accent-color:var(--color-primary);">
+                    Keep me signed in
+                </label>
                 <div class="form-error" id="loginError" style="display:none;"></div>
                 <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign In</button>
             </form>
@@ -48,6 +52,7 @@
                     body: JSON.stringify({
                         email: document.getElementById('email').value,
                         password: document.getElementById('password').value,
+                        remember: document.getElementById('remember').checked,
                     }),
                 });
                 const data = await res.json();
