@@ -239,7 +239,7 @@ class ChecklistController extends Controller
                 $this->createNotification((int) $data['assigned_to'], NOTIF_CARD_ASSIGNED, [
                     'board_id'   => $boardId,
                     'card_id'    => $item['card_id'],
-                    'card_title' => $cardTitle . ' (checklist item)',
+                    'card_title' => $cardTitle . ' (' . $item['content'] . ')',
                     'actor_name' => Auth::userName(),
                 ]);
             }
