@@ -17,6 +17,13 @@ const Board = {
         this.isAdmin = wrapper.dataset.isAdmin === '1';
         await this.load();
         this.bindEvents();
+
+        // Auto-open card if ?card=ID is in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const cardId = parseInt(urlParams.get('card'));
+        if (cardId) {
+            CardModal.open(cardId);
+        }
     },
 
     async load() {

@@ -103,7 +103,17 @@ const Notifications = {
                     await App.api('notifications.mark_read', { id: parseInt(notifId) });
 
                     if (boardId) {
-                        window.location.href = `index.php?page=board&id=${boardId}`;
+                        let url = `index.php?page=board&id=${boardId}`;
+                        if (cardId) url += `&card=${cardId}`;
+
+                        // If already on this board, just open the card modal
+                        if (Board.boardId === parseInt(boardId) && cardId) {
+                            CardModal.open(parseInt(cardId));
+                            document.getElementById('notificationDropdown')?.classList.remove('open');
+                            el.classList.remove('unread');
+                        } else {
+                            window.location.href = url;
+                        }
                     }
                 });
             });

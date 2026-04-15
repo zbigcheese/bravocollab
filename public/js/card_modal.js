@@ -23,6 +23,10 @@ const CardModal = {
             this.boardMembers = Board.data?.members || [];
             this.boardLabels = Board.data?.labels || [];
             this.render();
+            // Update URL with card param
+            const url = new URL(window.location);
+            url.searchParams.set('card', cardId);
+            history.replaceState(null, '', url);
         } catch (e) {
             App.showToast('Failed to load card', 'error');
         }
@@ -269,18 +273,27 @@ const CardModal = {
         `;
     },
 
+    closeModal() {
+        document.getElementById('cardDetailModal')?.remove();
+        this.currentCard = null;
+        const url = new URL(window.location);
+        url.searchParams.delete('card');
+        history.replaceState(null, '', url);
+    },
+
     bindModalEvents(overlay) {
         const c = this.currentCard;
 
         // Close
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) overlay.remove();
+            if (e.target === overlay) this.closeModal();
         });
-        document.getElementById('closeCardModal').addEventListener('click', () => overlay.remove());
+        document.getElementById('closeCardModal').addEventListener('click', () => this.closeModal());
+        const self = this;
         document.addEventListener('keydown', function handler(e) {
             if (e.key === 'Escape' && document.getElementById('cardDetailModal')) {
                 if (document.querySelector('.lightbox-overlay')) return;
-                overlay.remove();
+                self.closeModal();
                 document.removeEventListener('keydown', handler);
             }
         });
@@ -893,8 +906,9 @@ const CardModal = {
         this.suppressSSE();
         try {
             await App.api('cards.archive', { id: this.currentCard.id });
-            document.getElementById('cardDetailModal')?.remove();
-            Board.handleCardArchived({ card_id: this.currentCard.id });
+            const archivedCardId = this.currentCard.id;
+            this.closeModal();
+            Board.handleCardArchived({ card_id: archivedCardId });
             App.showToast('Card archived', 'info');
         } catch (e) {
             App.showToast(e.message, 'error');
