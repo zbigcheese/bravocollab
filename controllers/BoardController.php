@@ -84,7 +84,7 @@ class BoardController extends Controller
 
     public function update(): void
     {
-        $this->requireAuth();
+        $this->requireAdmin();
         $this->requirePost();
         $this->validateCSRF();
 

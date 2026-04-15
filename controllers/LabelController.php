@@ -19,7 +19,7 @@ class LabelController extends Controller
 
     public function create(): void
     {
-        $this->requireAuth();
+        $this->requireAdmin();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -49,7 +49,7 @@ class LabelController extends Controller
 
     public function update(): void
     {
-        $this->requireAuth();
+        $this->requireAdmin();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -96,7 +96,7 @@ class LabelController extends Controller
 
     public function delete(): void
     {
-        $this->requireAuth();
+        $this->requireAdmin();
         $this->requirePost();
         $this->validateCSRF();
 

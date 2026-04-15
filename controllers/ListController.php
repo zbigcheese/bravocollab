@@ -79,7 +79,7 @@ class ListController extends Controller
 
     public function archive(): void
     {
-        $this->requireAuth();
+        $this->requireAdmin();
         $this->requirePost();
         $this->validateCSRF();
 

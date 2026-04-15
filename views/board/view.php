@@ -5,7 +5,7 @@ if (!$boardId) {
     exit;
 }
 ?>
-<div class="board-wrapper" id="boardWrapper" data-board-id="<?php echo $boardId; ?>">
+<div class="board-wrapper" id="boardWrapper" data-board-id="<?php echo $boardId; ?>" data-is-admin="<?php echo Auth::isAdmin() ? '1' : '0'; ?>">
     <div class="board-header" id="boardHeader">
         <div class="board-header-left">
             <h1 class="board-title" id="boardTitle"></h1>
@@ -15,7 +15,9 @@ if (!$boardId) {
             <?php if (Auth::isAdmin()): ?>
             <button class="btn btn-sm btn-secondary" id="manageMembersBtn">Members</button>
             <?php endif; ?>
+            <?php if (Auth::isAdmin()): ?>
             <button class="btn btn-sm btn-secondary" id="boardMenuBtn">&#8943;</button>
+            <?php endif; ?>
         </div>
     </div>
     <div class="board-canvas" id="boardCanvas">

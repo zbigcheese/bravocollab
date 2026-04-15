@@ -7,11 +7,14 @@ const Board = {
     listSortable: null,
     cardSortables: [],
 
+    isAdmin: false,
+
     async init() {
         const wrapper = document.getElementById('boardWrapper');
         if (!wrapper) return;
 
         this.boardId = parseInt(wrapper.dataset.boardId);
+        this.isAdmin = wrapper.dataset.isAdmin === '1';
         await this.load();
         this.bindEvents();
     },
@@ -66,7 +69,7 @@ const Board = {
             <div class="list-column" data-list-id="${list.id}">
                 <div class="list-header">
                     <div class="list-title" contenteditable="false" data-list-id="${list.id}">${App.escapeHtml(list.title)}</div>
-                    <button class="btn-icon list-menu-btn" data-list-id="${list.id}" title="List actions">&#8943;</button>
+                    ${this.isAdmin ? `<button class="btn-icon list-menu-btn" data-list-id="${list.id}" title="List actions">&#8943;</button>` : ''}
                 </div>
                 <div class="list-cards" data-list-id="${list.id}">
                     ${cardsHtml}
@@ -395,27 +398,29 @@ const Board = {
             }
         });
 
-        // Board title editing
-        const boardTitle = document.getElementById('boardTitle');
-        boardTitle?.addEventListener('dblclick', () => {
-            boardTitle.contentEditable = 'true';
-            boardTitle.classList.add('editing');
-            boardTitle.focus();
-        });
+        // Board title editing (admin only)
+        if (this.isAdmin) {
+            const boardTitle = document.getElementById('boardTitle');
+            boardTitle?.addEventListener('dblclick', () => {
+                boardTitle.contentEditable = 'true';
+                boardTitle.classList.add('editing');
+                boardTitle.focus();
+            });
 
-        boardTitle?.addEventListener('blur', () => {
-            boardTitle.contentEditable = 'false';
-            boardTitle.classList.remove('editing');
-            const title = boardTitle.textContent.trim();
-            if (title && title !== this.data.title) {
-                App.api('boards.update', { id: this.boardId, title }).catch(() => {});
-                this.data.title = title;
-            }
-        });
+            boardTitle?.addEventListener('blur', () => {
+                boardTitle.contentEditable = 'false';
+                boardTitle.classList.remove('editing');
+                const title = boardTitle.textContent.trim();
+                if (title && title !== this.data.title) {
+                    App.api('boards.update', { id: this.boardId, title }).catch(() => {});
+                    this.data.title = title;
+                }
+            });
 
-        boardTitle?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); boardTitle.blur(); }
-        });
+            boardTitle?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); boardTitle.blur(); }
+            });
+        }
 
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());
@@ -480,6 +485,8 @@ const Board = {
     },
 
     showListMenu(listId, anchor) {
+        if (!this.isAdmin) return; // Only admins can archive lists
+
         document.querySelectorAll('.context-menu').forEach(m => m.remove());
 
         const menu = document.createElement('div');
@@ -581,12 +588,18 @@ const Board = {
         const rect = btn.getBoundingClientRect();
         menu.style.top = (rect.bottom + 4) + 'px';
         menu.style.right = (window.innerWidth - rect.right) + 'px';
-        menu.innerHTML = `
-            <button class="context-menu-item" data-action="labels">Edit Labels</button>
-            <button class="context-menu-item" data-action="description">Edit Description</button>
-            <button class="context-menu-item" data-action="background">Change Background</button>
-            <button class="context-menu-item danger" data-action="archive">Archive Board</button>
-        `;
+        let menuItems = '';
+        if (this.isAdmin) {
+            menuItems += '<button class="context-menu-item" data-action="labels">Edit Labels</button>';
+            menuItems += '<button class="context-menu-item" data-action="description">Edit Description</button>';
+            menuItems += '<button class="context-menu-item" data-action="background">Change Background</button>';
+            menuItems += '<button class="context-menu-item danger" data-action="archive">Archive Board</button>';
+        }
+        if (!menuItems) {
+            // Nothing to show for regular members
+            return;
+        }
+        menu.innerHTML = menuItems;
         document.body.appendChild(menu);
 
         menu.querySelector('[data-action="labels"]').addEventListener('click', () => {
