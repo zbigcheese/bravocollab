@@ -582,11 +582,17 @@ const Board = {
         menu.style.top = (rect.bottom + 4) + 'px';
         menu.style.right = (window.innerWidth - rect.right) + 'px';
         menu.innerHTML = `
+            <button class="context-menu-item" data-action="labels">Edit Labels</button>
             <button class="context-menu-item" data-action="description">Edit Description</button>
             <button class="context-menu-item" data-action="background">Change Background</button>
             <button class="context-menu-item danger" data-action="archive">Archive Board</button>
         `;
         document.body.appendChild(menu);
+
+        menu.querySelector('[data-action="labels"]').addEventListener('click', () => {
+            menu.remove();
+            this.showLabelsEditor();
+        });
 
         menu.querySelector('[data-action="description"]').addEventListener('click', () => {
             menu.remove();
@@ -670,6 +676,178 @@ const Board = {
         } catch (e) {
             App.showToast(e.message, 'error');
         }
+    },
+
+    showLabelsEditor() {
+        const PRESET_COLORS = [
+            '#61BD4F','#F2D600','#FF9F1A','#EB5A46','#C377E0',
+            '#0079BF','#00C2E0','#51E898','#FF78CB','#344563',
+        ];
+
+        const renderLabelList = () => {
+            return (this.data.labels || []).map(l => `
+                <div class="label-editor-item" data-label-id="${l.id}">
+                    <span class="label-editor-swatch" style="background:${l.color}"></span>
+                    <input type="text" class="label-editor-name" value="${App.escapeHtml(l.name || '')}" placeholder="Label name (optional)" data-label-id="${l.id}">
+                    <button class="label-editor-color-btn" data-label-id="${l.id}" data-color="${l.color}" title="Change color">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z"/></svg>
+                    </button>
+                    <button class="label-editor-delete" data-label-id="${l.id}" title="Delete label">&times;</button>
+                </div>
+            `).join('');
+        };
+
+        const modal = App.createModal('labelsEditorModal', 'Edit Labels', `
+            <style>
+                .label-editor-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--color-bg); }
+                .label-editor-item:last-child { border-bottom:none; }
+                .label-editor-swatch { width:32px; height:24px; border-radius:4px; flex-shrink:0; }
+                .label-editor-name { flex:1; padding:6px 8px; border:1px solid var(--color-border); border-radius:4px; font-size:13px; font-family:var(--font-family); }
+                .label-editor-name:focus { border-color:var(--color-primary); outline:none; }
+                .label-editor-color-btn { background:none; border:none; cursor:pointer; padding:4px; color:var(--color-text-light); border-radius:4px; }
+                .label-editor-color-btn:hover { background:var(--color-bg); }
+                .label-editor-delete { background:none; border:none; cursor:pointer; font-size:18px; color:var(--color-text-light); padding:4px 6px; border-radius:4px; }
+                .label-editor-delete:hover { background:#FFF4F4; color:var(--color-danger); }
+                .color-palette { display:flex; flex-wrap:wrap; gap:6px; padding:8px 0; }
+                .color-palette-swatch { width:28px; height:28px; border-radius:4px; cursor:pointer; border:2px solid transparent; transition:transform 0.1s; }
+                .color-palette-swatch:hover { transform:scale(1.15); }
+                .color-palette-swatch.selected { border-color:var(--color-text); }
+                .label-editor-add { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--color-border); }
+                .label-editor-add input { flex:1; padding:6px 8px; border:2px solid var(--color-border); border-radius:4px; font-size:13px; }
+                .label-editor-add input:focus { border-color:var(--color-primary); outline:none; }
+            </style>
+            <div id="labelEditorList">${renderLabelList()}</div>
+            <div class="label-editor-add">
+                <input type="text" id="newLabelName" placeholder="New label name...">
+                <div id="newLabelColor" class="label-editor-swatch" style="background:#0079BF;cursor:pointer;" title="Pick color"></div>
+                <button class="btn btn-primary btn-sm" id="addLabelBtn">Add</button>
+            </div>
+            <div id="newLabelPalette" style="display:none;">
+                <div class="color-palette">
+                    ${PRESET_COLORS.map(c => `<div class="color-palette-swatch" data-color="${c}" style="background:${c}"></div>`).join('')}
+                </div>
+            </div>
+        `);
+
+        let newLabelColorValue = '#0079BF';
+
+        // New label color picker toggle
+        document.getElementById('newLabelColor').addEventListener('click', () => {
+            const palette = document.getElementById('newLabelPalette');
+            palette.style.display = palette.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('newLabelPalette').addEventListener('click', (e) => {
+            const swatch = e.target.closest('.color-palette-swatch');
+            if (!swatch) return;
+            newLabelColorValue = swatch.dataset.color;
+            document.getElementById('newLabelColor').style.background = newLabelColorValue;
+            document.getElementById('newLabelPalette').style.display = 'none';
+        });
+
+        // Add label
+        document.getElementById('addLabelBtn').addEventListener('click', async () => {
+            const name = document.getElementById('newLabelName').value.trim();
+            try {
+                const res = await App.api('labels.create', {
+                    board_id: this.boardId,
+                    name: name || null,
+                    color: newLabelColorValue,
+                });
+                if (res.success) {
+                    this.data.labels.push({ id: res.label_id, name: name || null, color: newLabelColorValue });
+                    document.getElementById('labelEditorList').innerHTML = renderLabelList();
+                    document.getElementById('newLabelName').value = '';
+                    this.bindLabelEditorEvents(modal, PRESET_COLORS);
+                }
+            } catch (e) {
+                App.showToast(e.message, 'error');
+            }
+        });
+
+        document.getElementById('newLabelName').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('addLabelBtn').click(); }
+        });
+
+        this.bindLabelEditorEvents(modal, PRESET_COLORS);
+    },
+
+    bindLabelEditorEvents(modal, presetColors) {
+        const listEl = document.getElementById('labelEditorList');
+
+        // Name blur → save
+        listEl.querySelectorAll('.label-editor-name').forEach(input => {
+            input.addEventListener('blur', async () => {
+                const labelId = parseInt(input.dataset.labelId);
+                const label = this.data.labels.find(l => l.id === labelId);
+                const newName = input.value.trim();
+                if (label && newName !== (label.name || '')) {
+                    try {
+                        await App.api('labels.update', { id: labelId, name: newName });
+                        label.name = newName || null;
+                    } catch (e) {
+                        App.showToast(e.message, 'error');
+                    }
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            });
+        });
+
+        // Color button → show inline palette
+        listEl.querySelectorAll('.label-editor-color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const labelId = parseInt(btn.dataset.labelId);
+                const item = btn.closest('.label-editor-item');
+                const existing = item.querySelector('.color-palette');
+                if (existing) { existing.remove(); return; }
+
+                // Remove any other open palettes
+                listEl.querySelectorAll('.color-palette').forEach(p => p.remove());
+
+                const palette = document.createElement('div');
+                palette.className = 'color-palette';
+                palette.style.padding = '8px 0 4px 40px';
+                palette.innerHTML = presetColors.map(c =>
+                    `<div class="color-palette-swatch ${c === btn.dataset.color ? 'selected' : ''}" data-color="${c}" style="background:${c}"></div>`
+                ).join('');
+                item.after(palette);
+
+                palette.addEventListener('click', async (e) => {
+                    const swatch = e.target.closest('.color-palette-swatch');
+                    if (!swatch) return;
+                    const newColor = swatch.dataset.color;
+                    try {
+                        await App.api('labels.update', { id: labelId, color: newColor });
+                        const label = this.data.labels.find(l => l.id === labelId);
+                        if (label) label.color = newColor;
+                        btn.dataset.color = newColor;
+                        item.querySelector('.label-editor-swatch').style.background = newColor;
+                        palette.remove();
+                    } catch (e2) {
+                        App.showToast(e2.message, 'error');
+                    }
+                });
+            });
+        });
+
+        // Delete
+        listEl.querySelectorAll('.label-editor-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const labelId = parseInt(btn.dataset.labelId);
+                try {
+                    await App.api('labels.delete', { id: labelId });
+                    this.data.labels = this.data.labels.filter(l => l.id !== labelId);
+                    btn.closest('.label-editor-item').remove();
+                    // Also remove any palette that was open for this label
+                    const nextPalette = listEl.querySelector(`.color-palette`);
+                    if (nextPalette) nextPalette.remove();
+                } catch (e) {
+                    App.showToast(e.message, 'error');
+                }
+            });
+        });
     },
 
     // SSE event handlers — coerce IDs to int since SSE JSON may deliver strings
