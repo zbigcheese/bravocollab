@@ -129,10 +129,11 @@ class ChecklistController extends Controller
 
         $db->prepare('INSERT INTO checklist_items (checklist_id, content, position) VALUES (:clid, :content, :pos)')
            ->execute(['clid' => $checklistId, 'content' => $content, 'pos' => $position]);
+        $itemId = (int) $db->lastInsertId();
 
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $checklist['card_id']]);
 
-        $this->json(['success' => true, 'item_id' => (int) $db->lastInsertId()]);
+        $this->json(['success' => true, 'item_id' => $itemId]);
     }
 
     public function toggleItem(): void
