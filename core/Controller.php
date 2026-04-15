@@ -84,13 +84,65 @@ class Controller
         }
     }
 
+    // Event types where only the latest event per entity matters
+    private static array $supersedableEvents = [
+        SSE_CARD_UPDATED    => 'card_id',      // keyed by card id in payload or payload.card.id
+        SSE_CARD_MOVED      => 'card_id',
+        SSE_LIST_UPDATED    => 'list_id',
+        SSE_LIST_REORDERED  => null,            // null = one per board (no sub-key)
+        SSE_CHECKLIST_CHANGED => 'card_id',
+        SSE_LABEL_CHANGED   => null,
+    ];
+
     protected function publishSSE(int $boardId, string $eventType, array $payload): void
     {
         $db = Database::get();
-        $stmt = $db->prepare(
+
+        // Prune older superseded events of the same type/entity
+        if (isset(self::$supersedableEvents[$eventType])) {
+            $entityKey = self::$supersedableEvents[$eventType];
+
+            if ($entityKey === null) {
+                // One per board — delete all older events of this type for this board
+                $db->prepare(
+                    'DELETE FROM `sse_events` WHERE `board_id` = :board_id AND `event_type` = :event_type'
+                )->execute(['board_id' => $boardId, 'event_type' => $eventType]);
+            } else {
+                // Per-entity — extract entity ID from payload
+                $entityId = $payload[$entityKey]
+                    ?? $payload['card']['id']
+                    ?? $payload['list']['id']
+                    ?? null;
+
+                if ($entityId !== null) {
+                    // Delete older events of same type where the payload contains this entity ID
+                    // Use JSON_EXTRACT for precise matching
+                    $jsonPaths = [
+                        "\$.{$entityKey}",
+                        '$.card.id',
+                        '$.list.id',
+                    ];
+                    $conditions = [];
+                    foreach ($jsonPaths as $path) {
+                        $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(`payload`, '{$path}')) = :entity_id";
+                    }
+                    $db->prepare(
+                        'DELETE FROM `sse_events`
+                         WHERE `board_id` = :board_id
+                           AND `event_type` = :event_type
+                           AND (' . implode(' OR ', $conditions) . ')'
+                    )->execute([
+                        'board_id'   => $boardId,
+                        'event_type' => $eventType,
+                        'entity_id'  => (string) $entityId,
+                    ]);
+                }
+            }
+        }
+
+        $db->prepare(
             'INSERT INTO `sse_events` (`board_id`, `event_type`, `payload`) VALUES (:board_id, :event_type, :payload)'
-        );
-        $stmt->execute([
+        )->execute([
             'board_id'   => $boardId,
             'event_type' => $eventType,
             'payload'    => json_encode($payload),

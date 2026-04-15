@@ -21,9 +21,19 @@ require_once __DIR__ . '/config/database.php';
 
 $db = Database::get();
 
-// 1. Clean up old SSE events
-$deleted = $db->exec("DELETE FROM sse_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+// 1. Clean up old SSE events (>10 min old — supersedable events are already pruned at insert time)
+$deleted = $db->exec("DELETE FROM sse_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
 echo "Cleaned up {$deleted} old SSE events.\n";
+
+// 1b. Hard cap: keep max 1000 events per board to prevent unbounded growth
+$boards = $db->query("SELECT DISTINCT board_id FROM sse_events")->fetchAll(PDO::FETCH_COLUMN);
+foreach ($boards as $bid) {
+    $db->exec("DELETE FROM sse_events WHERE board_id = {$bid} AND id NOT IN (SELECT id FROM (SELECT id FROM sse_events WHERE board_id = {$bid} ORDER BY id DESC LIMIT 1000) AS keep)");
+}
+
+// 1c. Clean up old password resets
+$deleted = $db->exec("DELETE FROM password_resets WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+echo "Cleaned up {$deleted} old password resets.\n";
 
 // 2. Clean up expired invitations (older than 30 days past expiry)
 $deleted = $db->exec("DELETE FROM invitations WHERE expires_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
