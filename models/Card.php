@@ -25,16 +25,16 @@ class Card extends Model
             ['card_id' => $cardId]
         )->fetchAll();
 
-        // Comments
+        // Comments (oldest first, with parent_id for threading)
         $card['comments'] = $this->query(
             'SELECT c.*, u.display_name as author_name FROM comments c
              JOIN users u ON c.user_id = u.id
              WHERE c.card_id = :card_id
-             ORDER BY c.created_at DESC',
+             ORDER BY c.created_at ASC',
             ['card_id' => $cardId]
         )->fetchAll();
 
-        // Checklists with items
+        // Checklists with items (include assignee info)
         $card['checklists'] = $this->query(
             'SELECT * FROM checklists WHERE card_id = :card_id ORDER BY position ASC',
             ['card_id' => $cardId]
@@ -42,8 +42,10 @@ class Card extends Model
 
         foreach ($card['checklists'] as &$checklist) {
             $checklist['items'] = $this->query(
-                'SELECT ci.*, u.display_name as checked_by_name FROM checklist_items ci
+                'SELECT ci.*, u.display_name as checked_by_name, ua.display_name as assigned_to_name
+                 FROM checklist_items ci
                  LEFT JOIN users u ON ci.checked_by = u.id
+                 LEFT JOIN users ua ON ci.assigned_to = ua.id
                  WHERE ci.checklist_id = :cl_id ORDER BY ci.position ASC',
                 ['cl_id' => $checklist['id']]
             )->fetchAll();

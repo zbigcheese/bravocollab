@@ -608,6 +608,95 @@
     font-size: 14px;
 }
 
+/* ---- Checklist item meta (assignee, due date) ---- */
+.cl-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.cl-item-due {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--color-bg);
+    color: var(--color-text-light);
+}
+
+.cl-item-due.overdue { background: var(--color-danger); color: white; }
+.cl-item-due.due-today { background: var(--color-warning); }
+.cl-item-due.due-soon { background: #FCF3CF; }
+.cl-item-due.complete { background: var(--color-success); color: white; }
+
+.cl-item-assign-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-light);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.checklist-item:hover .cl-item-assign-btn { opacity: 1; }
+.cl-item-assign-btn:hover { background: rgba(9,30,66,0.08); color: var(--color-text); }
+
+/* ---- @mention ---- */
+.mention-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--color-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+    margin-bottom: 4px;
+}
+
+.mention-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.mention-option:hover {
+    background: var(--color-primary-light);
+}
+
+.mention-tag {
+    color: var(--color-primary);
+    font-weight: 600;
+    background: var(--color-primary-light);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+/* ---- Comment replies ---- */
+.comment-replies {
+    margin-left: 38px;
+    border-left: 2px solid var(--color-border);
+    padding-left: 12px;
+}
+
+.comment-reply {
+    padding: 4px 0;
+}
+
+.comment-reply .comment-text {
+    font-size: 13px;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
     .modal-overlay {

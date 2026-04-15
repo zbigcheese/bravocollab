@@ -24,9 +24,24 @@ class CommentController extends Controller
         }
         $this->requireBoardAccess($boardId);
 
+        $parentId = isset($data['parent_id']) ? (int) $data['parent_id'] : null;
+
+        // If replying to a reply, flatten to the root comment
         $db = Database::get();
-        $db->prepare('INSERT INTO comments (card_id, user_id, body) VALUES (:card_id, :user_id, :body)')
-           ->execute(['card_id' => $cardId, 'user_id' => Auth::userId(), 'body' => $body]);
+        if ($parentId) {
+            $parentStmt = $db->prepare('SELECT id, parent_id FROM comments WHERE id = :id AND card_id = :cid');
+            $parentStmt->execute(['id' => $parentId, 'cid' => $cardId]);
+            $parent = $parentStmt->fetch();
+            if (!$parent) {
+                $parentId = null;
+            } elseif ($parent['parent_id']) {
+                // Parent is itself a reply — flatten to root
+                $parentId = (int) $parent['parent_id'];
+            }
+        }
+
+        $db->prepare('INSERT INTO comments (card_id, user_id, parent_id, body) VALUES (:card_id, :user_id, :parent_id, :body)')
+           ->execute(['card_id' => $cardId, 'user_id' => Auth::userId(), 'parent_id' => $parentId, 'body' => $body]);
         $commentId = (int) $db->lastInsertId();
 
         // Notify card assignees

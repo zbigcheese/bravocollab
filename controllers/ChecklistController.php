@@ -201,4 +201,68 @@ class ChecklistController extends Controller
 
         $this->json(['success' => true]);
     }
+
+    public function updateItem(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $itemId = (int) ($data['id'] ?? 0);
+
+        $db = Database::get();
+        $stmt = $db->prepare(
+            'SELECT ci.*, cl.card_id FROM checklist_items ci JOIN checklists cl ON ci.checklist_id = cl.id WHERE ci.id = :id'
+        );
+        $stmt->execute(['id' => $itemId]);
+        $item = $stmt->fetch();
+        if (!$item) {
+            $this->json(['error' => 'Item not found'], 404);
+            return;
+        }
+
+        $boardId = $this->getBoardIdForCard($item['card_id']);
+        $this->requireBoardAccess($boardId);
+
+        $updates = [];
+        $params = ['id' => $itemId];
+        if (array_key_exists('assigned_to', $data)) {
+            $updates[] = '`assigned_to` = :assigned_to';
+            $params['assigned_to'] = $data['assigned_to'] ? (int) $data['assigned_to'] : null;
+
+            // Notify assigned user
+            if ($data['assigned_to'] && (int) $data['assigned_to'] !== Auth::userId()) {
+                $card = $db->prepare('SELECT title FROM cards WHERE id = :id');
+                $card->execute(['id' => $item['card_id']]);
+                $cardTitle = ($card->fetch())['title'] ?? '';
+                $this->createNotification((int) $data['assigned_to'], NOTIF_CARD_ASSIGNED, [
+                    'board_id'   => $boardId,
+                    'card_id'    => $item['card_id'],
+                    'card_title' => $cardTitle . ' (checklist item)',
+                    'actor_name' => Auth::userName(),
+                ]);
+            }
+        }
+        if (array_key_exists('due_date', $data)) {
+            $updates[] = '`due_date` = :due_date';
+            $params['due_date'] = $data['due_date'] ?: null;
+        }
+        if (isset($data['content'])) {
+            $content = trim($data['content']);
+            if (!empty($content)) {
+                $updates[] = '`content` = :content';
+                $params['content'] = $content;
+            }
+        }
+
+        if (!empty($updates)) {
+            $db->prepare('UPDATE `checklist_items` SET ' . implode(', ', $updates) . ' WHERE `id` = :id')
+               ->execute($params);
+        }
+
+        $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $item['card_id']]);
+
+        $this->json(['success' => true]);
+    }
 }

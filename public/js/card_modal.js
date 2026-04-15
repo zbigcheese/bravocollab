@@ -68,6 +68,10 @@ const CardModal = {
                             <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0;">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
                             <button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>
+                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-light);">
+                                Created by <strong style="color:var(--color-text);">${App.escapeHtml(c.creator_name)}</strong><br>
+                                ${App.formatDate(c.created_at)}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -174,13 +178,28 @@ const CardModal = {
         const checked = cl.items.filter(i => i.is_checked).length;
         const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
 
-        const items = cl.items.map(item => `
-            <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
-                <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
-                <span class="checklist-item-content">${App.escapeHtml(item.content)}</span>
-                <button class="delete-item" data-item-id="${item.id}" data-checklist-id="${cl.id}">&times;</button>
-            </div>
-        `).join('');
+        const items = cl.items.map(item => {
+            let meta = '';
+            if (item.assigned_to_name) {
+                meta += `<span class="cl-item-assignee" title="${App.escapeHtml(item.assigned_to_name)}">${App.avatarHtml(item.assigned_to_name, 'sm')}</span>`;
+            }
+            if (item.due_date) {
+                const due = App.formatDueDate(item.due_date);
+                const cls = item.is_checked ? 'complete' : due.class;
+                meta += `<span class="cl-item-due ${cls}">${due.text}</span>`;
+            }
+            return `
+                <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
+                    <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
+                    <span class="checklist-item-content">${App.escapeHtml(item.content)}</span>
+                    <div class="cl-item-meta">${meta}</div>
+                    <button class="cl-item-assign-btn" data-item-id="${item.id}" data-checklist-id="${cl.id}" title="Assign / Due date">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a5.5 5.5 0 0 1 11 0v2"/></svg>
+                    </button>
+                    <button class="delete-item" data-item-id="${item.id}" data-checklist-id="${cl.id}">&times;</button>
+                </div>
+            `;
+        }).join('');
 
         return `
             <div class="card-section checklist-section" data-checklist-id="${cl.id}">
@@ -235,17 +254,23 @@ const CardModal = {
         `;
     },
 
-    renderSingleComment(cm) {
+    formatCommentBody(body) {
+        // Render @mentions as styled spans
+        return App.escapeHtml(body).replace(/@(\w[\w\s]*?)(?=\s@|\s*$|[.,!?)\]])/g, '<span class="mention-tag">@$1</span>');
+    },
+
+    renderSingleComment(cm, isReply = false) {
         return `
-            <div class="comment-item" data-comment-id="${cm.id}">
-                ${App.avatarHtml(cm.author_name)}
+            <div class="comment-item ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
+                ${App.avatarHtml(cm.author_name, isReply ? 'sm' : '')}
                 <div class="comment-body">
                     <div class="comment-header">
                         <span class="comment-author">${App.escapeHtml(cm.author_name)}</span>
                         <span class="comment-time">${App.formatDate(cm.created_at)}${cm.is_edited ? ' (edited)' : ''}</span>
                     </div>
-                    <div class="comment-text">${App.escapeHtml(cm.body)}</div>
+                    <div class="comment-text">${this.formatCommentBody(cm.body)}</div>
                     <div class="comment-actions">
+                        ${!isReply ? `<button class="reply-comment" data-comment-id="${cm.id}" data-author="${App.escapeHtml(cm.author_name)}">Reply</button>` : ''}
                         <button class="edit-comment" data-comment-id="${cm.id}">Edit</button>
                         <button class="delete-comment" data-comment-id="${cm.id}">Delete</button>
                     </div>
@@ -256,7 +281,22 @@ const CardModal = {
 
     renderCommentsSection() {
         const c = this.currentCard;
-        const comments = (c.comments || []).map(cm => this.renderSingleComment(cm)).join('');
+        const allComments = c.comments || [];
+
+        // Thread: root comments (no parent) with their replies nested below
+        const roots = allComments.filter(cm => !cm.parent_id);
+        const replies = allComments.filter(cm => cm.parent_id);
+        const replyMap = {};
+        replies.forEach(r => {
+            const pid = parseInt(r.parent_id);
+            if (!replyMap[pid]) replyMap[pid] = [];
+            replyMap[pid].push(r);
+        });
+
+        const commentsHtml = roots.map(cm => {
+            const threadReplies = (replyMap[cm.id] || []).map(r => this.renderSingleComment(r, true)).join('');
+            return this.renderSingleComment(cm, false) + (threadReplies ? `<div class="comment-replies">${threadReplies}</div>` : '');
+        }).join('');
 
         return `
             <div class="card-section" id="commentsSection">
@@ -264,11 +304,14 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     <h3>Comments</h3>
                 </div>
-                <div class="comment-form" style="margin-bottom:16px;">
-                    <textarea id="newComment" placeholder="Write a comment..."></textarea>
-                    <button class="btn btn-primary btn-sm" id="submitComment" style="margin-top:6px;">Save</button>
+                <div id="commentsList">${commentsHtml || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
+                <div class="comment-form" style="margin-top:12px;">
+                    <div style="position:relative;">
+                        <textarea id="newComment" placeholder="Write a comment... Use @ to mention members"></textarea>
+                        <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="submitComment" style="margin-top:6px;">Comment</button>
                 </div>
-                <div id="commentsList">${comments || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
             </div>
         `;
     },
@@ -369,10 +412,14 @@ const CardModal = {
         });
 
         // Comments
+        this._replyToId = null;
         document.getElementById('submitComment')?.addEventListener('click', () => this.addComment());
         document.getElementById('newComment')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) this.addComment();
         });
+
+        // @mention autocomplete
+        this.initMentionAutocomplete(document.getElementById('newComment'));
 
         // Delegated actions
         overlay.addEventListener('click', (e) => {
@@ -382,6 +429,16 @@ const CardModal = {
             const deleteBtn = e.target.closest('.delete-comment');
             if (deleteBtn) { this.deleteComment(parseInt(deleteBtn.dataset.commentId)); return; }
 
+            const replyBtn = e.target.closest('.reply-comment');
+            if (replyBtn) {
+                this._replyToId = parseInt(replyBtn.dataset.commentId);
+                const textarea = document.getElementById('newComment');
+                textarea.placeholder = `Replying to ${replyBtn.dataset.author}... (Ctrl+Enter to send)`;
+                textarea.focus();
+                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
             const checkbox = e.target.closest('.checklist-item input[type="checkbox"]');
             if (checkbox) { this.toggleChecklistItem(parseInt(checkbox.dataset.itemId), parseInt(checkbox.dataset.checklistId), checkbox.checked); return; }
 
@@ -390,6 +447,9 @@ const CardModal = {
 
             const addItemBtn = e.target.closest('.add-item-btn');
             if (addItemBtn) { this.addChecklistItem(parseInt(addItemBtn.dataset.checklistId)); return; }
+
+            const clItemAssign = e.target.closest('.cl-item-assign-btn');
+            if (clItemAssign) { this.showChecklistItemEditor(parseInt(clItemAssign.dataset.itemId), parseInt(clItemAssign.dataset.checklistId)); return; }
 
             const delCl = e.target.closest('.delete-checklist');
             if (delCl) { this.deleteChecklist(parseInt(delCl.dataset.checklistId)); return; }
@@ -420,31 +480,113 @@ const CardModal = {
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
     },
 
+    // ---- @mention autocomplete ----
+    initMentionAutocomplete(textarea) {
+        if (!textarea) return;
+        const dropdown = document.getElementById('mentionDropdown');
+
+        textarea.addEventListener('input', () => {
+            const val = textarea.value;
+            const cursorPos = textarea.selectionStart;
+            // Find @ before cursor
+            const beforeCursor = val.substring(0, cursorPos);
+            const match = beforeCursor.match(/@(\w*)$/);
+
+            if (match) {
+                const query = match[1].toLowerCase();
+                const members = this.boardMembers.filter(m =>
+                    m.display_name.toLowerCase().includes(query)
+                ).slice(0, 6);
+
+                if (members.length > 0) {
+                    dropdown.innerHTML = members.map(m => `
+                        <div class="mention-option" data-name="${App.escapeHtml(m.display_name)}">
+                            ${App.avatarHtml(m.display_name, 'sm')}
+                            <span>${App.escapeHtml(m.display_name)}</span>
+                        </div>
+                    `).join('');
+                    dropdown.style.display = 'block';
+
+                    dropdown.querySelectorAll('.mention-option').forEach(opt => {
+                        opt.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            const name = opt.dataset.name;
+                            const start = beforeCursor.lastIndexOf('@');
+                            textarea.value = val.substring(0, start) + '@' + name + ' ' + val.substring(cursorPos);
+                            textarea.selectionStart = textarea.selectionEnd = start + name.length + 2;
+                            dropdown.style.display = 'none';
+                            textarea.focus();
+                        });
+                    });
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } else {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        textarea.addEventListener('blur', () => {
+            setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+        });
+
+        textarea.addEventListener('keydown', (e) => {
+            if (dropdown.style.display === 'block' && e.key === 'Escape') {
+                dropdown.style.display = 'none';
+                e.stopPropagation();
+            }
+        });
+    },
+
     // ---- Comments (local DOM updates) ----
     async addComment() {
         const textarea = document.getElementById('newComment');
         const body = textarea.value.trim();
         if (!body) return;
 
+        const parentId = this._replyToId || null;
+
         this.suppressSSE();
         try {
-            const res = await App.api('comments.create', { card_id: this.currentCard.id, body });
+            const res = await App.api('comments.create', {
+                card_id: this.currentCard.id,
+                body,
+                parent_id: parentId,
+            });
             if (res.success) {
                 const newComment = {
                     id: res.comment_id,
+                    parent_id: parentId,
                     body: body,
                     author_name: document.querySelector('.user-name')?.textContent || 'You',
                     created_at: new Date().toISOString(),
                     is_edited: false,
                 };
                 this.currentCard.comments = this.currentCard.comments || [];
-                this.currentCard.comments.unshift(newComment);
-                // Insert into DOM
+                this.currentCard.comments.push(newComment);
+
                 const list = document.getElementById('commentsList');
                 const emptyMsg = list.querySelector('.text-muted');
                 if (emptyMsg) emptyMsg.remove();
-                list.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment));
+
+                if (parentId) {
+                    // Insert as reply under parent
+                    const parentEl = list.querySelector(`.comment-item[data-comment-id="${parentId}"]`);
+                    let repliesContainer = parentEl?.nextElementSibling;
+                    if (!repliesContainer || !repliesContainer.classList.contains('comment-replies')) {
+                        repliesContainer = document.createElement('div');
+                        repliesContainer.className = 'comment-replies';
+                        parentEl.after(repliesContainer);
+                    }
+                    repliesContainer.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment, true));
+                } else {
+                    // Append at end (oldest-to-newest order)
+                    list.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment));
+                }
+
                 textarea.value = '';
+                textarea.placeholder = 'Write a comment... Use @ to mention members';
+                this._replyToId = null;
                 this.refreshBoardCard();
             }
         } catch (e) {
@@ -619,6 +761,58 @@ const CardModal = {
         } catch (e) {
             App.showToast(e.message, 'error');
         }
+    },
+
+    showChecklistItemEditor(itemId, checklistId) {
+        // Find the item data
+        let itemData = null;
+        for (const cl of this.currentCard.checklists) {
+            const found = cl.items.find(i => i.id === itemId);
+            if (found) { itemData = found; break; }
+        }
+        if (!itemData) return;
+
+        const memberOpts = this.boardMembers.map(m =>
+            `<option value="${m.id}" ${parseInt(itemData.assigned_to) === m.id ? 'selected' : ''}>${App.escapeHtml(m.display_name)}</option>`
+        ).join('');
+
+        const modal = App.createModal('clItemEditorModal', 'Checklist Item', `
+            <div class="form-group">
+                <label>Assign to</label>
+                <select id="clItemAssignee" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
+                    <option value="">Unassigned</option>
+                    ${memberOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Due Date</label>
+                <input type="date" id="clItemDueDate" value="${itemData.due_date || ''}" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
+            </div>
+        `, `
+            <button class="btn btn-secondary btn-sm" id="clItemClearDue">Clear Due Date</button>
+            <button class="btn btn-primary btn-sm" id="clItemSave">Save</button>
+        `);
+
+        document.getElementById('clItemSave').addEventListener('click', async () => {
+            const assignedTo = document.getElementById('clItemAssignee').value || null;
+            const dueDate = document.getElementById('clItemDueDate').value || null;
+            this.suppressSSE();
+            try {
+                await App.api('checklists.update_item', { id: itemId, assigned_to: assignedTo, due_date: dueDate });
+                itemData.assigned_to = assignedTo ? parseInt(assignedTo) : null;
+                itemData.assigned_to_name = assignedTo ? this.boardMembers.find(m => m.id === parseInt(assignedTo))?.display_name : null;
+                itemData.due_date = dueDate;
+                modal.remove();
+                // Re-render the checklist to update the meta display
+                this.open(this.currentCard.id);
+            } catch (e) {
+                App.showToast(e.message, 'error');
+            }
+        });
+
+        document.getElementById('clItemClearDue').addEventListener('click', () => {
+            document.getElementById('clItemDueDate').value = '';
+        });
     },
 
     // ---- Attachments (local DOM updates) ----

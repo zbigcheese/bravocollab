@@ -169,13 +169,16 @@ CREATE TABLE IF NOT EXISTS `comments` (
     `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `card_id`    INT UNSIGNED NOT NULL,
     `user_id`    INT UNSIGNED NOT NULL,
+    `parent_id`  INT UNSIGNED DEFAULT NULL,
     `body`       TEXT NOT NULL,
     `is_edited`  TINYINT(1) NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`card_id`) REFERENCES `cards`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-    INDEX `idx_card` (`card_id`)
+    FOREIGN KEY (`parent_id`) REFERENCES `comments`(`id`) ON DELETE CASCADE,
+    INDEX `idx_card` (`card_id`),
+    INDEX `idx_parent` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
@@ -218,10 +221,13 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
     `content`      VARCHAR(500) NOT NULL,
     `is_checked`   TINYINT(1) NOT NULL DEFAULT 0,
     `position`     INT UNSIGNED NOT NULL DEFAULT 0,
+    `assigned_to`  INT UNSIGNED DEFAULT NULL,
+    `due_date`     DATE DEFAULT NULL,
     `checked_by`   INT UNSIGNED DEFAULT NULL,
     `checked_at`   DATETIME DEFAULT NULL,
     `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`checklist_id`) REFERENCES `checklists`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`checked_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
     INDEX `idx_checklist` (`checklist_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
