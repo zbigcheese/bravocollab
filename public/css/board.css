@@ -279,21 +279,18 @@
 }
 
 .card-label {
-    height: 8px;
-    min-width: 40px;
+    height: 20px;
+    min-width: 36px;
     border-radius: 4px;
-    cursor: pointer;
-    transition: height 0.1s;
-}
-
-.card-labels:hover .card-label,
-.card-labels-expanded .card-label {
-    height: 16px;
     padding: 0 8px;
     font-size: 11px;
-    line-height: 16px;
+    line-height: 20px;
     color: white;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
 }
 
 .card-title {
