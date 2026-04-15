@@ -437,11 +437,9 @@ const CardModal = {
 
             const replyBtn = e.target.closest('.reply-comment');
             if (replyBtn) {
-                this._replyToId = parseInt(replyBtn.dataset.commentId);
-                const textarea = document.getElementById('newComment');
-                textarea.placeholder = `Replying to ${replyBtn.dataset.author}... (Ctrl+Enter to send)`;
-                textarea.focus();
-                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const commentId = parseInt(replyBtn.dataset.commentId);
+                const authorName = replyBtn.dataset.author;
+                this.showInlineReplyForm(commentId, authorName);
                 return;
             }
 
@@ -541,6 +539,134 @@ const CardModal = {
                 dropdown.style.display = 'none';
                 e.stopPropagation();
             }
+        });
+    },
+
+    // ---- Inline reply form ----
+    showInlineReplyForm(parentCommentId, authorName) {
+        // Remove any existing inline reply form
+        document.querySelectorAll('.inline-reply-form').forEach(f => f.remove());
+
+        const commentEl = document.querySelector(`.comment-item[data-comment-id="${parentCommentId}"]`);
+        if (!commentEl) return;
+
+        // Find or create the replies container
+        let repliesContainer = commentEl.nextElementSibling;
+        if (!repliesContainer || !repliesContainer.classList.contains('comment-replies')) {
+            repliesContainer = document.createElement('div');
+            repliesContainer.className = 'comment-replies';
+            commentEl.after(repliesContainer);
+        }
+
+        const form = document.createElement('div');
+        form.className = 'inline-reply-form';
+        form.innerHTML = `
+            <div style="position:relative;">
+                <textarea class="inline-reply-textarea" placeholder="Reply to ${App.escapeHtml(authorName)}..." rows="2"></textarea>
+                <div class="inline-reply-mention-dropdown mention-dropdown" style="display:none;"></div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+                <button class="btn btn-primary btn-sm inline-reply-submit">Reply</button>
+                <button class="btn btn-secondary btn-sm inline-reply-cancel">Cancel</button>
+            </div>
+        `;
+        repliesContainer.appendChild(form);
+
+        const textarea = form.querySelector('.inline-reply-textarea');
+        textarea.focus();
+
+        // Wire up @mention for this textarea too
+        const dropdown = form.querySelector('.inline-reply-mention-dropdown');
+        this.initMentionAutocompleteOn(textarea, dropdown);
+
+        form.querySelector('.inline-reply-submit').addEventListener('click', async () => {
+            const body = textarea.value.trim();
+            if (!body) return;
+            this.suppressSSE();
+            try {
+                const res = await App.api('comments.create', {
+                    card_id: this.currentCard.id,
+                    body,
+                    parent_id: parentCommentId,
+                });
+                if (res.success) {
+                    const newComment = {
+                        id: res.comment_id,
+                        parent_id: parentCommentId,
+                        body,
+                        author_name: document.querySelector('.user-name')?.textContent || 'You',
+                        created_at: new Date().toISOString(),
+                        is_edited: false,
+                    };
+                    this.currentCard.comments.push(newComment);
+                    form.remove();
+                    repliesContainer.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment, true));
+                    this.refreshBoardCard();
+                }
+            } catch (e) {
+                App.showToast(e.message, 'error');
+            }
+        });
+
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                form.querySelector('.inline-reply-submit').click();
+            }
+            if (e.key === 'Escape') {
+                form.remove();
+            }
+        });
+
+        form.querySelector('.inline-reply-cancel').addEventListener('click', () => {
+            form.remove();
+        });
+    },
+
+    // Reusable @mention init for any textarea+dropdown pair
+    initMentionAutocompleteOn(textarea, dropdown) {
+        textarea.addEventListener('input', () => {
+            const val = textarea.value;
+            const cursorPos = textarea.selectionStart;
+            const beforeCursor = val.substring(0, cursorPos);
+            const match = beforeCursor.match(/@(\w*)$/);
+
+            if (match) {
+                const query = match[1].toLowerCase();
+                const members = this.boardMembers.filter(m =>
+                    m.display_name.toLowerCase().includes(query)
+                ).slice(0, 6);
+
+                if (members.length > 0) {
+                    dropdown.innerHTML = members.map(m => `
+                        <div class="mention-option" data-name="${App.escapeHtml(m.display_name)}">
+                            ${App.avatarHtml(m.display_name, 'sm')}
+                            <span>${App.escapeHtml(m.display_name)}</span>
+                        </div>
+                    `).join('');
+                    dropdown.style.display = 'block';
+
+                    dropdown.querySelectorAll('.mention-option').forEach(opt => {
+                        opt.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            const name = opt.dataset.name;
+                            const start = beforeCursor.lastIndexOf('@');
+                            textarea.value = val.substring(0, start) + '@' + name + ' ' + val.substring(cursorPos);
+                            textarea.selectionStart = textarea.selectionEnd = start + name.length + 2;
+                            dropdown.style.display = 'none';
+                            textarea.focus();
+                        });
+                    });
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } else {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        textarea.addEventListener('blur', () => {
+            setTimeout(() => { dropdown.style.display = 'none'; }, 200);
         });
     },
 

@@ -697,6 +697,34 @@
     font-size: 13px;
 }
 
+.inline-reply-form {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.inline-reply-textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 8px 10px;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: var(--font-family);
+    resize: vertical;
+}
+
+.inline-reply-textarea:focus {
+    outline: none;
+}
+
+.inline-reply-mention-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
     .modal-overlay {
