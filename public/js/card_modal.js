@@ -255,8 +255,14 @@ const CardModal = {
     },
 
     formatCommentBody(body) {
-        // Render @mentions as styled spans
-        return App.escapeHtml(body).replace(/@(\w[\w\s]*?)(?=\s@|\s*$|[.,!?)\]])/g, '<span class="mention-tag">@$1</span>');
+        let html = App.escapeHtml(body);
+        // Replace @mentions by matching known board member names (longest first to avoid partial matches)
+        const names = this.boardMembers.map(m => m.display_name).sort((a, b) => b.length - a.length);
+        for (const name of names) {
+            const escaped = App.escapeHtml(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            html = html.replace(new RegExp('@' + escaped, 'g'), `<span class="mention-tag">@${App.escapeHtml(name)}</span>`);
+        }
+        return html;
     },
 
     renderSingleComment(cm, isReply = false) {
