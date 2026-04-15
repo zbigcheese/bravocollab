@@ -115,26 +115,21 @@ class Controller
                     ?? null;
 
                 if ($entityId !== null) {
-                    // Delete older events of same type where the payload contains this entity ID
-                    // Use JSON_EXTRACT for precise matching
-                    $jsonPaths = [
-                        "\$.{$entityKey}",
-                        '$.card.id',
-                        '$.list.id',
-                    ];
-                    $conditions = [];
-                    foreach ($jsonPaths as $path) {
-                        $conditions[] = "JSON_UNQUOTE(JSON_EXTRACT(`payload`, '{$path}')) = :entity_id";
-                    }
+                    // JSON paths are safe literals (from $supersedableEvents, not user input)
+                    $eKey = addslashes($entityKey);
                     $db->prepare(
-                        'DELETE FROM `sse_events`
+                        "DELETE FROM `sse_events`
                          WHERE `board_id` = :board_id
                            AND `event_type` = :event_type
-                           AND (' . implode(' OR ', $conditions) . ')'
+                           AND (JSON_UNQUOTE(JSON_EXTRACT(`payload`, '\$.{$eKey}')) = :eid1
+                             OR JSON_UNQUOTE(JSON_EXTRACT(`payload`, '\$.card.id')) = :eid2
+                             OR JSON_UNQUOTE(JSON_EXTRACT(`payload`, '\$.list.id')) = :eid3)"
                     )->execute([
                         'board_id'   => $boardId,
                         'event_type' => $eventType,
-                        'entity_id'  => (string) $entityId,
+                        'eid1'       => (string) $entityId,
+                        'eid2'       => (string) $entityId,
+                        'eid3'       => (string) $entityId,
                     ]);
                 }
             }
