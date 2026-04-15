@@ -60,14 +60,16 @@ class CommentController extends Controller
             ]);
         }
 
-        // Check for @mentions
-        if (preg_match_all('/@(\w+)/', $body, $matches)) {
-            $mentioned = $db->prepare(
-                'SELECT id FROM users WHERE display_name IN (' . implode(',', array_fill(0, count($matches[1]), '?')) . ')'
-            );
-            $mentioned->execute($matches[1]);
-            foreach ($mentioned->fetchAll() as $user) {
-                $this->createNotification($user['id'], NOTIF_COMMENT_MENTION, [
+        // Check for @mentions — match against actual board member names
+        $boardMembers = $db->prepare(
+            'SELECT u.id, u.display_name FROM board_members bm
+             JOIN users u ON bm.user_id = u.id
+             WHERE bm.board_id = :bid'
+        );
+        $boardMembers->execute(['bid' => $boardId]);
+        foreach ($boardMembers->fetchAll() as $member) {
+            if (mb_stripos($body, '@' . $member['display_name']) !== false) {
+                $this->createNotification((int) $member['id'], NOTIF_COMMENT_MENTION, [
                     'board_id'   => $boardId,
                     'card_id'    => $cardId,
                     'card_title' => $cardTitle,
