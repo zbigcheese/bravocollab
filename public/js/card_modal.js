@@ -851,6 +851,10 @@ const CardModal = {
                         <div class="checklist-item" data-item-id="${newItem.id}">
                             <input type="checkbox" data-item-id="${newItem.id}" data-checklist-id="${checklistId}">
                             <span class="checklist-item-content">${App.escapeHtml(content)}</span>
+                            <div class="cl-item-meta"></div>
+                            <button class="cl-item-assign-btn" data-item-id="${newItem.id}" data-checklist-id="${checklistId}" title="Assign / Due date">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a5.5 5.5 0 0 1 11 0v2"/></svg>
+                            </button>
                             <button class="delete-item" data-item-id="${newItem.id}" data-checklist-id="${checklistId}">&times;</button>
                         </div>
                     `);
