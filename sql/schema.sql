@@ -119,13 +119,16 @@ CREATE TABLE IF NOT EXISTS `cards` (
     `due_date`       DATETIME DEFAULT NULL,
     `due_complete`   TINYINT(1) NOT NULL DEFAULT 0,
     `cover_image_id` INT UNSIGNED DEFAULT NULL,
+    `coordinator_id` INT UNSIGNED DEFAULT NULL,
     `is_archived`    TINYINT(1) NOT NULL DEFAULT 0,
     `created_by`     INT UNSIGNED NOT NULL,
     `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`list_id`) REFERENCES `lists`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-    INDEX `idx_list_position` (`list_id`, `position`)
+    FOREIGN KEY (`coordinator_id`) REFERENCES `users`(`id`) ON DELETE SET NULL,
+    INDEX `idx_list_position` (`list_id`, `position`),
+    INDEX `idx_coordinator` (`coordinator_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `card_assignments` (

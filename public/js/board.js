@@ -144,12 +144,19 @@ const Board = {
                 ${done}/${total}</span>`;
         }
 
-        // Assignees
+        // Coordinator (leftmost, with extra border) + assignees (deduped against coordinator)
         let assigneesHtml = '';
-        if (card.assignees && card.assignees.length > 0) {
-            assigneesHtml = '<div class="card-assignees">' +
-                card.assignees.slice(0, 3).map(a => App.avatarHtml(a.display_name, 'sm')).join('') +
-                '</div>';
+        const coord = card.coordinator || null;
+        const coordId = coord ? parseInt(coord.id) : null;
+        const assignees = (card.assignees || []).filter(a => parseInt(a.id) !== coordId);
+
+        if (coord || assignees.length > 0) {
+            let inner = '';
+            if (coord) {
+                inner += `<span class="card-coordinator-avatar" title="Coordinator: ${App.escapeHtml(coord.display_name)}">${App.avatarHtml(coord.display_name, 'sm')}</span>`;
+            }
+            inner += assignees.slice(0, 3).map(a => App.avatarHtml(a.display_name, 'sm')).join('');
+            assigneesHtml = `<div class="card-assignees">${inner}</div>`;
         }
 
         const hasBadges = badges || assigneesHtml;

@@ -261,4 +261,62 @@ class CardController extends Controller
 
         $this->json(['success' => true]);
     }
+
+    public function setCoordinator(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['card_id'] ?? 0);
+        $rawUser = $data['user_id'] ?? null;
+        $userId = ($rawUser === null || $rawUser === '' || (int) $rawUser === 0) ? null : (int) $rawUser;
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        // If setting a coordinator, verify they're a board member (or admin)
+        if ($userId !== null) {
+            $db = Database::get();
+            $stmt = $db->prepare(
+                'SELECT 1 FROM board_members WHERE board_id = :bid AND user_id = :uid
+                 UNION SELECT 1 FROM users WHERE id = :uid2 AND role = "admin"'
+            );
+            $stmt->execute(['bid' => $boardId, 'uid' => $userId, 'uid2' => $userId]);
+            if (!$stmt->fetch()) {
+                $this->json(['error' => 'User is not a board member'], 400);
+                return;
+            }
+        }
+
+        $this->cardModel->update($cardId, ['coordinator_id' => $userId]);
+
+        $card = $this->cardModel->find($cardId);
+        $coordinator = null;
+        if ($userId !== null) {
+            $db = Database::get();
+            $stmt = $db->prepare('SELECT id, display_name FROM users WHERE id = :id');
+            $stmt->execute(['id' => $userId]);
+            $coordinator = $stmt->fetch() ?: null;
+
+            // Notify new coordinator
+            $this->createNotification($userId, NOTIF_CARD_ASSIGNED, [
+                'board_id'    => $boardId,
+                'card_id'     => $cardId,
+                'card_title'  => $card['title'],
+                'actor_name'  => Auth::userName(),
+                'as_coordinator' => true,
+            ]);
+        }
+        $card['coordinator'] = $coordinator;
+
+        $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $card]);
+
+        $this->json(['success' => true, 'coordinator' => $coordinator]);
+    }
 }

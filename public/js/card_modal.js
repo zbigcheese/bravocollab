@@ -50,6 +50,7 @@ const CardModal = {
                 <div class="modal-body">
                     <div class="card-detail-layout">
                         <div class="card-detail-main">
+                            ${this.renderCoordinatorSection()}
                             ${this.renderMembersSection()}
                             ${this.renderLabelsSection()}
                             ${this.renderDueDateSection()}
@@ -60,6 +61,7 @@ const CardModal = {
                         </div>
                         <div class="card-detail-sidebar">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Add to card</h4>
+                            <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Coordinator</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarMembers">Members</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarLabels">Labels</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarChecklist">Checklist</button>
@@ -81,6 +83,28 @@ const CardModal = {
         document.body.appendChild(overlay);
         this.bindModalEvents(overlay);
         this.autoResizeTextarea(document.getElementById('cardTitle'));
+    },
+
+    renderCoordinatorSection() {
+        const c = this.currentCard;
+        const coord = c.coordinator;
+        const chip = coord ? `
+            <span class="card-member-chip card-coordinator-chip" data-user-id="${coord.id}">
+                ${App.avatarHtml(coord.display_name, 'sm')}
+                ${App.escapeHtml(coord.display_name)}
+                <span class="remove" data-remove-coordinator="1">&times;</span>
+            </span>
+        ` : '<span class="text-muted text-sm">No coordinator assigned</span>';
+
+        return `
+            <div class="card-section" id="coordinatorSection">
+                <div class="card-section-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8 5.8 21.3l2.4-7.4L2 9.4h7.6z"/></svg>
+                    <h3>Coordinator</h3>
+                </div>
+                <div class="card-members" id="cardCoordinatorDisplay">${chip}</div>
+            </div>
+        `;
     },
 
     renderMembersSection() {
@@ -464,6 +488,9 @@ const CardModal = {
             const lightboxTrigger = e.target.closest('.lightbox-trigger');
             if (lightboxTrigger) { e.preventDefault(); this.openLightbox(parseInt(lightboxTrigger.dataset.attachmentId)); return; }
 
+            const removeCoord = e.target.closest('.card-coordinator-chip .remove');
+            if (removeCoord) { this.setCoordinator(null); return; }
+
             const removeMember = e.target.closest('.card-member-chip .remove');
             if (removeMember) { this.unassignMember(parseInt(removeMember.dataset.userId)); return; }
         });
@@ -476,6 +503,7 @@ const CardModal = {
         });
 
         // Sidebar buttons
+        document.getElementById('sidebarCoordinator')?.addEventListener('click', () => this.showCoordinatorPicker());
         document.getElementById('sidebarMembers')?.addEventListener('click', () => this.showMemberPicker());
         document.getElementById('sidebarLabels')?.addEventListener('click', () => this.showLabelPicker());
         document.getElementById('sidebarChecklist')?.addEventListener('click', () => this.addChecklist());
@@ -1108,6 +1136,67 @@ const CardModal = {
             </span>
         `).join('');
         container.innerHTML = chips;
+    },
+
+    // ---- Coordinator ----
+    showCoordinatorPicker() {
+        const currentId = this.currentCard.coordinator ? parseInt(this.currentCard.coordinator.id) : null;
+
+        const noneItem = `
+            <div class="member-picker-item ${currentId === null ? 'selected' : ''}" data-user-id="">
+                <span class="avatar avatar-sm" style="background:var(--color-text-light);">&times;</span>
+                <span>No coordinator</span>
+                ${currentId === null ? '<span style="margin-left:auto;">&#10003;</span>' : ''}
+            </div>
+        `;
+
+        const items = this.boardMembers.map(m => `
+            <div class="member-picker-item ${currentId === m.id ? 'selected' : ''}" data-user-id="${m.id}">
+                ${App.avatarHtml(m.display_name, 'sm')}
+                <span>${App.escapeHtml(m.display_name)}</span>
+                ${currentId === m.id ? '<span style="margin-left:auto;">&#10003;</span>' : ''}
+            </div>
+        `).join('');
+
+        const modal = App.createModal('coordinatorPickerModal', 'Coordinator', `<div class="label-picker">${noneItem}${items}</div>`);
+
+        modal.querySelectorAll('.member-picker-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const raw = el.dataset.userId;
+                const userId = raw === '' ? null : parseInt(raw);
+                modal.remove();
+                this.setCoordinator(userId);
+            });
+        });
+    },
+
+    async setCoordinator(userId) {
+        this.suppressSSE();
+        try {
+            const res = await App.api('cards.set_coordinator', {
+                card_id: this.currentCard.id,
+                user_id: userId,
+            });
+            this.currentCard.coordinator = res.coordinator || null;
+            this.currentCard.coordinator_id = res.coordinator ? res.coordinator.id : null;
+            this.updateCoordinatorDOM();
+            this.refreshBoardCard();
+        } catch (e) {
+            App.showToast(e.message, 'error');
+        }
+    },
+
+    updateCoordinatorDOM() {
+        const container = document.getElementById('cardCoordinatorDisplay');
+        if (!container) return;
+        const coord = this.currentCard.coordinator;
+        container.innerHTML = coord ? `
+            <span class="card-member-chip card-coordinator-chip" data-user-id="${coord.id}">
+                ${App.avatarHtml(coord.display_name, 'sm')}
+                ${App.escapeHtml(coord.display_name)}
+                <span class="remove" data-remove-coordinator="1">&times;</span>
+            </span>
+        ` : '<span class="text-muted text-sm">No coordinator assigned</span>';
     },
 
     // ---- Labels (local DOM updates) ----

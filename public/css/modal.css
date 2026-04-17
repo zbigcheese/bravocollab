@@ -216,6 +216,11 @@
     margin-left: 4px;
 }
 
+.card-coordinator-chip .avatar {
+    border: 2px solid #F2D600;
+    box-shadow: 0 0 0 1px var(--color-white);
+}
+
 /* Labels in modal */
 .card-labels-list {
     display: flex;

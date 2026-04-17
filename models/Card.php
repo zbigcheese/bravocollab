@@ -17,6 +17,15 @@ class Card extends Model
             ['card_id' => $cardId]
         )->fetchAll();
 
+        // Coordinator (nullable single user)
+        $card['coordinator'] = null;
+        if (!empty($card['coordinator_id'])) {
+            $card['coordinator'] = $this->query(
+                'SELECT id, display_name, email FROM users WHERE id = :id',
+                ['id' => $card['coordinator_id']]
+            )->fetch() ?: null;
+        }
+
         // Labels
         $card['labels'] = $this->query(
             'SELECT l.* FROM labels l

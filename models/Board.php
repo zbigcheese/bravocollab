@@ -69,6 +69,14 @@ class Board extends Model
                     ['card_id' => $card['id']]
                 )->fetchAll();
 
+                $card['coordinator'] = null;
+                if (!empty($card['coordinator_id'])) {
+                    $card['coordinator'] = $this->query(
+                        'SELECT id, display_name FROM users WHERE id = :id',
+                        ['id' => $card['coordinator_id']]
+                    )->fetch() ?: null;
+                }
+
                 $card['labels'] = $card['label_ids']
                     ? $this->query(
                         'SELECT l.* FROM labels l
