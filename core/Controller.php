@@ -142,6 +142,14 @@ class Controller
             'event_type' => $eventType,
             'payload'    => json_encode($payload),
         ]);
+
+        // Inline cleanup (1% of publishes) so sse_events stays bounded even if cron isn't running.
+        // Safe because fresh SSE connects skip history (sse.php uses MAX(id) as starting point).
+        if (mt_rand(1, 100) === 1) {
+            $db->prepare(
+                'DELETE FROM `sse_events` WHERE `created_at` < DATE_SUB(NOW(), INTERVAL 10 MINUTE)'
+            )->execute();
+        }
     }
 
     protected function createNotification(int $userId, string $type, array $data): void

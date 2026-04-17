@@ -901,10 +901,27 @@ const Board = {
         const targetListId = parseInt(data.target_list_id);
         const position = parseInt(data.position);
 
-        // Skip if card is already in the target list at roughly the right position
         const targetList = this.data.lists.find(l => parseInt(l.id) === targetListId);
-        const alreadyThere = targetList?.cards.find(c => parseInt(c.id) === cardId && parseInt(c.list_id) === targetListId);
-        if (alreadyThere) return;
+        if (!targetList) return;
+
+        // Remove any stale copies from non-target lists (defensive against replayed
+        // card_created / out-of-order events that can leave duplicates behind)
+        let removedStale = false;
+        for (const list of this.data.lists) {
+            if (parseInt(list.id) === targetListId) continue;
+            const before = list.cards.length;
+            list.cards = list.cards.filter(c => parseInt(c.id) !== cardId);
+            if (list.cards.length !== before) removedStale = true;
+        }
+
+        const existing = targetList.cards.find(c => parseInt(c.id) === cardId);
+        if (existing) {
+            existing.list_id = targetListId;
+            existing.position = position;
+            targetList.cards.sort((a, b) => a.position - b.position);
+            if (removedStale) this.renderLists();
+            return;
+        }
 
         this.updateCardInData(cardId, targetListId, position);
         this.renderLists();

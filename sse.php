@@ -57,11 +57,19 @@ set_time_limit(300);
 ignore_user_abort(false);
 
 // Get last event ID for reconnection
-$lastEventId = 0;
-if (isset($_SERVER['HTTP_LAST_EVENT_ID'])) {
+$lastEventId = null;
+if (isset($_SERVER['HTTP_LAST_EVENT_ID']) && $_SERVER['HTTP_LAST_EVENT_ID'] !== '') {
     $lastEventId = (int) $_SERVER['HTTP_LAST_EVENT_ID'];
-} elseif (isset($_GET['last_event_id'])) {
+} elseif (isset($_GET['last_event_id']) && $_GET['last_event_id'] !== '') {
     $lastEventId = (int) $_GET['last_event_id'];
+}
+
+// Fresh connect: skip history — boards.get already returned current state,
+// so replaying past events (card_created for moved cards, etc.) would cause drift
+if ($lastEventId === null) {
+    $stmt = $db->prepare('SELECT COALESCE(MAX(id), 0) FROM sse_events WHERE board_id = :bid');
+    $stmt->execute(['bid' => $boardId]);
+    $lastEventId = (int) $stmt->fetchColumn();
 }
 
 // Send initial connection event
