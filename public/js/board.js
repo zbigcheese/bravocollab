@@ -877,6 +877,71 @@ const Board = {
         });
     },
 
+    // ---- Live-update fallback: re-fetch a card's thumbnail state on demand ----
+    _pendingRefresh: {},
+
+    refreshCardThumbnail(cardId) {
+        cardId = parseInt(cardId);
+        if (!cardId) return;
+        if (this._pendingRefresh[cardId]) return;
+        this._pendingRefresh[cardId] = setTimeout(async () => {
+            delete this._pendingRefresh[cardId];
+            try {
+                const res = await App.api('cards.summary', { id: cardId }, 'GET');
+                this._mergeCardSummary(res.card);
+            } catch (e) {
+                // Card may have been archived or deleted — nothing to do
+            }
+        }, 200);
+    },
+
+    _mergeCardSummary(summary) {
+        if (!summary) return;
+        const cardId = parseInt(summary.id);
+        const newListId = parseInt(summary.list_id);
+
+        // If archived, remove from all lists
+        if (summary.is_archived) {
+            for (const list of this.data.lists) {
+                list.cards = list.cards.filter(c => parseInt(c.id) !== cardId);
+            }
+            this.renderLists();
+            return;
+        }
+
+        let existing = null;
+        let existingListId = null;
+        for (const list of this.data.lists) {
+            const idx = list.cards.findIndex(c => parseInt(c.id) === cardId);
+            if (idx !== -1) {
+                if (!existing) {
+                    existing = list.cards[idx];
+                    existingListId = parseInt(list.id);
+                }
+                // Strip all copies defensively
+                list.cards.splice(idx, 1);
+            }
+        }
+
+        const target = this.data.lists.find(l => parseInt(l.id) === newListId);
+        if (!target) return; // list not on this board
+
+        const merged = existing ? Object.assign(existing, summary) : summary;
+        merged.list_id = newListId;
+        target.cards.push(merged);
+        target.cards.sort((a, b) => a.position - b.position);
+        this.renderLists();
+    },
+
+    async refreshBoardData() {
+        try {
+            const res = await App.api('boards.get', { id: this.boardId }, 'GET');
+            // Preserve SSE connection — only update data and re-render
+            this.data = res.board;
+            this.renderLists();
+        } catch (e) { /* ignore */ }
+    },
+
     // SSE event handlers — coerce IDs to int since SSE JSON may deliver strings
     handleCardCreated(data) {
         const cardId = parseInt(data.card.id);
@@ -893,14 +958,9 @@ const Board = {
     handleCardUpdated(data) {
         const cardId = parseInt(data.card?.id || data.card_id);
         if (!cardId) return;
-        for (const list of this.data.lists) {
-            const idx = list.cards.findIndex(c => parseInt(c.id) === cardId);
-            if (idx !== -1) {
-                if (data.card) Object.assign(list.cards[idx], data.card);
-                this.renderLists();
-                break;
-            }
-        }
+        // Payloads are inconsistent (flat row, {card_id} only, or nested card with partial fields).
+        // Always refresh from server so labels/assignees/coordinator/counts stay in sync.
+        this.refreshCardThumbnail(cardId);
     },
 
     handleCardMoved(data) {
@@ -911,26 +971,31 @@ const Board = {
         const targetList = this.data.lists.find(l => parseInt(l.id) === targetListId);
         if (!targetList) return;
 
-        // Remove any stale copies from non-target lists (defensive against replayed
-        // card_created / out-of-order events that can leave duplicates behind)
-        let removedStale = false;
+        // Capture the card first, then strip every copy — fixes the "card disappears" bug
+        // where we used to strip before locating it.
+        let card = null;
         for (const list of this.data.lists) {
-            if (parseInt(list.id) === targetListId) continue;
-            const before = list.cards.length;
-            list.cards = list.cards.filter(c => parseInt(c.id) !== cardId);
-            if (list.cards.length !== before) removedStale = true;
+            const kept = [];
+            for (const c of list.cards) {
+                if (parseInt(c.id) === cardId) {
+                    if (!card) card = c;
+                } else {
+                    kept.push(c);
+                }
+            }
+            list.cards = kept;
         }
 
-        const existing = targetList.cards.find(c => parseInt(c.id) === cardId);
-        if (existing) {
-            existing.list_id = targetListId;
-            existing.position = position;
-            targetList.cards.sort((a, b) => a.position - b.position);
-            if (removedStale) this.renderLists();
+        if (!card) {
+            // Card isn't in local data — fetch it and _mergeCardSummary will place it
+            this.refreshCardThumbnail(cardId);
             return;
         }
 
-        this.updateCardInData(cardId, targetListId, position);
+        card.list_id = targetListId;
+        card.position = position;
+        targetList.cards.push(card);
+        targetList.cards.sort((a, b) => a.position - b.position);
         this.renderLists();
     },
 

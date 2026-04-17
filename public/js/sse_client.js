@@ -23,9 +23,13 @@ const SSEClient = {
         });
 
         this.source.addEventListener('card_updated', (e) => {
-            if (!CardModal.isSuppressed()) {
-                Board.handleCardUpdated(JSON.parse(e.data));
-            }
+            const data = JSON.parse(e.data);
+            const cardId = parseInt(data.card?.id || data.card_id);
+            // Always refresh the board thumbnail (labels/assignees/coordinator need this);
+            // modal suppression only applies to the actor's own open modal, not the board.
+            const openCardId = CardModal.currentCard ? parseInt(CardModal.currentCard.id) : null;
+            if (CardModal.isSuppressed() && openCardId === cardId) return;
+            Board.handleCardUpdated(data);
         });
 
         this.source.addEventListener('card_moved', (e) => {
@@ -52,57 +56,31 @@ const SSEClient = {
             Board.handleListArchived(JSON.parse(e.data));
         });
 
-        // Card sub-item events — only refresh modal if it's from another user (not suppressed)
-        this.source.addEventListener('comment_added', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
+        // Card sub-item events — refresh the board thumbnail (counts/labels) and,
+        // if the modal is open on the same card for another user's change, reopen it.
+        const handleSubItemEvent = (data) => {
+            const cardId = parseInt(data.card_id);
+            if (!cardId) return;
+            // Always refresh board thumbnail for counts/progress
+            Board.refreshCardThumbnail(cardId);
+            // Refresh open modal only if it's someone else's change on the currently-open card
+            const openCardId = CardModal.currentCard ? parseInt(CardModal.currentCard.id) : null;
+            if (openCardId === cardId && !CardModal.isSuppressed()) {
+                CardModal.open(cardId);
             }
-        });
+        };
 
-        this.source.addEventListener('comment_updated', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
-            }
-        });
+        this.source.addEventListener('comment_added', (e) => handleSubItemEvent(JSON.parse(e.data)));
+        this.source.addEventListener('comment_updated', (e) => handleSubItemEvent(JSON.parse(e.data)));
+        this.source.addEventListener('comment_deleted', (e) => handleSubItemEvent(JSON.parse(e.data)));
+        this.source.addEventListener('checklist_changed', (e) => handleSubItemEvent(JSON.parse(e.data)));
+        this.source.addEventListener('attachment_added', (e) => handleSubItemEvent(JSON.parse(e.data)));
+        this.source.addEventListener('attachment_deleted', (e) => handleSubItemEvent(JSON.parse(e.data)));
 
-        this.source.addEventListener('comment_deleted', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
-            }
-        });
-
-        this.source.addEventListener('checklist_changed', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
-            }
-        });
-
-        this.source.addEventListener('attachment_added', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
-            }
-        });
-
-        this.source.addEventListener('attachment_deleted', (e) => {
-            if (CardModal.isSuppressed()) return;
-            const data = JSON.parse(e.data);
-            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === parseInt(data.card_id)) {
-                CardModal.open(data.card_id);
-            }
-        });
-
-        this.source.addEventListener('label_changed', (e) => {
-            if (CardModal.isSuppressed()) return;
+        // Board-level label changes (created/updated/deleted) — reload board data
+        // so all cards pick up new colors/names without reconnecting SSE.
+        this.source.addEventListener('label_changed', () => {
+            Board.refreshBoardData();
         });
 
         // Notification count updates

@@ -85,6 +85,33 @@ class CardController extends Controller
         $this->json(['card' => $card]);
     }
 
+    public function summary(): void
+    {
+        $this->requireAuth();
+        $this->requireGet();
+
+        $cardId = (int) ($_GET['id'] ?? 0);
+        if (!$cardId) {
+            $this->json(['error' => 'Card ID required'], 400);
+            return;
+        }
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        $card = $this->cardModel->getSummary($cardId);
+        if (!$card) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+
+        $this->json(['card' => $card]);
+    }
+
     public function update(): void
     {
         $this->requireAuth();
