@@ -22,6 +22,15 @@ require_once __DIR__ . '/core/Mailer.php';
 
 $db = Database::get();
 
+// Log the start of this cron run; status will be updated at the end.
+$db->exec("INSERT INTO cron_runs (started_at, status) VALUES (NOW(), 'running')");
+$cronRunId = (int) $db->lastInsertId();
+
+// Buffer output so we can both print it for the operator AND store it in the log.
+ob_start();
+$cronStatus = 'success';
+try {
+
 // 1. Clean up old SSE events (>10 min old — supersedable events are already pruned at insert time)
 $deleted = $db->exec("DELETE FROM sse_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
 echo "Cleaned up {$deleted} old SSE events.\n";
@@ -130,3 +139,25 @@ foreach ($digestUsers as $uid) {
 echo "Sent {$digestSent} notification digest emails.\n";
 
 echo "Cron job complete.\n";
+
+} catch (Throwable $e) {
+    $cronStatus = 'failed';
+    echo "ERROR: " . $e->getMessage() . "\n";
+    echo "  at " . $e->getFile() . ":" . $e->getLine() . "\n";
+}
+
+$cronOutput = ob_get_clean();
+echo $cronOutput; // preserve visibility for anyone watching CLI output
+
+// Update the log row with outcome + captured output.
+$stmt = $db->prepare(
+    "UPDATE cron_runs SET finished_at = NOW(), status = :status, summary = :summary WHERE id = :id"
+);
+$stmt->execute([
+    'status'  => $cronStatus,
+    'summary' => mb_substr($cronOutput, 0, 65000),
+    'id'      => $cronRunId,
+]);
+
+// Prune log entries older than 10 days so the table never grows unbounded.
+$db->exec("DELETE FROM cron_runs WHERE started_at < DATE_SUB(NOW(), INTERVAL 10 DAY)");

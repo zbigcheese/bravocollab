@@ -285,6 +285,19 @@ CREATE TABLE IF NOT EXISTS `activities` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- CRON RUN LOG
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `cron_runs` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `started_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `finished_at` DATETIME DEFAULT NULL,
+    `status`      ENUM('running', 'success', 'failed') NOT NULL DEFAULT 'running',
+    `summary`     TEXT DEFAULT NULL,
+    INDEX `idx_started_at` (`started_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- SSE EVENTS QUEUE
 -- ============================================================
 
