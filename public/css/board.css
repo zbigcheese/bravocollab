@@ -227,6 +227,85 @@
     user-select: none;
 }
 
+/* ---- Show-archived toggle ---- */
+.archived-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.archived-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.archived-toggle-slider {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.archived-toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.archived-toggle input:checked + .archived-toggle-slider {
+    background: #5bc0de;
+}
+
+.archived-toggle input:checked + .archived-toggle-slider::after {
+    transform: translateX(16px);
+}
+
+.archived-toggle input:focus-visible + .archived-toggle-slider {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.archived-toggle-label {
+    white-space: nowrap;
+}
+
+/* ---- Archived card styling in list view ---- */
+/* By default: hide archived cards from the list view entirely. */
+.list-cards .card-archived {
+    display: none;
+}
+
+/* When toggle is on: show them dimmed. */
+.board-wrapper.show-archived .list-cards .card-archived {
+    display: block;
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+.board-wrapper.show-archived .list-cards .card-archived:hover {
+    opacity: 1;
+}
+
 .board-members-preview .avatar {
     margin-left: -4px;
     border: 2px solid rgba(255,255,255,0.3);

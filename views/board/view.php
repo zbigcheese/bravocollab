@@ -12,6 +12,11 @@ if (!$boardId) {
             <h1 class="board-title" id="boardTitle"></h1>
         </div>
         <div class="board-header-right">
+            <label class="archived-toggle" title="Show archived cards">
+                <input type="checkbox" id="showArchivedToggle">
+                <span class="archived-toggle-slider"></span>
+                <span class="archived-toggle-label">Show archived</span>
+            </label>
             <div class="board-members-preview" id="boardMembersPreview"></div>
             <?php if (Auth::isAdmin()): ?>
             <button class="btn btn-sm btn-secondary" id="manageMembersBtn">Members</button>

@@ -164,9 +164,10 @@ const Board = {
         }
 
         const hasBadges = badges || assigneesHtml;
+        const archivedCls = card.is_archived == 1 ? ' card-archived' : '';
 
         return `
-            <div class="card-item" data-card-id="${card.id}" data-list-id="${card.list_id}">
+            <div class="card-item${archivedCls}" data-card-id="${card.id}" data-list-id="${card.list_id}">
                 ${labelsHtml}
                 <div class="card-title">${App.escapeHtml(card.title)}</div>
                 ${hasBadges ? `<div class="card-badges">${badges}${assigneesHtml}</div>` : ''}
@@ -198,6 +199,8 @@ const Board = {
                 group: 'cards',
                 animation: 150,
                 draggable: '.card-item',
+                filter: '.card-archived',
+                preventOnFilter: false,
                 ghostClass: 'sortable-ghost',
                 dragClass: 'sortable-drag',
                 onEnd: (evt) => this.onCardMove(evt),
@@ -445,6 +448,21 @@ const Board = {
             e.stopPropagation();
             this.toggleMembersDrawer();
         });
+
+        // Show-archived toggle (per-board, persisted in localStorage)
+        const archivedToggle = document.getElementById('showArchivedToggle');
+        if (archivedToggle) {
+            const key = 'showArchived:' + this.boardId;
+            const wrapper = document.getElementById('boardWrapper');
+            const initial = localStorage.getItem(key) === '1';
+            archivedToggle.checked = initial;
+            wrapper.classList.toggle('show-archived', initial);
+            archivedToggle.addEventListener('change', () => {
+                const on = archivedToggle.checked;
+                wrapper.classList.toggle('show-archived', on);
+                try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+            });
+        }
 
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());

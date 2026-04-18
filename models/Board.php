@@ -54,7 +54,7 @@ class Board extends Model
                     )) as checklist_progress
                  FROM cards c
                  LEFT JOIN card_labels cl ON c.id = cl.card_id
-                 WHERE c.list_id = :list_id AND c.is_archived = 0
+                 WHERE c.list_id = :list_id
                  GROUP BY c.id
                  ORDER BY c.position ASC',
                 ['list_id' => $list['id']]
