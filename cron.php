@@ -1,14 +1,16 @@
 <?php
-/**
- * BravoCollab - Cron Job
- * Run every 15 minutes: */15 * * * * /usr/bin/php /path/to/cron.php
- *
- * Tasks:
- * 1. Clean up old SSE events (older than 1 hour)
- * 2. Clean up expired invitations
- * 3. Clean up old login attempts
- * 4. Send due-date reminders (due within 24 hours)
- */
+// BravoCollab - Cron Job
+// Run every 15 minutes via cPanel: "/15 * * * *" /usr/bin/php /path/to/cron.php
+// (the crontab "*/15" notation is omitted from this comment because
+//  PHP's block-comment terminator "*/" would close the comment early.)
+//
+// Tasks:
+//   1. Clean up old SSE events (older than 10 minutes)
+//   2. Clean up expired invitations
+//   3. Clean up old login attempts
+//   4. Send due-date reminders (due within 24 hours)
+//   5. Send notification-digest emails for unread notifications > 1 hour old
+//   6. Log this run and prune runs older than 10 days
 
 // Only allow CLI execution
 if (php_sapi_name() !== 'cli') {
