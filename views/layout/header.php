@@ -14,7 +14,7 @@
     <nav class="navbar">
         <div class="navbar-left">
             <a href="index.php?page=dashboard" class="navbar-brand">
-                <img src="public/img/favicon.png" alt="" class="navbar-brand-logo">
+                <img src="public/img/logo_white.png" alt="" class="navbar-brand-logo">
                 <span>BravoCollab</span>
             </a>
         </div>
