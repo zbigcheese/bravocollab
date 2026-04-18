@@ -19,18 +19,20 @@
     gap: 16px;
 }
 
-/* Archived board tiles — hidden by default, dimmed when toggle is on. */
-.board-tile-wrap-archived {
+/* Archived board tiles — hidden by default, dimmed when toggle is on.
+   Double-class selector raises specificity above the plain .board-tile-wrap
+   rule defined later in this file. */
+.board-tile-wrap.board-tile-wrap-archived {
     display: none;
 }
 
-.dashboard.show-archived .board-tile-wrap-archived {
+.dashboard.show-archived .board-tile-wrap.board-tile-wrap-archived {
     display: flex;
     opacity: 0.5;
     transition: opacity 0.15s;
 }
 
-.dashboard.show-archived .board-tile-wrap-archived:hover {
+.dashboard.show-archived .board-tile-wrap.board-tile-wrap-archived:hover {
     opacity: 1;
 }
 
