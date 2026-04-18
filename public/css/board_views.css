@@ -9,11 +9,10 @@
     display: inline-flex;
     gap: 4px;
     padding: 4px;
-    background: rgba(23, 43, 77, 0.92);
+    background: #F16820;
     border-radius: 999px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
     z-index: 200;
-    backdrop-filter: blur(4px);
 }
 
 .view-switcher-btn {
@@ -23,9 +22,9 @@
     padding: 6px 14px;
     border: 0;
     background: transparent;
-    color: rgba(255, 255, 255, 0.78);
+    color: #fff;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     border-radius: 999px;
     cursor: pointer;
     transition: background 0.12s, color 0.12s;
@@ -39,11 +38,11 @@
 
 .view-switcher-btn:hover {
     color: #fff;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.14);
 }
 
 .view-switcher-btn.active {
-    color: #172b4d;
+    color: #F16820;
     background: #fff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
@@ -73,6 +72,7 @@
     padding: 0 8px;
     min-width: 160px;
     text-align: center;
+    color: #fff;
 }
 
 /* ============================================================
@@ -298,4 +298,143 @@
 
 .tl-bar.tl-done .tl-bar-title {
     text-decoration: line-through;
+}
+
+/* ============================================================
+   Inline calendar (used in the Dates modal)
+   ============================================================ */
+.inline-cal-wrap {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.inline-cal-col {
+    flex: 1 1 260px;
+    min-width: 240px;
+}
+
+.inline-cal-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+}
+
+.inline-cal-hint {
+    font-weight: 400;
+    text-transform: none;
+    font-size: 11px;
+    margin-left: 4px;
+}
+
+.inline-cal {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 8px;
+    background: #fff;
+    user-select: none;
+}
+
+.inline-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.inline-cal-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.inline-cal-nav {
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--color-text);
+}
+
+.inline-cal-nav:hover {
+    background: #f4f5f7;
+}
+
+.inline-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.inline-cal-dow {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+    padding: 4px 0;
+}
+
+.inline-cal-day {
+    height: 32px;
+    border: 0;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+    cursor: pointer;
+    padding: 0;
+}
+
+.inline-cal-day:hover {
+    background: #ebecf0;
+}
+
+.inline-cal-day.outside {
+    color: #a5adba;
+}
+
+.inline-cal-day.today {
+    font-weight: 800;
+    color: #F16820;
+}
+
+.inline-cal-day.sel {
+    background: #5bc0de;
+    color: #fff;
+}
+
+.inline-cal-day.sel.today {
+    background: #F16820;
+    color: #fff;
+}
+
+.inline-cal-time-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.inline-cal-time-row label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+    letter-spacing: 0.04em;
+}
+
+.inline-cal-time-row input[type="time"] {
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 13px;
 }

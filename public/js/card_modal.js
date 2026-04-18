@@ -1259,33 +1259,135 @@ const CardModal = {
     },
 
     // ---- Due Date ----
+    _buildInlineCalendar(initialDateStr) {
+        const keyOf = (d) =>
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        const state = {
+            selected: initialDateStr || null,
+            month: initialDateStr ? new Date(initialDateStr + 'T00:00:00') : new Date(),
+        };
+        state.month = new Date(state.month.getFullYear(), state.month.getMonth(), 1);
+
+        const el = document.createElement('div');
+        el.className = 'inline-cal';
+
+        const render = () => {
+            const m = state.month;
+            const first = new Date(m.getFullYear(), m.getMonth(), 1);
+            const last  = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+            const lead  = (first.getDay() + 6) % 7; // Monday-start
+            const prevLast = new Date(m.getFullYear(), m.getMonth(), 0).getDate();
+            const daysInMonth = last.getDate();
+            const cells = [];
+            for (let i = lead - 1; i >= 0; i--) {
+                cells.push({ d: prevLast - i, outside: true, dateObj: new Date(m.getFullYear(), m.getMonth() - 1, prevLast - i) });
+            }
+            for (let d = 1; d <= daysInMonth; d++) {
+                cells.push({ d, outside: false, dateObj: new Date(m.getFullYear(), m.getMonth(), d) });
+            }
+            while (cells.length % 7 !== 0) {
+                const lastCell = cells[cells.length - 1].dateObj;
+                cells.push({
+                    d: lastCell.getDate() + 1,
+                    outside: true,
+                    dateObj: new Date(lastCell.getFullYear(), lastCell.getMonth(), lastCell.getDate() + 1),
+                });
+            }
+
+            const todayKey = keyOf(new Date());
+            const monthLabel = m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+            el.innerHTML = `
+                <div class="inline-cal-head">
+                    <button type="button" class="inline-cal-nav" data-nav="prev" aria-label="Previous month">&lsaquo;</button>
+                    <div class="inline-cal-title">${monthLabel}</div>
+                    <button type="button" class="inline-cal-nav" data-nav="next" aria-label="Next month">&rsaquo;</button>
+                </div>
+                <div class="inline-cal-grid">
+                    ${['Mo','Tu','We','Th','Fr','Sa','Su'].map(n => `<div class="inline-cal-dow">${n}</div>`).join('')}
+                    ${cells.map(c => {
+                        const k = keyOf(c.dateObj);
+                        const classes = ['inline-cal-day'];
+                        if (c.outside) classes.push('outside');
+                        if (k === todayKey) classes.push('today');
+                        if (state.selected === k) classes.push('sel');
+                        return `<button type="button" class="${classes.join(' ')}" data-date="${k}">${c.d}</button>`;
+                    }).join('')}
+                </div>
+            `;
+
+            el.querySelector('[data-nav="prev"]').addEventListener('click', () => {
+                state.month = new Date(m.getFullYear(), m.getMonth() - 1, 1);
+                render();
+            });
+            el.querySelector('[data-nav="next"]').addEventListener('click', () => {
+                state.month = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+                render();
+            });
+            el.querySelectorAll('.inline-cal-day').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.selected = btn.dataset.date;
+                    // If user picked an outside-month day, jump the calendar to that month
+                    const picked = new Date(btn.dataset.date + 'T00:00:00');
+                    state.month = new Date(picked.getFullYear(), picked.getMonth(), 1);
+                    render();
+                });
+            });
+        };
+
+        render();
+        return { el, getValue: () => state.selected, clear: () => { state.selected = null; render(); } };
+    },
+
     showDueDatePicker() {
-        const currentDue   = this.currentCard.due_date   ? this.currentCard.due_date.substring(0, 16)   : '';
-        const currentStart = this.currentCard.start_date ? this.currentCard.start_date.substring(0, 10) : '';
+        const currentDueDate = this.currentCard.due_date   ? this.currentCard.due_date.substring(0, 10)  : '';
+        const currentDueTime = this.currentCard.due_date   ? this.currentCard.due_date.substring(11, 16) : '';
+        const currentStart   = this.currentCard.start_date ? this.currentCard.start_date.substring(0, 10): '';
 
         const modal = App.createModal('dueDateModal', 'Dates', `
-            <div class="form-group">
-                <label>Start date (optional, for Timeline)</label>
-                <input type="date" id="startDateInput" value="${currentStart}">
-            </div>
-            <div class="form-group">
-                <label>Due date &amp; time</label>
-                <input type="datetime-local" id="dueDateInput" value="${currentDue}">
+            <div class="inline-cal-wrap">
+                <div class="inline-cal-col">
+                    <div class="inline-cal-label">Start date <span class="inline-cal-hint">(optional, for Timeline)</span></div>
+                    <div id="startCalMount"></div>
+                </div>
+                <div class="inline-cal-col">
+                    <div class="inline-cal-label">Due date</div>
+                    <div id="dueCalMount"></div>
+                    <div class="inline-cal-time-row">
+                        <label for="dueTimeInput">Time</label>
+                        <input type="time" id="dueTimeInput" value="${currentDueTime || '17:00'}">
+                    </div>
+                </div>
             </div>
         `, `
             <button class="btn btn-secondary btn-sm" id="removeDueDate">Remove</button>
             <button class="btn btn-primary btn-sm" id="saveDueDate">Save</button>
         `);
 
+        const startCal = this._buildInlineCalendar(currentStart || null);
+        const dueCal   = this._buildInlineCalendar(currentDueDate || null);
+        document.getElementById('startCalMount').appendChild(startCal.el);
+        document.getElementById('dueCalMount').appendChild(dueCal.el);
+
         document.getElementById('saveDueDate').addEventListener('click', async () => {
-            const due   = document.getElementById('dueDateInput').value;
-            const start = document.getElementById('startDateInput').value || null;
-            if (!due) return;
+            const dueDate = dueCal.getValue();
+            const startDate = startCal.getValue();
+            if (!dueDate) {
+                App.showToast('Please pick a due date', 'error');
+                return;
+            }
+            const time = document.getElementById('dueTimeInput').value || '17:00';
+            const dueDateTime = `${dueDate}T${time}`;
             this.suppressSSE();
             try {
-                await App.api('cards.update', { id: this.currentCard.id, due_date: due, start_date: start });
-                this.currentCard.due_date   = due;
-                this.currentCard.start_date = start;
+                await App.api('cards.update', {
+                    id: this.currentCard.id,
+                    due_date: dueDateTime,
+                    start_date: startDate || null,
+                });
+                this.currentCard.due_date   = dueDateTime;
+                this.currentCard.start_date = startDate || null;
                 modal.remove();
                 this.updateDueDateDOM();
                 this.refreshBoardCard();
