@@ -126,6 +126,15 @@
     margin-left: auto;
 }
 
+.card-archived-label {
+    font-size: 20px;
+    font-weight: 700;
+    color: #b34b0c;
+    padding-top: 6px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 /* Inline title editing */
 .card-detail-title {
     font-size: 20px;

@@ -220,6 +220,33 @@ class CardController extends Controller
         $this->json(['success' => true]);
     }
 
+    public function restore(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['id'] ?? 0);
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        $card = $this->cardModel->find($cardId);
+        $this->cardModel->update($cardId, ['is_archived' => 0]);
+
+        // Re-use card_updated for live refresh; consumers will pick up is_archived=0.
+        $fresh = $this->cardModel->find($cardId);
+        $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $fresh]);
+        $this->logActivity($boardId, $cardId, 'card_updated', ['restored' => true, 'title' => $card['title']]);
+
+        $this->json(['success' => true]);
+    }
+
     public function assign(): void
     {
         $this->requireAuth();

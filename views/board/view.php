@@ -9,6 +9,7 @@ if (!$boardId) {
 <div class="board-wrapper" id="boardWrapper" data-board-id="<?php echo $boardId; ?>" data-is-admin="<?php echo Auth::isAdmin() ? '1' : '0'; ?>">
     <div class="board-header" id="boardHeader">
         <div class="board-header-left">
+            <span class="board-archived-label" id="boardArchivedLabel" hidden>(Archived)&nbsp;</span>
             <h1 class="board-title" id="boardTitle"></h1>
         </div>
         <div class="board-header-right">

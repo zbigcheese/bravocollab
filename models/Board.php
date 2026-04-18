@@ -12,8 +12,7 @@ class Board extends Model
                     (SELECT COUNT(*) FROM board_members bm WHERE bm.board_id = b.id) as member_count
                  FROM boards b
                  JOIN users u ON b.created_by = u.id
-                 WHERE b.is_archived = 0
-                 ORDER BY b.updated_at DESC'
+                 ORDER BY b.is_archived ASC, b.updated_at DESC'
             )->fetchAll();
         }
 
@@ -23,8 +22,8 @@ class Board extends Model
              FROM boards b
              JOIN board_members bm ON b.id = bm.board_id
              JOIN users u ON b.created_by = u.id
-             WHERE bm.user_id = :user_id AND b.is_archived = 0
-             ORDER BY b.updated_at DESC',
+             WHERE bm.user_id = :user_id
+             ORDER BY b.is_archived ASC, b.updated_at DESC',
             ['user_id' => $userId]
         )->fetchAll();
     }

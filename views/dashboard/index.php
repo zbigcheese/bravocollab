@@ -1,9 +1,16 @@
-<div class="dashboard">
+<div class="dashboard" id="dashboard">
     <div class="dashboard-header">
         <h1>My Boards</h1>
-        <?php if (Auth::isAdmin()): ?>
-        <button class="btn btn-primary" id="createBoardBtn">+ New Board</button>
-        <?php endif; ?>
+        <div class="dashboard-header-actions">
+            <label class="archived-toggle archived-toggle-dark" title="Show archived boards">
+                <input type="checkbox" id="showArchivedBoardsToggle">
+                <span class="archived-toggle-slider"></span>
+                <span class="archived-toggle-label">Show archived</span>
+            </label>
+            <?php if (Auth::isAdmin()): ?>
+            <button class="btn btn-primary" id="createBoardBtn">+ New Board</button>
+            <?php endif; ?>
+        </div>
     </div>
     <div class="board-grid" id="boardGrid">
         <div class="empty-state" id="boardsLoading">
@@ -168,16 +175,34 @@ document.addEventListener('DOMContentLoaded', async function() {
             const updatesHtml = updates.length
                 ? `<div class="board-updates">${updates.map(u => renderUpdate(b.id, u)).join('')}</div>`
                 : '';
+            const archivedCls = b.is_archived == 1 ? ' board-tile-wrap-archived' : '';
+            const archivedPrefix = b.is_archived == 1
+                ? '<span class="board-tile-archived-tag">(Archived)&nbsp;</span>' : '';
             return `
-                <div class="board-tile-wrap" data-board-id="${b.id}">
+                <div class="board-tile-wrap${archivedCls}" data-board-id="${b.id}">
                     <a href="index.php?page=board&id=${b.id}" class="board-tile" style="background-color:${App.escapeHtml(b.background_color)}">
-                        <div class="board-tile-title">${App.escapeHtml(b.title)}</div>
+                        <div class="board-tile-title">${archivedPrefix}${App.escapeHtml(b.title)}</div>
                         <div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>
                     </a>
                     ${updatesHtml}
                 </div>
             `;
         }).join('');
+
+        // Show-archived toggle (persisted across sessions)
+        const archivedToggle = document.getElementById('showArchivedBoardsToggle');
+        const dashEl = document.getElementById('dashboard');
+        if (archivedToggle && dashEl) {
+            const key = 'showArchivedBoards';
+            const on = localStorage.getItem(key) === '1';
+            archivedToggle.checked = on;
+            dashEl.classList.toggle('show-archived', on);
+            archivedToggle.addEventListener('change', () => {
+                const v = archivedToggle.checked;
+                dashEl.classList.toggle('show-archived', v);
+                try { localStorage.setItem(key, v ? '1' : '0'); } catch (e) {}
+            });
+        }
 
         // Poll for live updates while the tab is visible.
         setInterval(refreshUpdates, 10000);

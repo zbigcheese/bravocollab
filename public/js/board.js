@@ -48,8 +48,10 @@ const Board = {
         wrapper.style.backgroundColor = board.background_color;
         wrapper.setAttribute('data-bg', '1');
 
-        // Title
+        // Title + archived label
         document.getElementById('boardTitle').textContent = board.title;
+        const archivedLbl = document.getElementById('boardArchivedLabel');
+        if (archivedLbl) archivedLbl.hidden = board.is_archived != 1;
 
         // Members preview
         const preview = document.getElementById('boardMembersPreview');
@@ -688,7 +690,9 @@ const Board = {
             menuItems += '<button class="context-menu-item" data-action="labels">Edit Labels</button>';
             menuItems += '<button class="context-menu-item" data-action="description">Edit Description</button>';
             menuItems += '<button class="context-menu-item" data-action="background">Change Background</button>';
-            menuItems += '<button class="context-menu-item danger" data-action="archive">Archive Board</button>';
+            menuItems += this.data?.is_archived == 1
+                ? '<button class="context-menu-item" data-action="restore">Restore Board</button>'
+                : '<button class="context-menu-item danger" data-action="archive">Archive Board</button>';
         }
         if (!menuItems) {
             // Nothing to show for regular members
@@ -712,9 +716,14 @@ const Board = {
             this.showBackgroundPicker();
         });
 
-        menu.querySelector('[data-action="archive"]').addEventListener('click', () => {
+        menu.querySelector('[data-action="archive"]')?.addEventListener('click', () => {
             menu.remove();
             this.archiveBoard();
+        });
+
+        menu.querySelector('[data-action="restore"]')?.addEventListener('click', () => {
+            menu.remove();
+            this.restoreBoard();
         });
     },
 
@@ -773,6 +782,18 @@ const Board = {
                 }
             });
         });
+    },
+
+    async restoreBoard() {
+        try {
+            await App.api('boards.restore', { id: this.boardId });
+            this.data.is_archived = 0;
+            const archivedLbl = document.getElementById('boardArchivedLabel');
+            if (archivedLbl) archivedLbl.hidden = true;
+            App.showToast('Board restored', 'success');
+        } catch (e) {
+            App.showToast(e.message, 'error');
+        }
     },
 
     async archiveBoard() {

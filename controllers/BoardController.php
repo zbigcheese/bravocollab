@@ -194,6 +194,18 @@ class BoardController extends Controller
         $this->json(['success' => true]);
     }
 
+    public function restore(): void
+    {
+        $this->requireAdmin();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $id = (int) ($data['id'] ?? 0);
+        $this->boardModel->update($id, ['is_archived' => 0]);
+        $this->json(['success' => true]);
+    }
+
     public function members(): void
     {
         $this->requireAuth();

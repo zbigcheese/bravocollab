@@ -41,9 +41,14 @@ const CardModal = {
         overlay.id = 'cardDetailModal';
         overlay.className = 'modal-overlay card-detail-modal';
 
+        const archivedLabel = c.is_archived == 1
+            ? '<span class="card-archived-label">(Archived)&nbsp;</span>'
+            : '';
+
         overlay.innerHTML = `
             <div class="modal">
                 <div class="modal-header">
+                    ${archivedLabel}
                     <textarea class="card-detail-title" id="cardTitle" rows="1">${App.escapeHtml(c.title)}</textarea>
                     <button class="modal-close" id="closeCardModal">&times;</button>
                 </div>
@@ -69,7 +74,9 @@ const CardModal = {
                             <button class="btn btn-secondary btn-sm" id="sidebarAttachment">Attachment</button>
                             <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0;">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
-                            <button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>
+                            ${c.is_archived == 1
+                                ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
+                                : '<button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
                             <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-light);">
                                 Created by <strong style="color:var(--color-text);">${App.escapeHtml(c.creator_name)}</strong><br>
                                 ${App.formatDate(c.created_at)}
@@ -520,6 +527,7 @@ const CardModal = {
         document.getElementById('sidebarDueDate')?.addEventListener('click', () => this.showDueDatePicker());
         document.getElementById('sidebarAttachment')?.addEventListener('click', () => this.triggerAttachmentUpload());
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
+        document.getElementById('sidebarRestore')?.addEventListener('click', () => this.restoreCard());
     },
 
     // ---- @mention autocomplete ----
@@ -1450,6 +1458,21 @@ const CardModal = {
             this.closeModal();
             Board.handleCardArchived({ card_id: archivedCardId });
             App.showToast('Card archived', 'info');
+        } catch (e) {
+            App.showToast(e.message, 'error');
+        }
+    },
+
+    async restoreCard() {
+        this.suppressSSE();
+        try {
+            await App.api('cards.restore', { id: this.currentCard.id });
+            const cardId = this.currentCard.id;
+            this.closeModal();
+            // Pull fresh board data so the card reappears normally in its list.
+            if (Board?.refreshBoardData) Board.refreshBoardData();
+            else Board?.refreshCardThumbnail?.(cardId);
+            App.showToast('Card restored', 'success');
         } catch (e) {
             App.showToast(e.message, 'error');
         }
