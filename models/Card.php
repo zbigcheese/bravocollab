@@ -79,12 +79,13 @@ class Card extends Model
             ['card_id' => $cardId]
         )->fetchAll();
 
-        // Comments (oldest first, with parent_id for threading)
+        // Comments (newest first; client groups by parent_id so order
+        // applies independently to roots and to replies under each root).
         $card['comments'] = $this->query(
             'SELECT c.*, u.display_name as author_name FROM comments c
              JOIN users u ON c.user_id = u.id
              WHERE c.card_id = :card_id
-             ORDER BY c.created_at ASC',
+             ORDER BY c.created_at DESC',
             ['card_id' => $cardId]
         )->fetchAll();
 

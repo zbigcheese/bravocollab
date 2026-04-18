@@ -334,14 +334,14 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     <h3>Comments</h3>
                 </div>
-                <div id="commentsList">${commentsHtml || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
-                <div class="comment-form" style="margin-top:12px;">
+                <div class="comment-form" style="margin-bottom:12px;">
                     <div style="position:relative;">
                         <textarea id="newComment" placeholder="Write a comment... Use @ to mention members"></textarea>
                         <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                     </div>
                     <button class="btn btn-primary btn-sm" id="submitComment" style="margin-top:6px;">Comment</button>
                 </div>
+                <div id="commentsList">${commentsHtml || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
             </div>
         `;
     },
@@ -598,7 +598,8 @@ const CardModal = {
                 <button class="btn btn-secondary btn-sm inline-reply-cancel">Cancel</button>
             </div>
         `;
-        repliesContainer.appendChild(form);
+        // Place reply form at top so newest reply lands above existing ones.
+        repliesContainer.insertBefore(form, repliesContainer.firstChild);
 
         const textarea = form.querySelector('.inline-reply-textarea');
         textarea.focus();
@@ -628,7 +629,7 @@ const CardModal = {
                     };
                     this.currentCard.comments.push(newComment);
                     form.remove();
-                    repliesContainer.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment, true));
+                    repliesContainer.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment, true));
                     this.refreshBoardCard();
                 }
             } catch (e) {
@@ -730,7 +731,7 @@ const CardModal = {
                 if (emptyMsg) emptyMsg.remove();
 
                 if (parentId) {
-                    // Insert as reply under parent
+                    // Insert as reply under parent (newest first)
                     const parentEl = list.querySelector(`.comment-item[data-comment-id="${parentId}"]`);
                     let repliesContainer = parentEl?.nextElementSibling;
                     if (!repliesContainer || !repliesContainer.classList.contains('comment-replies')) {
@@ -738,10 +739,10 @@ const CardModal = {
                         repliesContainer.className = 'comment-replies';
                         parentEl.after(repliesContainer);
                     }
-                    repliesContainer.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment, true));
+                    repliesContainer.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment, true));
                 } else {
-                    // Append at end (oldest-to-newest order)
-                    list.insertAdjacentHTML('beforeend', this.renderSingleComment(newComment));
+                    // Prepend at top (newest first)
+                    list.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment));
                 }
 
                 textarea.value = '';
