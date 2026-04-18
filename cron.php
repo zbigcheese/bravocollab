@@ -43,6 +43,10 @@ echo "Cleaned up {$deleted} expired invitations.\n";
 $deleted = $db->exec("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
 echo "Cleaned up {$deleted} old login attempts.\n";
 
+// 3b. Clean up expired remember-me tokens
+$deleted = $db->exec("DELETE FROM remember_tokens WHERE expires_at < NOW()");
+echo "Cleaned up {$deleted} expired remember tokens.\n";
+
 // 4. Due-date reminders - cards due within 24 hours that haven't been notified yet
 $stmt = $db->query(
     "SELECT c.id, c.title, c.due_date, l.board_id

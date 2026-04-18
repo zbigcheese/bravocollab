@@ -63,6 +63,19 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
     INDEX `idx_ip_time` (`ip_address`, `attempted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `remember_tokens` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`        INT UNSIGNED NOT NULL,
+    `selector`       CHAR(32) NOT NULL,
+    `validator_hash` CHAR(64) NOT NULL,
+    `expires_at`     DATETIME NOT NULL,
+    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    UNIQUE KEY `uk_selector` (`selector`),
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_expires_at` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 -- BOARDS
 -- ============================================================
