@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="public/css/board.css">
     <link rel="stylesheet" href="public/css/modal.css">
 </head>
+<?php
+$navUser   = Auth::currentUser() ?: [];
+$userEmail = $navUser['email'] ?? '';
+$userRole  = $navUser['role']  ?? 'member';
+$roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
+?>
 <body>
     <nav class="navbar">
         <div class="navbar-left">
@@ -22,6 +28,20 @@
             <?php if (Auth::isAdmin()): ?>
             <a href="index.php?page=admin_users" class="nav-link">Users</a>
             <?php endif; ?>
+            <div class="user-menu" id="userMenu">
+                <button type="button" class="user-menu-trigger" id="userMenuTrigger" aria-haspopup="true" aria-expanded="false">
+                    <span class="user-name"><?php echo htmlspecialchars(Auth::userName()); ?></span>
+                    <svg class="user-menu-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="user-menu-dropdown" id="userMenuDropdown" role="menu">
+                    <div class="user-menu-identity">
+                        <div class="user-menu-name"><?php echo htmlspecialchars(Auth::userName()); ?></div>
+                        <div class="user-menu-email" title="<?php echo htmlspecialchars($userEmail); ?>"><?php echo htmlspecialchars($userEmail); ?></div>
+                        <span class="user-menu-role user-menu-role-<?php echo htmlspecialchars($userRole); ?>"><?php echo $roleLabel; ?></span>
+                    </div>
+                    <button type="button" class="user-menu-logout" id="logoutBtn">Sign out</button>
+                </div>
+            </div>
             <div class="notification-bell" id="notificationBell">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -37,10 +57,6 @@
                         <p class="notification-empty">No notifications</p>
                     </div>
                 </div>
-            </div>
-            <div class="user-menu">
-                <span class="user-name"><?php echo htmlspecialchars(Auth::userName()); ?></span>
-                <button class="btn-text" id="logoutBtn">Logout</button>
             </div>
         </div>
     </nav>

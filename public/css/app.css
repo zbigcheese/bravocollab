@@ -107,15 +107,118 @@ a:hover {
 }
 
 .user-menu {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
+}
+
+.user-menu-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.user-menu-trigger:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.user-menu-chev {
+    opacity: 0.85;
+    transition: transform 0.15s;
+}
+
+.user-menu-trigger[aria-expanded="true"] .user-menu-chev {
+    transform: rotate(180deg);
 }
 
 .user-name {
     font-size: 13px;
     font-weight: 700;
     color: #fff;
+}
+
+.user-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 240px;
+    background: #fff;
+    color: var(--color-text);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    padding: 14px;
+    display: none;
+    z-index: 150;
+}
+
+.user-menu-dropdown.open {
+    display: block;
+}
+
+.user-menu-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 12px;
+}
+
+.user-menu-name {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.user-menu-email {
+    font-size: 12px;
+    color: var(--color-text-light);
+    word-break: break-all;
+}
+
+.user-menu-role {
+    display: inline-block;
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: var(--color-primary-light);
+    color: var(--color-primary-dark);
+}
+
+.user-menu-role-admin {
+    background: #fde4d3;
+    color: #b34b0c;
+}
+
+.user-menu-logout {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+.user-menu-logout:hover {
+    background: #f4f5f7;
+    border-color: #c1c7d0;
 }
 
 /* ---- Buttons ---- */
