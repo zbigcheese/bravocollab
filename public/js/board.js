@@ -17,6 +17,7 @@ const Board = {
         this.isAdmin = wrapper.dataset.isAdmin === '1';
         await this.load();
         this.bindEvents();
+        if (typeof BoardViews !== 'undefined') BoardViews.init();
 
         // Auto-open card if ?card=ID is in URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -67,6 +68,9 @@ const Board = {
 
         // Reinit sortables
         this.initSortable();
+
+        // Let Calendar/Timeline views pick up the new data
+        if (typeof BoardViews !== 'undefined') BoardViews.refresh();
     },
 
     listHtml(list) {

@@ -1260,12 +1260,17 @@ const CardModal = {
 
     // ---- Due Date ----
     showDueDatePicker() {
-        const current = this.currentCard.due_date ? this.currentCard.due_date.substring(0, 16) : '';
+        const currentDue   = this.currentCard.due_date   ? this.currentCard.due_date.substring(0, 16)   : '';
+        const currentStart = this.currentCard.start_date ? this.currentCard.start_date.substring(0, 10) : '';
 
-        const modal = App.createModal('dueDateModal', 'Due Date', `
+        const modal = App.createModal('dueDateModal', 'Dates', `
             <div class="form-group">
-                <label>Date & Time</label>
-                <input type="datetime-local" id="dueDateInput" value="${current}">
+                <label>Start date (optional, for Timeline)</label>
+                <input type="date" id="startDateInput" value="${currentStart}">
+            </div>
+            <div class="form-group">
+                <label>Due date &amp; time</label>
+                <input type="datetime-local" id="dueDateInput" value="${currentDue}">
             </div>
         `, `
             <button class="btn btn-secondary btn-sm" id="removeDueDate">Remove</button>
@@ -1273,12 +1278,14 @@ const CardModal = {
         `);
 
         document.getElementById('saveDueDate').addEventListener('click', async () => {
-            const val = document.getElementById('dueDateInput').value;
-            if (!val) return;
+            const due   = document.getElementById('dueDateInput').value;
+            const start = document.getElementById('startDateInput').value || null;
+            if (!due) return;
             this.suppressSSE();
             try {
-                await App.api('cards.update', { id: this.currentCard.id, due_date: val });
-                this.currentCard.due_date = val;
+                await App.api('cards.update', { id: this.currentCard.id, due_date: due, start_date: start });
+                this.currentCard.due_date   = due;
+                this.currentCard.start_date = start;
                 modal.remove();
                 this.updateDueDateDOM();
                 this.refreshBoardCard();
@@ -1290,8 +1297,9 @@ const CardModal = {
         document.getElementById('removeDueDate').addEventListener('click', async () => {
             this.suppressSSE();
             try {
-                await App.api('cards.update', { id: this.currentCard.id, due_date: null });
-                this.currentCard.due_date = null;
+                await App.api('cards.update', { id: this.currentCard.id, due_date: null, start_date: null });
+                this.currentCard.due_date   = null;
+                this.currentCard.start_date = null;
                 modal.remove();
                 this.updateDueDateDOM();
                 this.refreshBoardCard();

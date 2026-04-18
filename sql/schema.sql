@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS `cards` (
     `description`    TEXT,
     `position`       INT UNSIGNED NOT NULL DEFAULT 0,
     `due_date`       DATETIME DEFAULT NULL,
+    `start_date`     DATE DEFAULT NULL,
     `due_complete`   TINYINT(1) NOT NULL DEFAULT 0,
     `cover_image_id` INT UNSIGNED DEFAULT NULL,
     `coordinator_id` INT UNSIGNED DEFAULT NULL,

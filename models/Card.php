@@ -9,7 +9,7 @@ class Card extends Model
     {
         $row = $this->query(
             "SELECT c.id, c.list_id, c.title, c.description, c.position,
-                    c.due_date, c.due_complete, c.coordinator_id, c.is_archived,
+                    c.due_date, c.start_date, c.due_complete, c.coordinator_id, c.is_archived,
                     (SELECT COUNT(*) FROM attachments a WHERE a.card_id = c.id) as attachment_count,
                     (SELECT COUNT(*) FROM comments cm WHERE cm.card_id = c.id) as comment_count,
                     CONCAT(

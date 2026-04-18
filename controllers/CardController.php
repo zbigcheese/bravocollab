@@ -139,6 +139,7 @@ class CardController extends Controller
         }
         if (array_key_exists('description', $data)) $updates['description'] = $data['description'];
         if (array_key_exists('due_date', $data)) $updates['due_date'] = $data['due_date'] ?: null;
+        if (array_key_exists('start_date', $data)) $updates['start_date'] = $data['start_date'] ?: null;
         if (isset($data['due_complete'])) $updates['due_complete'] = $data['due_complete'] ? 1 : 0;
 
         if (empty($updates)) {
