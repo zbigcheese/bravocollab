@@ -106,8 +106,12 @@ const Notifications = {
                         let url = `index.php?page=board&id=${boardId}`;
                         if (cardId) url += `&card=${cardId}`;
 
-                        // If already on this board, just open the card modal
-                        if (Board.boardId === parseInt(boardId) && cardId) {
+                        // If already on this board, just open the card modal.
+                        // `Board` is only defined on the board view, so guard with typeof
+                        // otherwise the handler throws on the dashboard and never navigates.
+                        const onSameBoard = typeof Board !== 'undefined'
+                            && Board.boardId === parseInt(boardId);
+                        if (onSameBoard && cardId) {
                             CardModal.open(parseInt(cardId));
                             document.getElementById('notificationDropdown')?.classList.remove('open');
                             el.classList.remove('unread');
