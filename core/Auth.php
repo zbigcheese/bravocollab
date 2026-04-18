@@ -14,6 +14,17 @@ class Auth
         }
 
         $config = require __DIR__ . '/../config/config.php';
+        $lifetime = (int) ($config['session_lifetime'] ?? 7200);
+
+        // Raise PHP's server-side session GC lifetime to match our idle window,
+        // so session files aren't deleted by shared-host GC before our 2h
+        // idle-timeout check has a chance to run. Must be set BEFORE session_start().
+        ini_set('session.gc_maxlifetime', (string) $lifetime);
+        // Slightly higher GC probability so our own requests still clean up
+        // expired sessions in a timely way (default host values can be 0/1000).
+        ini_set('session.gc_probability', '1');
+        ini_set('session.gc_divisor', '100');
+
         session_set_cookie_params([
             'lifetime' => 0,
             'path'     => '/',
