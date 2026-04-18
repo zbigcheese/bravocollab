@@ -436,6 +436,12 @@ const Board = {
             });
         }
 
+        // Members preview → view-only drawer
+        document.getElementById('boardMembersPreview')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleMembersDrawer();
+        });
+
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());
 
@@ -448,6 +454,59 @@ const Board = {
                 document.querySelectorAll('.context-menu').forEach(m => m.remove());
             }
         });
+    },
+
+    toggleMembersDrawer() {
+        const existing = document.getElementById('boardMembersDrawer');
+        if (existing) {
+            existing.remove();
+            if (this._membersDrawerOutsideHandler) {
+                document.removeEventListener('click', this._membersDrawerOutsideHandler, true);
+                this._membersDrawerOutsideHandler = null;
+            }
+            if (this._membersDrawerKeyHandler) {
+                document.removeEventListener('keydown', this._membersDrawerKeyHandler);
+                this._membersDrawerKeyHandler = null;
+            }
+            return;
+        }
+
+        const preview = document.getElementById('boardMembersPreview');
+        if (!preview) return;
+        const rect = preview.getBoundingClientRect();
+        const members = this.data?.members || [];
+
+        const drawer = document.createElement('div');
+        drawer.id = 'boardMembersDrawer';
+        drawer.className = 'board-members-drawer';
+        drawer.style.top = (rect.bottom + 8) + 'px';
+        drawer.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        drawer.innerHTML = `
+            <div class="board-members-drawer-header">Board members (${members.length})</div>
+            <div class="board-members-drawer-list">
+                ${members.map(m => `
+                    <div class="board-members-drawer-item">
+                        ${App.avatarHtml(m.display_name, 'sm')}
+                        <span class="board-members-drawer-name">${App.escapeHtml(m.display_name)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        document.body.appendChild(drawer);
+
+        this._membersDrawerOutsideHandler = (e) => {
+            if (e.target.closest('#boardMembersDrawer')) return;
+            if (e.target.closest('#boardMembersPreview')) return; // preview's own handler toggles
+            this.toggleMembersDrawer();
+        };
+        this._membersDrawerKeyHandler = (e) => {
+            if (e.key === 'Escape') this.toggleMembersDrawer();
+        };
+        // Defer registration so the opening click doesn't immediately close.
+        setTimeout(() => {
+            document.addEventListener('click', this._membersDrawerOutsideHandler, true);
+            document.addEventListener('keydown', this._membersDrawerKeyHandler);
+        }, 0);
     },
 
     async addList() {
