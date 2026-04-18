@@ -9,9 +9,9 @@
 }
 
 :root {
-    --color-primary: #0079BF;
-    --color-primary-dark: #026AA7;
-    --color-primary-light: #E4F0F6;
+    --color-primary: #5bc0de;
+    --color-primary-dark: #31b0d5;
+    --color-primary-light: #e5f4f9;
     --color-danger: #EB5A46;
     --color-success: #61BD4F;
     --color-warning: #F2D600;
@@ -56,19 +56,28 @@ a:hover {
     justify-content: space-between;
     height: 48px;
     padding: 0 16px;
-    background: var(--color-bg-dark);
-    color: var(--color-white);
+    background: #F16820;
+    color: #fff;
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
 .navbar-brand {
-    color: var(--color-white);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
     font-size: 18px;
     font-weight: 700;
     text-decoration: none;
     letter-spacing: -0.5px;
+}
+
+.navbar-brand-logo {
+    height: 24px;
+    width: auto;
+    display: block;
 }
 
 .navbar-brand:hover {
@@ -83,7 +92,8 @@ a:hover {
 }
 
 .nav-link {
-    color: rgba(255,255,255,0.8);
+    color: #fff;
+    font-weight: 700;
     font-size: 14px;
     text-decoration: none;
     padding: 4px 8px;
@@ -104,7 +114,8 @@ a:hover {
 
 .user-name {
     font-size: 13px;
-    opacity: 0.8;
+    font-weight: 700;
+    color: #fff;
 }
 
 /* ---- Buttons ---- */
@@ -157,7 +168,8 @@ a:hover {
 .btn-text {
     background: none;
     border: none;
-    color: rgba(255,255,255,0.7);
+    color: #fff;
+    font-weight: 700;
     cursor: pointer;
     font-size: 13px;
     padding: 4px 8px;
@@ -274,7 +286,7 @@ a:hover {
 }
 
 .notification-bell svg {
-    color: rgba(255,255,255,0.8);
+    color: #fff;
 }
 
 .notification-badge {

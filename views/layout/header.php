@@ -13,7 +13,10 @@
 <body>
     <nav class="navbar">
         <div class="navbar-left">
-            <a href="index.php?page=dashboard" class="navbar-brand">BravoCollab</a>
+            <a href="index.php?page=dashboard" class="navbar-brand">
+                <img src="public/img/favicon.png" alt="" class="navbar-brand-logo">
+                <span>BravoCollab</span>
+            </a>
         </div>
         <div class="navbar-right">
             <?php if (Auth::isAdmin()): ?>
