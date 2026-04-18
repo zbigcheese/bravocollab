@@ -20,15 +20,34 @@ $page = $_GET['page'] ?? '';
 // Public pages (no auth required)
 $publicPages = ['login', 'register', 'forgot_password', 'reset_password'];
 
-// Redirect to login if not authenticated
+// Validate a `next` URL: must be a relative `index.php?...` path
+// (prevents open-redirect to external domains).
+$safeNext = static function (?string $candidate): ?string {
+    if (!$candidate) return null;
+    if (preg_match('/^index\.php\?[A-Za-z0-9_=&\-.%]+$/', $candidate)) {
+        return $candidate;
+    }
+    return null;
+};
+
+// Redirect to login if not authenticated — preserve where they were headed.
 if (!Auth::isLoggedIn() && !in_array($page, $publicPages, true)) {
-    header('Location: index.php?page=login');
+    $loginUrl = 'index.php?page=login';
+    if (!empty($_GET)) {
+        $next = 'index.php?' . http_build_query($_GET);
+        if ($safeNext($next)) {
+            $loginUrl .= '&next=' . urlencode($next);
+        }
+    }
+    header('Location: ' . $loginUrl);
     exit;
 }
 
-// Redirect to dashboard if logged in and visiting login
+// Already logged in and visiting login — honor `next` so email links
+// still work for users who happen to be signed in already.
 if (Auth::isLoggedIn() && ($page === 'login' || $page === '')) {
-    header('Location: index.php?page=dashboard');
+    $next = $safeNext($_GET['next'] ?? null);
+    header('Location: ' . ($next ?: 'index.php?page=dashboard'));
     exit;
 }
 

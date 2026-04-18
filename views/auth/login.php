@@ -58,7 +58,10 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    window.location.href = 'index.php?page=dashboard';
+                    const nextParam = new URLSearchParams(window.location.search).get('next');
+                    const safeNext = nextParam && /^index\.php\?[A-Za-z0-9_=&\-.%]+$/.test(nextParam)
+                        ? nextParam : null;
+                    window.location.href = safeNext || 'index.php?page=dashboard';
                 } else {
                     errorEl.textContent = data.error || 'Login failed';
                     errorEl.style.display = 'block';

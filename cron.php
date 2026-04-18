@@ -18,6 +18,7 @@ if (php_sapi_name() !== 'cli') {
 
 require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/core/Mailer.php';
 
 $db = Database::get();
 
@@ -90,5 +91,42 @@ foreach ($dueSoonCards as $card) {
     }
 }
 echo "Sent {$count} due-date reminder notifications.\n";
+
+// 5. Email digest for users whose oldest unread, not-yet-emailed notification is >= 1 hour old.
+//    When a user qualifies, we send ALL currently-unread, not-yet-emailed notifications in one email.
+$digestUsers = $db->query(
+    "SELECT user_id
+     FROM notifications
+     WHERE is_read = 0 AND emailed_at IS NULL
+     GROUP BY user_id
+     HAVING MIN(created_at) <= DATE_SUB(NOW(), INTERVAL 1 HOUR)"
+)->fetchAll(PDO::FETCH_COLUMN);
+
+$digestSent = 0;
+foreach ($digestUsers as $uid) {
+    $userStmt = $db->prepare('SELECT email, display_name FROM users WHERE id = :id AND is_active = 1');
+    $userStmt->execute(['id' => $uid]);
+    $user = $userStmt->fetch();
+    if (!$user) continue;
+
+    $notifStmt = $db->prepare(
+        'SELECT id, type, data, created_at
+         FROM notifications
+         WHERE user_id = :uid AND is_read = 0 AND emailed_at IS NULL
+         ORDER BY created_at ASC'
+    );
+    $notifStmt->execute(['uid' => $uid]);
+    $notifs = $notifStmt->fetchAll();
+    if (empty($notifs)) continue;
+
+    if (Mailer::sendNotificationDigest($user['email'], $user['display_name'], $notifs)) {
+        $ids = array_column($notifs, 'id');
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $db->prepare("UPDATE notifications SET emailed_at = NOW() WHERE id IN ($ph)")
+           ->execute($ids);
+        $digestSent++;
+    }
+}
+echo "Sent {$digestSent} notification digest emails.\n";
 
 echo "Cron job complete.\n";

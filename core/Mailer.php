@@ -46,6 +46,94 @@ class Mailer
         return self::send($toEmail, $subject, $body);
     }
 
+    /**
+     * Send a digest of unread notifications. Subject reflects count:
+     *  - 1 notification → specific, derived from the notification content
+     *  - N notifications → "You have X new notifications in BravoCollab"
+     */
+    public static function sendNotificationDigest(string $toEmail, string $displayName, array $notifications): bool
+    {
+        $config = require __DIR__ . '/../config/config.php';
+        $count  = count($notifications);
+        if ($count === 0) return false;
+
+        $subject = ($count === 1)
+            ? self::notificationSubject($notifications[0], $config['app_name'])
+            : "You have {$count} new notifications in " . $config['app_name'];
+
+        $items = '';
+        foreach ($notifications as $n) {
+            $data = is_string($n['data']) ? json_decode($n['data'], true) : ($n['data'] ?? []);
+            $data = is_array($data) ? $data : [];
+            $text = self::notificationText($n['type'], $data);
+            $url  = self::notificationUrl($config['base_url'], $data);
+            $items .= '<li style="margin-bottom:12px;line-height:1.4;">'
+                   .   '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
+                   .     'style="color:#026AA7;text-decoration:none;">' . $text . '</a>'
+                   . '</li>';
+        }
+
+        $greeting = 'Hi ' . htmlspecialchars($displayName, ENT_QUOTES) . ',';
+        $intro = ($count === 1)
+            ? "<p>{$greeting}</p><p>You have a new notification waiting in " . $config['app_name'] . ":</p>"
+            : "<p>{$greeting}</p><p>You have <strong>{$count} unread notifications</strong> waiting in " . $config['app_name'] . ":</p>";
+
+        $body = self::buildHtml(
+            $config['app_name'],
+            'New notifications',
+            $intro
+            . '<ul style="padding-left:20px;margin:16px 0;">' . $items . '</ul>'
+            . '<p style="color:#666;font-size:13px;margin-top:24px;">Click any item above to open it. If you\'re signed out, you\'ll be taken there after signing in.</p>'
+        );
+
+        return self::send($toEmail, $subject, $body);
+    }
+
+    private static function notificationText(string $type, array $data): string
+    {
+        $actor = htmlspecialchars($data['actor_name'] ?? 'Someone', ENT_QUOTES);
+        $card  = htmlspecialchars($data['card_title'] ?? 'a card', ENT_QUOTES);
+        $board = htmlspecialchars($data['board_title'] ?? 'a board', ENT_QUOTES);
+        switch ($type) {
+            case 'card_assigned':   return "<strong>{$actor}</strong> assigned you to <strong>{$card}</strong>";
+            case 'card_unassigned': return "<strong>{$actor}</strong> removed you from <strong>{$card}</strong>";
+            case 'comment_added':   return "<strong>{$actor}</strong> commented on <strong>{$card}</strong>";
+            case 'comment_mention': return "<strong>{$actor}</strong> mentioned you in <strong>{$card}</strong>";
+            case 'due_soon':        return "<strong>{$card}</strong> is due soon";
+            case 'due_overdue':     return "<strong>{$card}</strong> is overdue";
+            case 'board_invited':   return "<strong>{$actor}</strong> added you to <strong>{$board}</strong>";
+            default:                return "You have a new notification";
+        }
+    }
+
+    private static function notificationSubject(array $n, string $appName): string
+    {
+        $data = is_string($n['data']) ? json_decode($n['data'], true) : ($n['data'] ?? []);
+        $data = is_array($data) ? $data : [];
+        $actor = $data['actor_name'] ?? 'Someone';
+        $card  = $data['card_title'] ?? 'a card';
+        $board = $data['board_title'] ?? 'a board';
+        switch ($n['type']) {
+            case 'card_assigned':   return "{$actor} assigned you to {$card} — {$appName}";
+            case 'card_unassigned': return "{$actor} removed you from {$card} — {$appName}";
+            case 'comment_added':   return "{$actor} commented on {$card} — {$appName}";
+            case 'comment_mention': return "{$actor} mentioned you in {$card} — {$appName}";
+            case 'due_soon':        return "{$card} is due soon — {$appName}";
+            case 'due_overdue':     return "{$card} is overdue — {$appName}";
+            case 'board_invited':   return "You were added to {$board} — {$appName}";
+            default:                return "New notification — {$appName}";
+        }
+    }
+
+    private static function notificationUrl(string $baseUrl, array $data): string
+    {
+        $boardId = (int) ($data['board_id'] ?? 0);
+        $cardId  = (int) ($data['card_id'] ?? 0);
+        $url = rtrim($baseUrl, '/') . '/index.php?page=board&id=' . $boardId;
+        if ($cardId) $url .= '&card=' . $cardId;
+        return $url;
+    }
+
     public static function send(string $to, string $subject, string $htmlBody): bool
     {
         $config = require __DIR__ . '/../config/config.php';
