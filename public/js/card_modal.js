@@ -280,6 +280,16 @@ const CardModal = {
 
     formatCommentBody(body) {
         let html = App.escapeHtml(body);
+        // Linkify http(s) URLs before mention replacement so the mention tags
+        // don't interfere with URL matching. Runs on already-escaped text.
+        html = html.replace(/(https?:\/\/[^\s<]+)/g, (match) => {
+            let url = match, trailing = '';
+            while (url.length && /[.,;:!?)\]}>]/.test(url[url.length - 1])) {
+                trailing = url[url.length - 1] + trailing;
+                url = url.slice(0, -1);
+            }
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${trailing}`;
+        });
         // Replace @mentions by matching known board member names (longest first to avoid partial matches)
         const names = this.boardMembers.map(m => m.display_name).sort((a, b) => b.length - a.length);
         for (const name of names) {
