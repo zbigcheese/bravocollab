@@ -63,6 +63,63 @@
     z-index: 1;
 }
 
+.board-tile-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.board-updates {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.board-update {
+    display: block;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--color-text);
+    text-decoration: none;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.board-update:last-child {
+    border-bottom: none;
+}
+
+.board-update:hover {
+    background: rgba(0,0,0,0.04);
+    text-decoration: none;
+}
+
+.board-update-line {
+    color: var(--color-text);
+    line-height: 1.35;
+}
+
+.board-update-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--color-text-light);
+    margin-top: 1px;
+}
+
+.board-update-card-title {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.board-update-time {
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
 /* Color picker for board creation */
 .color-picker {
     display: flex;

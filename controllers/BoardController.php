@@ -20,6 +20,74 @@ class BoardController extends Controller
         $this->json(['boards' => $boards]);
     }
 
+    public function recentUpdates(): void
+    {
+        $this->requireAuth();
+        $this->requireGet();
+
+        $userId  = Auth::userId();
+        $isAdmin = Auth::isAdmin();
+        $db      = Database::get();
+
+        // Scope to boards the user can see.
+        if ($isAdmin) {
+            $boardIds = $db->query('SELECT id FROM boards WHERE is_archived = 0')
+                           ->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $stmt = $db->prepare(
+                'SELECT b.id FROM boards b
+                 JOIN board_members bm ON b.id = bm.board_id
+                 WHERE bm.user_id = :uid AND b.is_archived = 0'
+            );
+            $stmt->execute(['uid' => $userId]);
+            $boardIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        if (empty($boardIds)) {
+            $this->json(['updates' => (object) []]);
+            return;
+        }
+
+        // Latest activity per card (one row per distinct card) within scope.
+        // The derived `latest` table collapses multiple activities on the same card
+        // to a single row before we join back for display data.
+        $placeholders = implode(',', array_fill(0, count($boardIds), '?'));
+        $sql = "SELECT a.id, a.board_id, a.card_id, a.action, a.created_at,
+                       u.display_name AS actor_name,
+                       c.title AS card_title
+                FROM activities a
+                JOIN users u ON a.user_id = u.id
+                JOIN cards c ON a.card_id = c.id
+                JOIN (
+                    SELECT MAX(id) AS max_id
+                    FROM activities
+                    WHERE card_id IS NOT NULL AND board_id IN ($placeholders)
+                    GROUP BY card_id
+                ) latest ON a.id = latest.max_id
+                WHERE c.is_archived = 0
+                ORDER BY a.board_id ASC, a.created_at DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($boardIds);
+        $rows = $stmt->fetchAll();
+
+        // Group by board, cap 3 per board (already ordered newest-first).
+        $grouped = [];
+        foreach ($rows as $row) {
+            $bid = (int) $row['board_id'];
+            if (!isset($grouped[$bid])) $grouped[$bid] = [];
+            if (count($grouped[$bid]) >= 3) continue;
+            $grouped[$bid][] = [
+                'card_id'    => (int) $row['card_id'],
+                'card_title' => $row['card_title'],
+                'action'     => $row['action'],
+                'actor_name' => $row['actor_name'],
+                'created_at' => $row['created_at'],
+            ];
+        }
+
+        $this->json(['updates' => (object) $grouped]);
+    }
+
     public function get(): void
     {
         $this->requireAuth();

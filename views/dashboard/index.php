@@ -16,9 +16,34 @@
 document.addEventListener('DOMContentLoaded', async function() {
     const grid = document.getElementById('boardGrid');
 
+    const actionVerbs = {
+        card_created:      'created',
+        card_updated:      'updated',
+        card_archived:     'archived',
+        comment_added:     'commented on',
+        attachment_added:  'attached a file to',
+    };
+
+    function renderUpdate(boardId, u) {
+        const verb = actionVerbs[u.action] || 'updated';
+        return `
+            <a class="board-update" href="index.php?page=board&id=${boardId}&card=${u.card_id}">
+                <div class="board-update-line"><strong>${App.escapeHtml(u.actor_name)}</strong> ${verb}</div>
+                <div class="board-update-card">
+                    <span class="board-update-card-title">${App.escapeHtml(u.card_title)}</span>
+                    <span class="board-update-time">${App.formatDate(u.created_at)}</span>
+                </div>
+            </a>
+        `;
+    }
+
     try {
-        const res = await App.api('boards.list', {}, 'GET');
-        const boards = res.boards || [];
+        const [boardsRes, updatesRes] = await Promise.all([
+            App.api('boards.list', {}, 'GET'),
+            App.api('boards.recent_updates', {}, 'GET'),
+        ]);
+        const boards = boardsRes.boards || [];
+        const updatesByBoard = updatesRes.updates || {};
 
         if (boards.length === 0) {
             grid.innerHTML = `
@@ -30,12 +55,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
 
-        grid.innerHTML = boards.map(b => `
-            <a href="index.php?page=board&id=${b.id}" class="board-tile" style="background-color:${App.escapeHtml(b.background_color)}">
-                <div class="board-tile-title">${App.escapeHtml(b.title)}</div>
-                <div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>
-            </a>
-        `).join('');
+        grid.innerHTML = boards.map(b => {
+            const updates = updatesByBoard[b.id] || [];
+            const updatesHtml = updates.length
+                ? `<div class="board-updates">${updates.map(u => renderUpdate(b.id, u)).join('')}</div>`
+                : '';
+            return `
+                <div class="board-tile-wrap">
+                    <a href="index.php?page=board&id=${b.id}" class="board-tile" style="background-color:${App.escapeHtml(b.background_color)}">
+                        <div class="board-tile-title">${App.escapeHtml(b.title)}</div>
+                        <div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>
+                    </a>
+                    ${updatesHtml}
+                </div>
+            `;
+        }).join('');
     } catch (e) {
         grid.innerHTML = '<div class="empty-state"><p>Failed to load boards.</p></div>';
     }
