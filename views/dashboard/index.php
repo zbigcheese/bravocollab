@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     function renderUpdate(boardId, u) {
         const verb = actionVerbs[u.action] || 'updated';
         return `
-            <a class="board-update" href="index.php?page=board&id=${boardId}&card=${u.card_id}">
+            <a class="board-update" data-activity-id="${u.id}" href="index.php?page=board&id=${boardId}&card=${u.card_id}">
                 <div class="board-update-line"><strong>${App.escapeHtml(u.actor_name)}</strong> ${verb}</div>
                 <div class="board-update-card">
                     <span class="board-update-card-title">${App.escapeHtml(u.card_title)}</span>
@@ -35,6 +35,113 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
             </a>
         `;
+    }
+
+    // Animate updates for a single board tile to reflect the new list.
+    // Smooth transitions for enter (new at top), leave (collapse), and move (FLIP).
+    function applyUpdatesToBoard(wrap, boardId, updates) {
+        let container = wrap.querySelector('.board-updates');
+
+        if (updates.length === 0) {
+            if (container) {
+                container.style.transition = 'opacity 0.3s';
+                container.style.opacity = '0';
+                setTimeout(() => container.remove(), 300);
+            }
+            return;
+        }
+
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'board-updates';
+            container.innerHTML = updates.map(u => renderUpdate(boardId, u)).join('');
+            wrap.appendChild(container);
+            return;
+        }
+
+        // Capture old positions for FLIP.
+        const existing = Array.from(container.querySelectorAll('.board-update'));
+        const oldRects = new Map();
+        existing.forEach(el => oldRects.set(el.dataset.activityId, el.getBoundingClientRect()));
+
+        const newIds = new Set(updates.map(u => String(u.id)));
+        const oldIds = new Set(existing.map(el => el.dataset.activityId));
+
+        // Collapse outgoing items; keep in DOM during the animation so FLIP math is clean.
+        const leaving = existing.filter(el => !newIds.has(el.dataset.activityId));
+        leaving.forEach(el => {
+            const h = el.getBoundingClientRect().height;
+            el.style.height       = h + 'px';
+            el.style.overflow     = 'hidden';
+            /* force reflow */ el.offsetHeight;
+            el.classList.add('upd-leaving');
+            requestAnimationFrame(() => {
+                el.style.height        = '0';
+                el.style.paddingTop    = '0';
+                el.style.paddingBottom = '0';
+                el.style.opacity       = '0';
+                el.style.borderBottomWidth = '0';
+            });
+            setTimeout(() => el.remove(), 360);
+        });
+
+        // Re-append everything in new order — appendChild moves existing nodes.
+        updates.forEach(u => {
+            const idStr = String(u.id);
+            let el;
+            if (oldIds.has(idStr)) {
+                el = existing.find(e => e.dataset.activityId === idStr);
+            } else {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = renderUpdate(boardId, u);
+                el = tmp.firstElementChild;
+                el.classList.add('upd-entering');
+            }
+            container.appendChild(el);
+        });
+
+        // FLIP kept items + release entering items on the next frame.
+        requestAnimationFrame(() => {
+            updates.forEach(u => {
+                const idStr = String(u.id);
+                if (!oldIds.has(idStr)) return;
+                const el = container.querySelector(`.board-update[data-activity-id="${idStr}"]`);
+                if (!el) return;
+                const oldRect = oldRects.get(idStr);
+                const newRect = el.getBoundingClientRect();
+                const dy = oldRect.top - newRect.top;
+                if (Math.abs(dy) < 1) return;
+                el.style.transition = 'none';
+                el.style.transform  = `translateY(${dy}px)`;
+                /* flush */ el.offsetHeight;
+                el.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                el.style.transform  = '';
+            });
+            container.querySelectorAll('.upd-entering').forEach(el => {
+                /* flush initial styles */ el.offsetHeight;
+                el.classList.remove('upd-entering');
+            });
+        });
+    }
+
+    // Signature of the currently-displayed updates per board, for change detection.
+    const updateSignatures = {};
+    const signatureOf = (arr) => arr.map(u => u.id).join(',');
+
+    async function refreshUpdates() {
+        if (document.hidden) return;
+        try {
+            const res = await App.api('boards.recent_updates', {}, 'GET');
+            const byBoard = res.updates || {};
+            document.querySelectorAll('.board-tile-wrap').forEach(wrap => {
+                const bid = wrap.dataset.boardId;
+                const updates = byBoard[bid] || [];
+                const sig = signatureOf(updates);
+                if (updateSignatures[bid] === sig) return;
+                updateSignatures[bid] = sig;
+                applyUpdatesToBoard(wrap, bid, updates);
+            });
+        } catch (e) { /* silent */ }
     }
 
     try {
@@ -57,11 +164,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         grid.innerHTML = boards.map(b => {
             const updates = updatesByBoard[b.id] || [];
+            updateSignatures[b.id] = signatureOf(updates);
             const updatesHtml = updates.length
                 ? `<div class="board-updates">${updates.map(u => renderUpdate(b.id, u)).join('')}</div>`
                 : '';
             return `
-                <div class="board-tile-wrap">
+                <div class="board-tile-wrap" data-board-id="${b.id}">
                     <a href="index.php?page=board&id=${b.id}" class="board-tile" style="background-color:${App.escapeHtml(b.background_color)}">
                         <div class="board-tile-title">${App.escapeHtml(b.title)}</div>
                         <div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>
@@ -70,6 +178,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
             `;
         }).join('');
+
+        // Poll for live updates while the tab is visible.
+        setInterval(refreshUpdates, 10000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshUpdates();
+        });
     } catch (e) {
         grid.innerHTML = '<div class="empty-state"><p>Failed to load boards.</p></div>';
     }

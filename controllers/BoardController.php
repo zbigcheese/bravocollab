@@ -77,6 +77,7 @@ class BoardController extends Controller
             if (!isset($grouped[$bid])) $grouped[$bid] = [];
             if (count($grouped[$bid]) >= 3) continue;
             $grouped[$bid][] = [
+                'id'         => (int) $row['id'],
                 'card_id'    => (int) $row['card_id'],
                 'card_title' => $row['card_title'],
                 'action'     => $row['action'],
