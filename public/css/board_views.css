@@ -464,25 +464,39 @@
    Responsive tweaks
    ============================================================ */
 @media (max-width: 768px) {
-    .cal-head {
-        padding: 6px 4px;
-        font-size: 10px;
+    /* Calendar: make each day column wider so cards are actually legible.
+       The whole grid scrolls horizontally; today's cell is auto-centered on
+       open (handled in JS). Weekly rows still stack vertically. */
+    .calendar-grid {
+        grid-template-columns: repeat(7, 140px);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
     }
 
     .cal-cell {
-        padding: 4px;
-        min-height: 90px;
+        scroll-snap-align: start;
+        padding: 6px;
+        min-height: 160px;
     }
 
     .cal-card {
-        padding: 2px 4px;
-        font-size: 11px;
+        padding: 3px 6px;
+        font-size: 12px;
     }
 
     .cal-date {
-        font-size: 11px;
-        padding: 1px 5px;
-        min-width: 18px;
+        font-size: 12px;
+        padding: 1px 6px;
+        min-width: 20px;
+    }
+
+    .cal-head {
+        padding: 6px 4px;
+        font-size: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 1;
     }
 
     .view-toolbar {
@@ -492,6 +506,12 @@
     .view-title {
         font-size: 14px;
         min-width: 120px;
+    }
+
+    /* Timeline: widen the day columns so bars are readable. Each day gets
+       ~40px, plus the fixed 140px row-label column. The pane already scrolls. */
+    .tl-wrap {
+        min-width: calc(var(--tl-days, 30) * 40px + 140px);
     }
 
     .tl-head-label,
@@ -510,16 +530,8 @@
         padding: 6px 10px;
     }
 
-    /* Day-name headers become one letter. */
-    .cal-head {
-        font-size: 0;
-    }
-    .cal-head::first-letter {
-        font-size: 10px;
-    }
-
     .cal-cell {
-        min-height: 72px;
+        min-height: 140px;
     }
 
     /* Stack Start/Due calendars instead of squeezing them side-by-side. */

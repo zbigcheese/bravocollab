@@ -521,7 +521,15 @@ const Board = {
         drawer.id = 'boardMembersDrawer';
         drawer.className = 'board-members-drawer';
         drawer.style.top = (rect.bottom + 8) + 'px';
-        drawer.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        if (window.innerWidth <= 520) {
+            // On phones, pin to both edges with a safe margin so the drawer
+            // can never be clipped by the viewport.
+            drawer.style.left = '8px';
+            drawer.style.right = '8px';
+            drawer.style.maxWidth = 'none';
+        } else {
+            drawer.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        }
         drawer.innerHTML = `
             <div class="board-members-drawer-header">Board members (${members.length})</div>
             <div class="board-members-drawer-list">

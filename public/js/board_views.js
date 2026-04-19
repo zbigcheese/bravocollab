@@ -158,6 +158,25 @@ const BoardViews = {
         pane.querySelectorAll('.cal-card').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
         });
+
+        // On mobile, the calendar grid scrolls horizontally. Center today's
+        // cell on first render so users land on the relevant day.
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const now = new Date();
+        const viewingCurrentMonth = m.getFullYear() === now.getFullYear()
+            && m.getMonth() === now.getMonth();
+        if (isMobile && viewingCurrentMonth) {
+            const grid = pane.querySelector('.calendar-grid');
+            const todayCell = pane.querySelector('.cal-today');
+            if (grid && todayCell) {
+                // Center today's column within the scrollable grid.
+                const offset = todayCell.offsetLeft
+                    - (grid.clientWidth / 2)
+                    + (todayCell.clientWidth / 2);
+                grid.scrollLeft = Math.max(0, offset);
+            }
+        }
+
         pane.querySelectorAll('.cal-toggle').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
