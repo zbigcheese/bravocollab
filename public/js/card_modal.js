@@ -50,8 +50,12 @@ const CardModal = {
                 <div class="modal-header">
                     ${archivedLabel}
                     <textarea class="card-detail-title" id="cardTitle" rows="1">${App.escapeHtml(c.title)}</textarea>
+                    <button class="card-detail-menu-btn" id="cardDetailMenuBtn" aria-label="Show actions" title="Actions">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
                     <button class="modal-close" id="closeCardModal">&times;</button>
                 </div>
+                <div class="card-detail-sidebar-backdrop" id="cardDetailSidebarBackdrop"></div>
                 <div class="modal-body">
                     <div class="card-detail-layout">
                         <div class="card-detail-main">
@@ -380,6 +384,17 @@ const CardModal = {
             if (e.target === overlay) this.closeModal();
         });
         document.getElementById('closeCardModal').addEventListener('click', () => this.closeModal());
+
+        // Mobile sidebar drawer (burger menu)
+        const menuBtn  = document.getElementById('cardDetailMenuBtn');
+        const backdrop = document.getElementById('cardDetailSidebarBackdrop');
+        const closeDrawer = () => overlay.classList.remove('sidebar-open');
+        menuBtn?.addEventListener('click', () => overlay.classList.toggle('sidebar-open'));
+        backdrop?.addEventListener('click', closeDrawer);
+        // Auto-close drawer after picking any action button inside it.
+        overlay.querySelector('.card-detail-sidebar')?.addEventListener('click', (e) => {
+            if (e.target.closest('button')) closeDrawer();
+        });
         const self = this;
         document.addEventListener('keydown', function handler(e) {
             if (e.key === 'Escape' && document.getElementById('cardDetailModal')) {
