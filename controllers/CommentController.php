@@ -44,9 +44,14 @@ class CommentController extends Controller
            ->execute(['card_id' => $cardId, 'user_id' => Auth::userId(), 'parent_id' => $parentId, 'body' => $body]);
         $commentId = (int) $db->lastInsertId();
 
-        // Notify card assignees
-        $assignees = $db->prepare('SELECT user_id FROM card_assignments WHERE card_id = :cid');
-        $assignees->execute(['cid' => $cardId]);
+        // Notify card assignees + watchers (union; createNotification skips the actor).
+        $recipients = $db->prepare(
+            'SELECT user_id FROM card_assignments WHERE card_id = :cid
+             UNION
+             SELECT user_id FROM card_watchers WHERE card_id = :cid'
+        );
+        $recipients->execute(['cid' => $cardId]);
+
         $stmt = $db->prepare('SELECT title FROM cards WHERE id = :id');
         $stmt->execute(['id' => $cardId]);
         $cardTitle = ($stmt->fetch())['title'] ?? '';
@@ -55,7 +60,7 @@ class CommentController extends Controller
         // email digests remain readable even for very long comments.
         $bodyForNotif = mb_strlen($body) > 500 ? mb_substr($body, 0, 500) . '…' : $body;
 
-        foreach ($assignees->fetchAll() as $row) {
+        foreach ($recipients->fetchAll() as $row) {
             $this->createNotification($row['user_id'], NOTIF_COMMENT_ADDED, [
                 'board_id'   => $boardId,
                 'card_id'    => $cardId,

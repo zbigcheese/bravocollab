@@ -220,6 +220,52 @@ class CardController extends Controller
         $this->json(['success' => true]);
     }
 
+    public function watch(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['id'] ?? 0);
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        Database::get()
+            ->prepare('INSERT IGNORE INTO card_watchers (card_id, user_id) VALUES (:cid, :uid)')
+            ->execute(['cid' => $cardId, 'uid' => Auth::userId()]);
+
+        $this->json(['success' => true]);
+    }
+
+    public function unwatch(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['id'] ?? 0);
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        Database::get()
+            ->prepare('DELETE FROM card_watchers WHERE card_id = :cid AND user_id = :uid')
+            ->execute(['cid' => $cardId, 'uid' => Auth::userId()]);
+
+        $this->json(['success' => true]);
+    }
+
     public function restore(): void
     {
         $this->requireAuth();

@@ -167,9 +167,18 @@ const Board = {
 
         const hasBadges = badges || assigneesHtml;
         const archivedCls = card.is_archived == 1 ? ' card-archived' : '';
+        const watchingCls = card.is_watching == 1 ? ' is-watching' : '';
+
+        // Eye icon toggles watch state. 0.5 opacity when not watching, 1 when watching.
+        const watchIcon = `
+            <button type="button" class="card-watch-icon${watchingCls}" data-card-id="${card.id}" title="Watch this card" aria-label="Watch this card">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+        `;
 
         return `
             <div class="card-item${archivedCls}" data-card-id="${card.id}" data-list-id="${card.list_id}">
+                ${watchIcon}
                 ${labelsHtml}
                 <div class="card-title">${App.escapeHtml(card.title)}</div>
                 ${hasBadges ? `<div class="card-badges">${badges}${assigneesHtml}</div>` : ''}
@@ -324,6 +333,14 @@ const Board = {
 
         // Delegated events on board container
         container.addEventListener('click', (e) => {
+            // Watch eye icon -> toggle watch without opening the modal.
+            const watchBtn = e.target.closest('.card-watch-icon');
+            if (watchBtn) {
+                e.stopPropagation();
+                this.toggleCardWatch(parseInt(watchBtn.dataset.cardId), watchBtn);
+                return;
+            }
+
             // Card click -> open modal
             const cardEl = e.target.closest('.card-item');
             if (cardEl && !e.target.closest('.card-label')) {
@@ -1033,6 +1050,30 @@ const Board = {
         target.cards.push(merged);
         target.cards.sort((a, b) => a.position - b.position);
         this.renderLists();
+    },
+
+    async toggleCardWatch(cardId, iconEl) {
+        // Find the card in local board data to determine current state.
+        let card = null;
+        for (const list of (this.data?.lists || [])) {
+            const c = list.cards.find(x => parseInt(x.id) === cardId);
+            if (c) { card = c; break; }
+        }
+        if (!card) return;
+        const wantWatch = card.is_watching != 1;
+        try {
+            await App.api(wantWatch ? 'cards.watch' : 'cards.unwatch', { id: cardId });
+            card.is_watching = wantWatch ? 1 : 0;
+            iconEl.classList.toggle('is-watching', wantWatch);
+            // Sync the card modal if it happens to be open on this card.
+            if (CardModal.currentCard && parseInt(CardModal.currentCard.id) === cardId) {
+                CardModal.currentCard.is_watching = wantWatch;
+                const mBtn = document.getElementById('sidebarWatch');
+                if (mBtn) mBtn.textContent = wantWatch ? 'Unfollow' : 'Watch';
+            }
+        } catch (e) {
+            App.showToast(e.message, 'error');
+        }
     },
 
     async refreshBoardData() {

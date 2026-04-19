@@ -39,6 +39,7 @@ class Board extends Model
             ['board_id' => $boardId]
         )->fetchAll();
 
+        $currentUid = Auth::userId() ?: 0;
         foreach ($lists as &$list) {
             $list['cards'] = $this->query(
                 'SELECT c.*,
@@ -46,6 +47,7 @@ class Board extends Model
                     (SELECT COUNT(*) FROM card_assignments ca WHERE ca.card_id = c.id) as assignee_count,
                     (SELECT COUNT(*) FROM attachments a WHERE a.card_id = c.id) as attachment_count,
                     (SELECT COUNT(*) FROM comments cm WHERE cm.card_id = c.id) as comment_count,
+                    (EXISTS(SELECT 1 FROM card_watchers cw WHERE cw.card_id = c.id AND cw.user_id = :uid)) as is_watching,
                     (SELECT CONCAT(
                         (SELECT COUNT(*) FROM checklist_items ci JOIN checklists ch ON ci.checklist_id = ch.id WHERE ch.card_id = c.id AND ci.is_checked = 1),
                         "/",
@@ -56,7 +58,7 @@ class Board extends Model
                  WHERE c.list_id = :list_id
                  GROUP BY c.id
                  ORDER BY c.position ASC',
-                ['list_id' => $list['id']]
+                ['list_id' => $list['id'], 'uid' => $currentUid]
             )->fetchAll();
 
             // Get assignees for each card

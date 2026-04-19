@@ -83,13 +83,17 @@ $notifStmt = $db->prepare(
 
 $count = 0;
 foreach ($dueSoonCards as $card) {
-    // Notify all assignees
-    $assignees = $db->prepare('SELECT user_id FROM card_assignments WHERE card_id = :cid');
-    $assignees->execute(['cid' => $card['id']]);
+    // Notify assignees + watchers (union).
+    $recipients = $db->prepare(
+        'SELECT user_id FROM card_assignments WHERE card_id = :cid
+         UNION
+         SELECT user_id FROM card_watchers WHERE card_id = :cid'
+    );
+    $recipients->execute(['cid' => $card['id']]);
 
-    foreach ($assignees->fetchAll() as $assignee) {
+    foreach ($recipients->fetchAll() as $r) {
         $notifStmt->execute([
-            'uid'  => $assignee['user_id'],
+            'uid'  => $r['user_id'],
             'type' => NOTIF_DUE_SOON,
             'data' => json_encode([
                 'board_id'   => $card['board_id'],

@@ -12,6 +12,7 @@ class Card extends Model
                     c.due_date, c.start_date, c.due_complete, c.coordinator_id, c.is_archived,
                     (SELECT COUNT(*) FROM attachments a WHERE a.card_id = c.id) as attachment_count,
                     (SELECT COUNT(*) FROM comments cm WHERE cm.card_id = c.id) as comment_count,
+                    (EXISTS(SELECT 1 FROM card_watchers cw WHERE cw.card_id = c.id AND cw.user_id = :uid)) as is_watching,
                     CONCAT(
                         (SELECT COUNT(*) FROM checklist_items ci JOIN checklists ch ON ci.checklist_id = ch.id WHERE ch.card_id = c.id AND ci.is_checked = 1),
                         '/',
@@ -19,7 +20,7 @@ class Card extends Model
                     ) as checklist_progress
              FROM cards c
              WHERE c.id = :id",
-            ['id' => $cardId]
+            ['id' => $cardId, 'uid' => Auth::userId() ?: 0]
         )->fetch();
 
         if (!$row) return null;
@@ -53,6 +54,13 @@ class Card extends Model
     {
         $card = $this->find($cardId);
         if (!$card) return null;
+
+        // Is the current user watching this card?
+        $wStmt = $this->query(
+            'SELECT 1 FROM card_watchers WHERE card_id = :cid AND user_id = :uid LIMIT 1',
+            ['cid' => $cardId, 'uid' => Auth::userId() ?: 0]
+        );
+        $card['is_watching'] = (bool) $wStmt->fetchColumn();
 
         // Assignees
         $card['assignees'] = $this->query(

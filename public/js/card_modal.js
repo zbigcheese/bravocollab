@@ -66,14 +66,15 @@ const CardModal = {
                         </div>
                         <div class="card-detail-sidebar">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Add to card</h4>
-                            <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Coordinator</button>
-                            <button class="btn btn-secondary btn-sm" id="sidebarMembers">Members</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarLabels">Labels</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarChecklist">Checklist</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarDueDate">Due Date</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarAttachment">Attachment</button>
                             <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0;">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
+                            <button class="btn btn-secondary btn-sm" id="sidebarMembers">Assign</button>
+                            <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Set Coordinator</button>
+                            <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
@@ -128,7 +129,7 @@ const CardModal = {
             <div class="card-section" id="membersSection">
                 <div class="card-section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <h3>Members</h3>
+                    <h3>Assigned</h3>
                 </div>
                 <div class="card-members" id="cardMembersList">${chips}</div>
             </div>
@@ -526,6 +527,7 @@ const CardModal = {
         document.getElementById('sidebarChecklist')?.addEventListener('click', () => this.addChecklist());
         document.getElementById('sidebarDueDate')?.addEventListener('click', () => this.showDueDatePicker());
         document.getElementById('sidebarAttachment')?.addEventListener('click', () => this.triggerAttachmentUpload());
+        document.getElementById('sidebarWatch')?.addEventListener('click', () => this.toggleWatch());
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
         document.getElementById('sidebarRestore')?.addEventListener('click', () => this.restoreCard());
     },
@@ -1097,32 +1099,28 @@ const CardModal = {
     showMemberPicker() {
         const assignedIds = (this.currentCard.assignees || []).map(a => a.id);
 
-        const items = this.boardMembers.map(m => `
-            <div class="member-picker-item ${assignedIds.includes(m.id) ? 'selected' : ''}" data-user-id="${m.id}">
-                ${App.avatarHtml(m.display_name, 'sm')}
-                <span>${App.escapeHtml(m.display_name)}</span>
-                ${assignedIds.includes(m.id) ? '<span style="margin-left:auto;">&#10003;</span>' : ''}
-            </div>
-        `).join('');
+        // Only show members not yet assigned to this card.
+        const available = this.boardMembers.filter(m => !assignedIds.includes(m.id));
+        const items = available.length
+            ? available.map(m => `
+                <div class="member-picker-item" data-user-id="${m.id}">
+                    ${App.avatarHtml(m.display_name, 'sm')}
+                    <span>${App.escapeHtml(m.display_name)}</span>
+                </div>
+            `).join('')
+            : '<p class="text-muted text-sm" style="padding:8px 4px;">All board members are already assigned.</p>';
 
-        const modal = App.createModal('memberPickerModal', 'Members', `<div class="label-picker">${items}</div>`);
+        const modal = App.createModal('memberPickerModal', 'Assign', `<div class="label-picker">${items}</div>`);
 
         modal.querySelectorAll('.member-picker-item').forEach(el => {
             el.addEventListener('click', async () => {
                 const userId = parseInt(el.dataset.userId);
-                const isAssigned = assignedIds.includes(userId);
                 this.suppressSSE();
                 try {
-                    if (isAssigned) {
-                        await App.api('cards.unassign', { card_id: this.currentCard.id, user_id: userId });
-                        this.currentCard.assignees = this.currentCard.assignees.filter(a => a.id !== userId);
-                    } else {
-                        await App.api('cards.assign', { card_id: this.currentCard.id, user_id: userId });
-                        const member = this.boardMembers.find(m => m.id === userId);
-                        if (member) this.currentCard.assignees.push({ id: member.id, display_name: member.display_name });
-                    }
+                    await App.api('cards.assign', { card_id: this.currentCard.id, user_id: userId });
+                    const member = this.boardMembers.find(m => m.id === userId);
+                    if (member) this.currentCard.assignees.push({ id: member.id, display_name: member.display_name });
                     modal.remove();
-                    // Update members DOM
                     this.updateMembersDOM();
                     this.refreshBoardCard();
                 } catch (e) {
@@ -1447,6 +1445,30 @@ const CardModal = {
             c.due_complete = complete;
             this.refreshBoardCard();
         });
+    },
+
+    // ---- Watch ----
+    async toggleWatch() {
+        const wantWatch = !this.currentCard.is_watching;
+        try {
+            await App.api(wantWatch ? 'cards.watch' : 'cards.unwatch', { id: this.currentCard.id });
+            this.currentCard.is_watching = wantWatch;
+            const btn = document.getElementById('sidebarWatch');
+            if (btn) btn.textContent = wantWatch ? 'Unfollow' : 'Watch';
+            // Keep the board-view eye icon in sync for this card.
+            if (Board?.data) {
+                for (const list of Board.data.lists) {
+                    const c = list.cards.find(x => parseInt(x.id) === parseInt(this.currentCard.id));
+                    if (c) { c.is_watching = wantWatch ? 1 : 0; break; }
+                }
+                const iconBtn = document.querySelector(
+                    `.card-item[data-card-id="${this.currentCard.id}"] .card-watch-icon`
+                );
+                if (iconBtn) iconBtn.classList.toggle('is-watching', wantWatch);
+            }
+        } catch (e) {
+            App.showToast(e.message, 'error');
+        }
     },
 
     // ---- Archive ----
