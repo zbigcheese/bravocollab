@@ -869,11 +869,6 @@
 }
 
 @media (max-width: 480px) {
-    /* Hide the "Show archived" text on phones — keep just the switch. */
-    .archived-toggle .archived-toggle-label {
-        display: none;
-    }
-
     .board-grid {
         grid-template-columns: 1fr;
     }
