@@ -459,3 +459,75 @@
     border-radius: 4px;
     font-size: 13px;
 }
+
+/* ============================================================
+   Responsive tweaks
+   ============================================================ */
+@media (max-width: 768px) {
+    .cal-head {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+
+    .cal-cell {
+        padding: 4px;
+        min-height: 90px;
+    }
+
+    .cal-card {
+        padding: 2px 4px;
+        font-size: 11px;
+    }
+
+    .cal-date {
+        font-size: 11px;
+        padding: 1px 5px;
+        min-width: 18px;
+    }
+
+    .view-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .view-title {
+        font-size: 14px;
+        min-width: 120px;
+    }
+
+    .tl-head-label,
+    .tl-row-label {
+        width: 140px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Compact view switcher: icons only on phones to save horizontal space. */
+    .view-switcher-btn span {
+        display: none;
+    }
+
+    .view-switcher-btn {
+        padding: 6px 10px;
+    }
+
+    /* Day-name headers become one letter. */
+    .cal-head {
+        font-size: 0;
+    }
+    .cal-head::first-letter {
+        font-size: 10px;
+    }
+
+    .cal-cell {
+        min-height: 72px;
+    }
+
+    /* Stack Start/Due calendars instead of squeezing them side-by-side. */
+    .inline-cal-wrap {
+        gap: 14px;
+    }
+    .inline-cal-col {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+}

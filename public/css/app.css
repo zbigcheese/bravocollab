@@ -617,15 +617,58 @@ a:hover {
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
     .main-content {
-        padding: 16px;
+        padding: 12px;
     }
 
     .navbar {
-        padding: 0 12px;
+        padding: 0 10px;
+    }
+
+    .navbar-left, .navbar-right {
+        gap: 8px;
     }
 
     .notification-dropdown {
         width: calc(100vw - 24px);
         right: -8px;
+    }
+
+    .user-menu-dropdown {
+        right: -8px;
+        min-width: 220px;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar {
+        padding: 0 8px;
+    }
+
+    .navbar-left, .navbar-right {
+        gap: 4px;
+    }
+
+    /* Keep the logo, hide the brand wordmark to save room. */
+    .navbar-brand span {
+        display: none;
+    }
+
+    /* Show only the chevron on the user menu button — name lives inside the dropdown. */
+    .user-menu-trigger .user-name {
+        display: none;
+    }
+
+    .user-menu-trigger {
+        padding: 4px 8px;
+    }
+
+    /* Tighten the admin "Users" link. */
+    .nav-link {
+        padding: 4px 6px;
+        font-size: 13px;
+    }
+
+    .notification-bell {
+        padding: 4px 6px;
     }
 }
