@@ -118,15 +118,23 @@ const BoardViews = {
                 ${cells.map(cell => {
                     const k = this._dateKey(cell.date);
                     const cards = byDate[k] || [];
+                    // Accordion: when more than 4 cards, show only 3 by default and
+                    // reveal the rest behind a "+ N more" toggle.
+                    const collapsed = cards.length > 4;
+                    const cardsHtml = cards.map((c, i) => `
+                        <div class="cal-card${collapsed && i >= 3 ? ' cal-card-hidden' : ''}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
+                            ${App.escapeHtml(c.title)}
+                        </div>
+                    `).join('');
+                    const toggle = collapsed
+                        ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
+                        : '';
                     return `
-                        <div class="cal-cell ${cell.outside ? 'cal-outside' : ''} ${k === todayKey ? 'cal-today' : ''}">
+                        <div class="cal-cell ${cell.outside ? 'cal-outside' : ''} ${k === todayKey ? 'cal-today' : ''} ${collapsed ? 'cal-collapsed' : ''}">
                             <div class="cal-date">${cell.date.getDate()}</div>
                             <div class="cal-cards">
-                                ${cards.map(c => `
-                                    <div class="cal-card" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
-                                        ${App.escapeHtml(c.title)}
-                                    </div>
-                                `).join('')}
+                                ${cardsHtml}
+                                ${toggle}
                             </div>
                         </div>
                     `;
@@ -149,6 +157,15 @@ const BoardViews = {
         });
         pane.querySelectorAll('.cal-card').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+        });
+        pane.querySelectorAll('.cal-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cell = btn.closest('.cal-cell');
+                const expanded = cell.classList.toggle('cal-expanded');
+                const hidden = btn.dataset.hiddenCount;
+                btn.textContent = expanded ? '− Show less' : `+ ${hidden} more`;
+            });
         });
     },
 
