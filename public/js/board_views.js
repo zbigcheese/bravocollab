@@ -4,15 +4,19 @@
  */
 const BoardViews = {
     currentView: 'board',
-    calendarMonth: null, // Date at 1st of displayed month
+    calendarMonth: null,     // desktop: 1st of displayed month
     timelineMonth: null,
+    calendarWeekStart: null, // mobile: Monday of displayed week
+    timelineWeekStart: null,
 
     init() {
         if (!document.getElementById('viewSwitcher')) return;
 
         const now = new Date();
-        this.calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        this.timelineMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        this.calendarMonth     = new Date(now.getFullYear(), now.getMonth(), 1);
+        this.timelineMonth     = new Date(now.getFullYear(), now.getMonth(), 1);
+        this.calendarWeekStart = this._startOfWeek(now);
+        this.timelineWeekStart = this._startOfWeek(now);
 
         document.querySelectorAll('.view-switcher-btn').forEach(btn => {
             btn.addEventListener('click', () => this.switchTo(btn.dataset.view));
@@ -70,8 +74,123 @@ const BoardViews = {
         return `${y}-${m}-${day}`;
     },
 
+    _startOfWeek(date) {
+        // Monday-start week, normalized to midnight.
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const offset = (d.getDay() + 6) % 7; // days since Monday
+        d.setDate(d.getDate() - offset);
+        return d;
+    },
+
+    _isMobileView() {
+        return window.matchMedia('(max-width: 768px)').matches;
+    },
+
+    _formatWeekRange(start) {
+        const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+        const monthShort = (d) => d.toLocaleDateString(undefined, { month: 'short' });
+        if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+            return `${monthShort(start)} ${start.getDate()} – ${end.getDate()}, ${start.getFullYear()}`;
+        }
+        if (start.getFullYear() === end.getFullYear()) {
+            return `${monthShort(start)} ${start.getDate()} – ${monthShort(end)} ${end.getDate()}, ${start.getFullYear()}`;
+        }
+        return `${monthShort(start)} ${start.getDate()}, ${start.getFullYear()} – ${monthShort(end)} ${end.getDate()}, ${end.getFullYear()}`;
+    },
+
     // ------------------------- Calendar -------------------------
     renderCalendar() {
+        if (this._isMobileView()) this._renderCalendarWeek();
+        else this._renderCalendarMonth();
+    },
+
+    _renderCalendarWeek() {
+        const pane = document.getElementById('calendarPane');
+        const ws = this.calendarWeekStart;
+        const days = Array.from({ length: 7 }, (_, i) =>
+            new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i));
+
+        const byDate = {};
+        for (const card of this._allCards()) {
+            if (!card.due_date) continue;
+            const k = card.due_date.substring(0, 10);
+            (byDate[k] = byDate[k] || []).push(card);
+        }
+        const todayKey = this._dateKey(new Date());
+        const title = this._formatWeekRange(ws);
+
+        const cellsHtml = days.map(d => {
+            const k = this._dateKey(d);
+            const cards = byDate[k] || [];
+            const collapsed = cards.length > 4;
+            const cardsHtml = cards.map((c, i) => `
+                <div class="cal-card${collapsed && i >= 3 ? ' cal-card-hidden' : ''}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
+                    ${App.escapeHtml(c.title)}
+                </div>
+            `).join('');
+            const toggle = collapsed
+                ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
+                : '';
+            const weekdayShort = d.toLocaleDateString(undefined, { weekday: 'short' });
+            return `
+                <div class="cal-cell ${k === todayKey ? 'cal-today' : ''} ${collapsed ? 'cal-collapsed' : ''}">
+                    <div class="cal-cell-weekday">${weekdayShort}</div>
+                    <div class="cal-date">${d.getDate()}</div>
+                    <div class="cal-cards">
+                        ${cardsHtml}
+                        ${toggle}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        pane.innerHTML = `
+            <div class="view-toolbar">
+                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous week">&lsaquo;</button>
+                <div class="view-title">${title}</div>
+                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next week">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary" data-nav="today">This week</button>
+            </div>
+            <div class="calendar-grid calendar-week">${cellsHtml}</div>
+        `;
+
+        pane.querySelector('[data-nav="prev"]').addEventListener('click', () => {
+            this.calendarWeekStart = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() - 7);
+            this._renderCalendarWeek();
+        });
+        pane.querySelector('[data-nav="next"]').addEventListener('click', () => {
+            this.calendarWeekStart = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 7);
+            this._renderCalendarWeek();
+        });
+        pane.querySelector('[data-nav="today"]').addEventListener('click', () => {
+            this.calendarWeekStart = this._startOfWeek(new Date());
+            this._renderCalendarWeek();
+        });
+        pane.querySelectorAll('.cal-card').forEach(el => {
+            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+        });
+        pane.querySelectorAll('.cal-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cell = btn.closest('.cal-cell');
+                const expanded = cell.classList.toggle('cal-expanded');
+                const hidden = btn.dataset.hiddenCount;
+                btn.textContent = expanded ? '− Show less' : `+ ${hidden} more`;
+            });
+        });
+
+        // Center today's cell within the scrollable strip if today is in this week.
+        const todayCell = pane.querySelector('.cal-today');
+        const grid = pane.querySelector('.calendar-grid');
+        if (todayCell && grid) {
+            const offset = todayCell.offsetLeft
+                - (grid.clientWidth / 2)
+                + (todayCell.clientWidth / 2);
+            grid.scrollLeft = Math.max(0, offset);
+        }
+    },
+
+    _renderCalendarMonth() {
         const pane = document.getElementById('calendarPane');
         const m = this.calendarMonth;
         const monthName = m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -160,25 +279,6 @@ const BoardViews = {
         pane.querySelectorAll('.cal-card').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
         });
-
-        // On mobile, the calendar grid scrolls horizontally. Center today's
-        // cell on first render so users land on the relevant day.
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
-        const now = new Date();
-        const viewingCurrentMonth = m.getFullYear() === now.getFullYear()
-            && m.getMonth() === now.getMonth();
-        if (isMobile && viewingCurrentMonth) {
-            const grid = pane.querySelector('.calendar-grid');
-            const todayCell = pane.querySelector('.cal-today');
-            if (grid && todayCell) {
-                // Center today's column within the scrollable grid.
-                const offset = todayCell.offsetLeft
-                    - (grid.clientWidth / 2)
-                    + (todayCell.clientWidth / 2);
-                grid.scrollLeft = Math.max(0, offset);
-            }
-        }
-
         pane.querySelectorAll('.cal-toggle').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -192,6 +292,11 @@ const BoardViews = {
 
     // ------------------------- Timeline -------------------------
     renderTimeline() {
+        if (this._isMobileView()) this._renderTimelineWeek();
+        else this._renderTimelineMonth();
+    },
+
+    _renderTimelineMonth() {
         const pane = document.getElementById('timelinePane');
         const m = this.timelineMonth;
         const monthName = m.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -279,6 +384,100 @@ const BoardViews = {
             const now = new Date();
             this.timelineMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             this.renderTimeline();
+        });
+        pane.querySelectorAll('.tl-bar').forEach(el => {
+            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+        });
+    },
+
+    _renderTimelineWeek() {
+        const pane = document.getElementById('timelinePane');
+        const ws = this.timelineWeekStart;
+        const we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6);
+        const daysInWeek = 7;
+        const todayKey = this._dateKey(new Date());
+        const msPerDay = 86400000;
+
+        // Cards whose date range intersects this week.
+        const visible = this._allCards().filter(c => c.due_date || c.start_date).filter(c => {
+            const startStr = c.start_date || (c.due_date ? c.due_date.substring(0, 10) : null);
+            const endStr   = c.due_date ? c.due_date.substring(0, 10) : startStr;
+            if (!startStr || !endStr) return false;
+            const s = new Date(startStr);
+            const e = new Date(endStr);
+            return !(e < ws || s > we);
+        }).sort((a, b) => {
+            const as = a.start_date || (a.due_date ? a.due_date.substring(0, 10) : '');
+            const bs = b.start_date || (b.due_date ? b.due_date.substring(0, 10) : '');
+            return as.localeCompare(bs) || (a.title || '').localeCompare(b.title || '');
+        });
+
+        const headCells = Array.from({ length: daysInWeek }, (_, i) => {
+            const date = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i);
+            const k = this._dateKey(date);
+            const dow = date.getDay();
+            const weekend = (dow === 0 || dow === 6) ? 'tl-weekend' : '';
+            const wd = date.toLocaleDateString(undefined, { weekday: 'short' });
+            return `<div class="tl-head-cell ${k === todayKey ? 'tl-today' : ''} ${weekend}">${wd} ${date.getDate()}</div>`;
+        }).join('');
+
+        const rowsHtml = visible.map(card => {
+            const startStr = card.start_date || card.due_date.substring(0, 10);
+            const endStr   = card.due_date ? card.due_date.substring(0, 10) : startStr;
+            const start = new Date(startStr);
+            const end   = new Date(endStr);
+            const spanStartMs = Math.max(start.getTime(), ws.getTime());
+            const spanEndMs   = Math.min(end.getTime(),   we.getTime());
+            const startDay = Math.round((spanStartMs - ws.getTime()) / msPerDay) + 1;
+            const endDay   = Math.max(startDay, Math.round((spanEndMs - ws.getTime()) / msPerDay) + 1);
+            const left  = ((startDay - 1) / daysInWeek) * 100;
+            const width = ((endDay - startDay + 1) / daysInWeek) * 100;
+            const done = card.due_complete == 1 ? ' tl-done' : '';
+            return `
+                <div class="tl-row">
+                    <div class="tl-row-label" title="${App.escapeHtml(card.title)}">${App.escapeHtml(card.title)}</div>
+                    <div class="tl-row-track">
+                        <div class="tl-bar${done}" data-card-id="${card.id}" style="left:${left}%;width:${width}%;background:${this._labelColor(card)}">
+                            <span class="tl-bar-title">${App.escapeHtml(card.title)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const title = this._formatWeekRange(ws);
+
+        pane.innerHTML = `
+            <div class="view-toolbar">
+                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous week">&lsaquo;</button>
+                <div class="view-title">${title}</div>
+                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next week">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary" data-nav="today">This week</button>
+            </div>
+            <div class="tl-wrap" style="--tl-days:${daysInWeek};">
+                <div class="tl-head-row">
+                    <div class="tl-head-label">Cards</div>
+                    <div class="tl-head-cells">${headCells}</div>
+                </div>
+                <div class="tl-body">
+                    ${visible.length === 0
+                        ? '<div class="tl-empty">No cards with dates in this week.</div>'
+                        : rowsHtml}
+                </div>
+            </div>
+        `;
+
+        pane.querySelector('[data-nav="prev"]').addEventListener('click', () => {
+            this.timelineWeekStart = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() - 7);
+            this._renderTimelineWeek();
+        });
+        pane.querySelector('[data-nav="next"]').addEventListener('click', () => {
+            this.timelineWeekStart = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 7);
+            this._renderTimelineWeek();
+        });
+        pane.querySelector('[data-nav="today"]').addEventListener('click', () => {
+            this.timelineWeekStart = this._startOfWeek(new Date());
+            this._renderTimelineWeek();
         });
         pane.querySelectorAll('.tl-bar').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
