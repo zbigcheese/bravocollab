@@ -67,9 +67,9 @@ class Mailer
             $data = is_array($data) ? $data : [];
             $text = self::notificationText($n['type'], $data);
             $url  = self::notificationUrl($config['base_url'], $data);
-            $items .= '<li style="margin-bottom:12px;line-height:1.4;">'
+            $items .= '<li style="margin-bottom:14px;line-height:1.5;">'
                    .   '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
-                   .     'style="color:#026AA7;text-decoration:none;">' . $text . '</a>'
+                   .     'style="display:block;color:#026AA7;text-decoration:none;">' . $text . '</a>'
                    . '</li>';
         }
 
@@ -94,16 +94,33 @@ class Mailer
         $actor = htmlspecialchars($data['actor_name'] ?? 'Someone', ENT_QUOTES);
         $card  = htmlspecialchars($data['card_title'] ?? 'a card', ENT_QUOTES);
         $board = htmlspecialchars($data['board_title'] ?? 'a board', ENT_QUOTES);
+
+        $line = '';
         switch ($type) {
-            case 'card_assigned':   return "<strong>{$actor}</strong> assigned you to <strong>{$card}</strong>";
-            case 'card_unassigned': return "<strong>{$actor}</strong> removed you from <strong>{$card}</strong>";
-            case 'comment_added':   return "<strong>{$actor}</strong> commented on <strong>{$card}</strong>";
-            case 'comment_mention': return "<strong>{$actor}</strong> mentioned you in <strong>{$card}</strong>";
-            case 'due_soon':        return "<strong>{$card}</strong> is due soon";
-            case 'due_overdue':     return "<strong>{$card}</strong> is overdue";
-            case 'board_invited':   return "<strong>{$actor}</strong> added you to <strong>{$board}</strong>";
-            default:                return "You have a new notification";
+            case 'card_assigned':   $line = "<strong>{$actor}</strong> assigned you to <strong>{$card}</strong>"; break;
+            case 'card_unassigned': $line = "<strong>{$actor}</strong> removed you from <strong>{$card}</strong>"; break;
+            case 'comment_added':   $line = "<strong>{$actor}</strong> commented on <strong>{$card}</strong>"; break;
+            case 'comment_mention': $line = "<strong>{$actor}</strong> mentioned you in <strong>{$card}</strong>"; break;
+            case 'due_soon':        $line = "<strong>{$card}</strong> is due soon"; break;
+            case 'due_overdue':     $line = "<strong>{$card}</strong> is overdue"; break;
+            case 'board_invited':   $line = "<strong>{$actor}</strong> added you to <strong>{$board}</strong>"; break;
+            default:                $line = "You have a new notification"; break;
         }
+
+        // For comment-triggered notifications, quote the comment body so the
+        // recipient can see what was actually said without opening the card.
+        if (($type === 'comment_added' || $type === 'comment_mention')
+            && !empty($data['body'])
+        ) {
+            $body     = (string) $data['body'];
+            $bodyHtml = nl2br(htmlspecialchars($body, ENT_QUOTES));
+            $line .= '<div style="margin-top:6px;padding:8px 12px;'
+                  . 'border-left:3px solid #5bc0de;background:#f4f5f7;'
+                  . 'color:#444;font-size:13px;border-radius:0 4px 4px 0;'
+                  . 'white-space:normal;">' . $bodyHtml . '</div>';
+        }
+
+        return $line;
     }
 
     private static function notificationSubject(array $n, string $appName): string

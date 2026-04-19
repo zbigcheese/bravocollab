@@ -51,12 +51,17 @@ class CommentController extends Controller
         $stmt->execute(['id' => $cardId]);
         $cardTitle = ($stmt->fetch())['title'] ?? '';
 
+        // Truncate the comment body so notification JSON stays reasonable and
+        // email digests remain readable even for very long comments.
+        $bodyForNotif = mb_strlen($body) > 500 ? mb_substr($body, 0, 500) . '…' : $body;
+
         foreach ($assignees->fetchAll() as $row) {
             $this->createNotification($row['user_id'], NOTIF_COMMENT_ADDED, [
                 'board_id'   => $boardId,
                 'card_id'    => $cardId,
                 'card_title' => $cardTitle,
                 'actor_name' => Auth::userName(),
+                'body'       => $bodyForNotif,
             ]);
         }
 
@@ -74,6 +79,7 @@ class CommentController extends Controller
                     'card_id'    => $cardId,
                     'card_title' => $cardTitle,
                     'actor_name' => Auth::userName(),
+                    'body'       => $bodyForNotif,
                 ]);
             }
         }
