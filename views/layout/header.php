@@ -25,11 +25,9 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
             </a>
         </div>
         <div class="navbar-right">
-            <?php if (Auth::isAdmin()): ?>
-            <a href="index.php?page=admin_users" class="nav-link">Users</a>
-            <?php endif; ?>
             <div class="user-menu" id="userMenu">
                 <button type="button" class="user-menu-trigger" id="userMenuTrigger" aria-haspopup="true" aria-expanded="false">
+                    <svg class="user-menu-avatar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <span class="user-name"><?php echo htmlspecialchars(Auth::userName()); ?></span>
                     <svg class="user-menu-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
@@ -39,6 +37,9 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
                         <div class="user-menu-email" title="<?php echo htmlspecialchars($userEmail); ?>"><?php echo htmlspecialchars($userEmail); ?></div>
                         <span class="user-menu-role user-menu-role-<?php echo htmlspecialchars($userRole); ?>"><?php echo $roleLabel; ?></span>
                     </div>
+                    <?php if (Auth::isAdmin()): ?>
+                    <a href="index.php?page=admin_users" class="user-menu-link">Manage users</a>
+                    <?php endif; ?>
                     <button type="button" class="user-menu-logout" id="logoutBtn">Sign out</button>
                 </div>
             </div>

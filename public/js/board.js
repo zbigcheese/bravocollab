@@ -468,6 +468,32 @@ const Board = {
             this.toggleMembersDrawer();
         });
 
+        // Mobile burger menu — collapses Show archived + Members + kebab
+        // behind a single trigger on phone-sized viewports.
+        const burger   = document.getElementById('boardBurgerBtn');
+        const controls = document.getElementById('boardHeaderControls');
+        if (burger && controls) {
+            burger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const open = controls.classList.toggle('open');
+                burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            // Close when an action button inside is clicked.
+            controls.addEventListener('click', (e) => {
+                if (e.target.closest('button')) {
+                    controls.classList.remove('open');
+                    burger.setAttribute('aria-expanded', 'false');
+                }
+            });
+            // Close on outside click.
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#boardHeaderControls') && !e.target.closest('#boardBurgerBtn')) {
+                    controls.classList.remove('open');
+                    burger.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+
         // Show-archived toggle (per-board, persisted in localStorage)
         const archivedToggle = document.getElementById('showArchivedToggle');
         if (archivedToggle) {
