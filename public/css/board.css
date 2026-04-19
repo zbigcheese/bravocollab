@@ -935,6 +935,18 @@
         width: 100%;
     }
 
+    /* Override the colored-header button style for buttons inside the popup —
+       otherwise they render white-on-white and disappear. */
+    .board-wrapper[data-bg] .board-header .board-header-controls .btn-secondary {
+        background: #f4f5f7;
+        color: var(--color-text);
+        border: 1px solid var(--color-border);
+    }
+
+    .board-wrapper[data-bg] .board-header .board-header-controls .btn-secondary:hover {
+        background: #ebecf0;
+    }
+
     .list-column {
         width: 260px;
         min-width: 260px;
