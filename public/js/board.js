@@ -17,6 +17,7 @@ const Board = {
         this.isAdmin = wrapper.dataset.isAdmin === '1';
         await this.load();
         this.bindEvents();
+        this.initDragScroll();
         if (typeof BoardViews !== 'undefined') BoardViews.init();
 
         // Auto-open card if ?card=ID is in URL
@@ -1097,6 +1098,56 @@ const Board = {
         target.cards.push(merged);
         target.cards.sort((a, b) => a.position - b.position);
         this.renderLists();
+    },
+
+    // Click-and-drag to horizontally scroll the board canvas when there are
+    // more lists than fit in the viewport. Only starts when the user clicks
+    // on empty background — not on a card, list, or interactive control — so
+    // it doesn't fight SortableJS or ordinary clicks.
+    initDragScroll() {
+        const canvas = document.getElementById('boardCanvas');
+        if (!canvas) return;
+
+        let isDragging = false;
+        let startX = 0;
+        let startScroll = 0;
+        let movedFar = false;
+
+        const isBackgroundTarget = (el) => {
+            if (!el) return false;
+            // Allow drag when the mousedown lands on the canvas itself, the
+            // lists container (space between/around list columns), or the
+            // add-list wrapper (but not the button or form inside it).
+            return el === canvas
+                || el.classList.contains('lists-container')
+                || (el.classList.contains('add-list-wrapper') && !el.closest('.add-list-btn'));
+        };
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (!isBackgroundTarget(e.target)) return;
+            isDragging = true;
+            movedFar = false;
+            startX = e.pageX;
+            startScroll = canvas.scrollLeft;
+            canvas.classList.add('is-drag-scrolling');
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.pageX - startX;
+            if (Math.abs(dx) > 3) movedFar = true;
+            canvas.scrollLeft = startScroll - dx;
+        });
+
+        const end = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            canvas.classList.remove('is-drag-scrolling');
+        };
+        document.addEventListener('mouseup', end);
+        window.addEventListener('blur', end);
     },
 
     async toggleCardWatch(cardId, iconEl) {
