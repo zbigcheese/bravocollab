@@ -45,12 +45,13 @@ class CommentController extends Controller
         $commentId = (int) $db->lastInsertId();
 
         // Notify card assignees + watchers (union; createNotification skips the actor).
+        // Distinct placeholder names — emulated PDO prepares disallow reusing the same name.
         $recipients = $db->prepare(
-            'SELECT user_id FROM card_assignments WHERE card_id = :cid
+            'SELECT user_id FROM card_assignments WHERE card_id = :cid_a
              UNION
-             SELECT user_id FROM card_watchers WHERE card_id = :cid'
+             SELECT user_id FROM card_watchers WHERE card_id = :cid_w'
         );
-        $recipients->execute(['cid' => $cardId]);
+        $recipients->execute(['cid_a' => $cardId, 'cid_w' => $cardId]);
 
         $stmt = $db->prepare('SELECT title FROM cards WHERE id = :id');
         $stmt->execute(['id' => $cardId]);

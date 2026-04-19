@@ -84,12 +84,13 @@ $notifStmt = $db->prepare(
 $count = 0;
 foreach ($dueSoonCards as $card) {
     // Notify assignees + watchers (union).
+    // Distinct placeholder names — emulated PDO prepares disallow reusing the same name.
     $recipients = $db->prepare(
-        'SELECT user_id FROM card_assignments WHERE card_id = :cid
+        'SELECT user_id FROM card_assignments WHERE card_id = :cid_a
          UNION
-         SELECT user_id FROM card_watchers WHERE card_id = :cid'
+         SELECT user_id FROM card_watchers WHERE card_id = :cid_w'
     );
-    $recipients->execute(['cid' => $card['id']]);
+    $recipients->execute(['cid_a' => $card['id'], 'cid_w' => $card['id']]);
 
     foreach ($recipients->fetchAll() as $r) {
         $notifStmt->execute([
