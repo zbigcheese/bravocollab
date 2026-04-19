@@ -739,31 +739,42 @@
     margin-bottom: 4px;
 }
 
-/* Burger button in the card modal header. Hidden on desktop — shown only
-   on mobile where the sidebar collapses into a bottom-sheet drawer. */
-.card-detail-menu-btn {
+/* Floating tool tab pinned to the right edge of the viewport — only visible
+   on mobile while the card modal is open. Opens the actions bottom sheet. */
+.card-detail-side-tool {
     display: none;
+    position: fixed;
+    top: 20vh;
+    right: 0;
+    z-index: 1050;
+    width: 40px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    background: #5bc0de;
+    color: #fff;
+    border-radius: 10px 0 0 10px;
+    box-shadow: -2px 2px 12px rgba(0, 0, 0, 0.22);
+    cursor: pointer;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    margin-right: 4px;
-    border: 0;
-    background: transparent;
-    color: var(--color-text-light);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
 }
 
-.card-detail-menu-btn svg {
+.card-detail-side-tool:hover {
+    background: #31b0d5;
+    transform: translateX(-2px);
+}
+
+.card-detail-side-tool svg {
     width: 20px;
     height: 20px;
 }
 
-.card-detail-menu-btn:hover {
-    background: #f4f5f7;
-    color: var(--color-text);
+.card-detail-modal.sidebar-open .card-detail-side-tool {
+    /* Hide the tab while the sheet is open so it doesn't float over it. */
+    opacity: 0;
+    pointer-events: none;
 }
 
 .card-detail-sidebar-backdrop {
@@ -780,9 +791,35 @@
         grid-template-columns: 1fr;
     }
 
-    /* Show the burger trigger. */
-    .card-detail-menu-btn {
+    /* Reveal the floating side tool tab. */
+    .card-detail-side-tool {
         display: inline-flex;
+    }
+
+    /* Tighten the card modal header on mobile — smaller title, less padding,
+       so the editable title has breathing room and the close × stays close. */
+    .card-detail-modal .modal-header {
+        padding: 14px 14px 8px;
+    }
+
+    .card-detail-modal .card-detail-title {
+        font-size: 17px;
+        padding: 4px 6px;
+        line-height: 1.3;
+    }
+
+    .card-detail-modal .card-archived-label {
+        font-size: 17px;
+        padding-top: 4px;
+    }
+
+    .card-detail-modal .modal-close {
+        font-size: 28px;
+        margin-left: 4px;
+    }
+
+    .card-detail-modal .modal-body {
+        padding: 12px 14px 16px;
     }
 
     /* Sidebar becomes a bottom-sheet drawer, hidden by default on mobile. */
