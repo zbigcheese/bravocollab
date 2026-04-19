@@ -914,12 +914,22 @@
         display: flex;
     }
 
-    /* Swap which utility-class items are visible inside the panel. */
-    .board-header-controls .mobile-only {
+    /* Swap which utility-class items are visible inside the panel. The
+       :not([hidden]) qualifier lets JS hide one of Archive/Restore via the
+       HTML hidden attribute without our display:inline-flex overriding it. */
+    .board-header-controls .mobile-only:not([hidden]) {
         display: inline-flex;
     }
     .board-header-controls .desktop-only {
         display: none;
+    }
+
+    /* Push the Show archived toggle to the bottom of the burger panel. */
+    .board-header-controls .archived-toggle {
+        order: 99;
+        margin-top: 4px;
+        padding-top: 8px;
+        border-top: 1px solid var(--color-border);
     }
 
     /* Toggle inside the popup uses dark text against white background. */

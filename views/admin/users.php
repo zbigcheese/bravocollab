@@ -19,7 +19,9 @@
                 </tr>
             </thead>
             <tbody id="usersTableBody">
-                <tr><td colspan="6" style="text-align:center;"><div class="spinner"></div></td></tr>
+                <tr><td colspan="6" style="text-align:center;" data-label="">
+                    <div class="spinner"></div>
+                </td></tr>
             </tbody>
         </table>
     </div>
@@ -51,6 +53,66 @@
 .board-picker-swatch { width: 24px; height: 18px; border-radius: 3px; flex-shrink: 0; }
 .board-picker-name { font-size: 14px; font-weight: 500; }
 .board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
+
+/* Mobile: stack each user row as a small card so role/status/actions wrap
+   to subsequent lines instead of overflowing the viewport. */
+@media (max-width: 600px) {
+    .admin-card {
+        padding: 12px;
+    }
+    .admin-table thead {
+        display: none;
+    }
+    .admin-table, .admin-table tbody, .admin-table tr, .admin-table td {
+        display: block;
+        width: 100%;
+    }
+    .admin-table tr {
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        margin-bottom: 10px;
+        padding: 10px 12px;
+    }
+    .admin-table td {
+        border-bottom: none;
+        padding: 4px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .admin-table td::before {
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--color-text-light);
+        letter-spacing: 0.04em;
+        flex-shrink: 0;
+    }
+    .admin-table td[data-label="Name"] {
+        padding-bottom: 6px;
+        margin-bottom: 4px;
+        border-bottom: 1px solid var(--color-border);
+    }
+    .admin-table td[data-label="Name"]::before {
+        display: none;
+    }
+    .admin-table td[data-label="Name"] strong {
+        font-size: 15px;
+    }
+    .admin-table td[data-label="Email"] {
+        word-break: break-all;
+    }
+    .admin-table .role-select,
+    .admin-table .toggle-active {
+        max-width: 60%;
+    }
+    .invite-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
 </style>
 
 <script>
@@ -63,17 +125,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         tbody.innerHTML = users.map(u => `
             <tr>
-                <td><strong>${App.escapeHtml(u.display_name)}</strong></td>
-                <td>${App.escapeHtml(u.email)}</td>
-                <td>
+                <td data-label="Name"><strong>${App.escapeHtml(u.display_name)}</strong></td>
+                <td data-label="Email">${App.escapeHtml(u.email)}</td>
+                <td data-label="Role">
                     <select class="role-select" data-user-id="${u.id}" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:4px;font-size:13px;">
                         <option value="member" ${u.role === 'member' ? 'selected' : ''}>Member</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                 </td>
-                <td><span class="status-badge ${u.is_active ? 'status-active' : 'status-inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
-                <td>${u.last_login_at ? App.formatDate(u.last_login_at) : 'Never'}</td>
-                <td>
+                <td data-label="Status"><span class="status-badge ${u.is_active ? 'status-active' : 'status-inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td data-label="Last login">${u.last_login_at ? App.formatDate(u.last_login_at) : 'Never'}</td>
+                <td data-label="Actions">
                     <button class="btn btn-sm btn-secondary toggle-active" data-user-id="${u.id}">
                         ${u.is_active ? 'Deactivate' : 'Activate'}
                     </button>

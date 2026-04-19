@@ -89,12 +89,13 @@ class Board extends Model
             }
         }
 
-        // Get members
+        // Get members — exclude deactivated users so they don't appear as
+        // assignable / visible board members anywhere in the UI.
         $members = $this->query(
             'SELECT u.id, u.display_name, u.email, bm.role as board_role
              FROM board_members bm
              JOIN users u ON bm.user_id = u.id
-             WHERE bm.board_id = :board_id
+             WHERE bm.board_id = :board_id AND u.is_active = 1
              ORDER BY u.display_name ASC',
             ['board_id' => $boardId]
         )->fetchAll();

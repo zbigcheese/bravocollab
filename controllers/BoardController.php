@@ -218,7 +218,8 @@ class BoardController extends Controller
         $members = $db->prepare(
             'SELECT u.id, u.display_name, u.email, bm.role as board_role
              FROM board_members bm JOIN users u ON bm.user_id = u.id
-             WHERE bm.board_id = :board_id ORDER BY u.display_name'
+             WHERE bm.board_id = :board_id AND u.is_active = 1
+             ORDER BY u.display_name'
         );
         $members->execute(['board_id' => $boardId]);
 
