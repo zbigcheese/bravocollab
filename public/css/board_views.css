@@ -463,40 +463,73 @@
 /* ============================================================
    Responsive tweaks
    ============================================================ */
+/* Weekday label inside each day cell — only shown on mobile (in the flat
+   day-strip layout, since the weekday header row is hidden). */
+.cal-cell-weekday {
+    display: none;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+    letter-spacing: 0.04em;
+}
+
 @media (max-width: 768px) {
-    /* Calendar: make each day column wider so cards are actually legible.
-       The whole grid scrolls horizontally; today's cell is auto-centered on
-       open (handled in JS). Weekly rows still stack vertically. */
+    /* Mobile calendar: flatten the month into a single horizontal strip.
+       The user swipes left/right through every day in the month. Today is
+       centered on first render (handled in JS). */
     .calendar-grid {
-        grid-template-columns: repeat(7, 140px);
+        display: flex;
+        flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scroll-snap-type: x proximity;
+        background: transparent;
+        gap: 6px;
+        border: 0;
+        padding-bottom: 4px;
+    }
+
+    /* Hide the weekday header row and the lead/trail outside-month cells —
+       neither is useful in the flat strip view. */
+    .cal-head,
+    .cal-cell.cal-outside {
+        display: none;
     }
 
     .cal-cell {
+        flex: 0 0 160px;
         scroll-snap-align: start;
-        padding: 6px;
-        min-height: 160px;
+        padding: 8px;
+        min-height: 220px;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+    }
+
+    .cal-cell-weekday {
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    /* Date number aligns left next to the weekday on mobile, not floating right. */
+    .cal-date {
+        align-self: flex-start;
+        font-size: 16px;
+        padding: 0;
+        min-width: 0;
+    }
+
+    .cal-today .cal-date {
+        background: transparent;
+        color: #F16820;
+        font-weight: 800;
     }
 
     .cal-card {
-        padding: 3px 6px;
+        padding: 4px 6px;
         font-size: 12px;
-    }
-
-    .cal-date {
-        font-size: 12px;
-        padding: 1px 6px;
-        min-width: 20px;
-    }
-
-    .cal-head {
-        padding: 6px 4px;
-        font-size: 10px;
-        position: sticky;
-        top: 0;
-        z-index: 1;
+        white-space: normal;
+        text-overflow: clip;
     }
 
     .view-toolbar {
@@ -509,9 +542,9 @@
     }
 
     /* Timeline: widen the day columns so bars are readable. Each day gets
-       ~40px, plus the fixed 140px row-label column. The pane already scrolls. */
+       ~100px, plus the fixed 140px row-label column. The pane already scrolls. */
     .tl-wrap {
-        min-width: calc(var(--tl-days, 30) * 40px + 140px);
+        min-width: calc(var(--tl-days, 30) * 100px + 140px);
     }
 
     .tl-head-label,
@@ -528,10 +561,6 @@
 
     .view-switcher-btn {
         padding: 6px 10px;
-    }
-
-    .cal-cell {
-        min-height: 140px;
     }
 
     /* Stack Start/Due calendars instead of squeezing them side-by-side. */

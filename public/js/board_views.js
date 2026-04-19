@@ -129,8 +129,10 @@ const BoardViews = {
                     const toggle = collapsed
                         ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
                         : '';
+                    const weekdayShort = cell.date.toLocaleDateString(undefined, { weekday: 'short' });
                     return `
                         <div class="cal-cell ${cell.outside ? 'cal-outside' : ''} ${k === todayKey ? 'cal-today' : ''} ${collapsed ? 'cal-collapsed' : ''}">
+                            <div class="cal-cell-weekday">${weekdayShort}</div>
                             <div class="cal-date">${cell.date.getDate()}</div>
                             <div class="cal-cards">
                                 ${cardsHtml}
