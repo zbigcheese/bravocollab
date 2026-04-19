@@ -659,6 +659,15 @@
 .checklist-item:hover .cl-item-assign-btn { opacity: 1; }
 .cl-item-assign-btn:hover { background: rgba(9,30,66,0.08); color: var(--color-text); }
 
+/* On mobile there's no hover state — keep checklist item controls always
+   visible so users can actually delete or assign items by tapping. */
+@media (max-width: 768px) {
+    .checklist-item .delete-item,
+    .cl-item-assign-btn {
+        opacity: 1;
+    }
+}
+
 /* ---- @mention ---- */
 .mention-dropdown {
     position: absolute;
