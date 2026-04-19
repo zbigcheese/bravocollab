@@ -268,6 +268,7 @@
     color: inherit;
     border-radius: var(--radius-sm);
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .board-burger-btn:hover {
@@ -277,6 +278,15 @@
 .board-burger-btn svg {
     width: 18px;
     height: 18px;
+}
+
+/* Utility classes for items shown only in one viewport mode (used by the
+   mobile burger panel that surfaces actions normally found in the kebab). */
+.board-header-controls .mobile-only {
+    display: none;
+}
+.board-header-controls .desktop-only {
+    display: inline-flex;
 }
 
 .board-title {
@@ -880,12 +890,13 @@
         display: inline-flex;
     }
 
-    /* Controls collapse into a small popup panel anchored under the header. */
+    /* Controls collapse into a popup panel anchored under the burger
+       on the left side of the header. */
     .board-header-controls {
         display: none;
         position: absolute;
         top: 100%;
-        right: 8px;
+        left: 8px;
         margin-top: 6px;
         padding: 10px;
         background: #fff;
@@ -895,12 +906,20 @@
         z-index: 90;
         flex-direction: column;
         align-items: stretch;
-        min-width: 200px;
+        min-width: 220px;
         gap: 8px;
     }
 
     .board-header-controls.open {
         display: flex;
+    }
+
+    /* Swap which utility-class items are visible inside the panel. */
+    .board-header-controls .mobile-only {
+        display: inline-flex;
+    }
+    .board-header-controls .desktop-only {
+        display: none;
     }
 
     /* Toggle inside the popup uses dark text against white background. */

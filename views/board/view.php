@@ -9,14 +9,14 @@ if (!$boardId) {
 <div class="board-wrapper" id="boardWrapper" data-board-id="<?php echo $boardId; ?>" data-is-admin="<?php echo Auth::isAdmin() ? '1' : '0'; ?>">
     <div class="board-header" id="boardHeader">
         <div class="board-header-left">
+            <button type="button" class="board-burger-btn" id="boardBurgerBtn" aria-label="Board controls" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
             <span class="board-archived-label" id="boardArchivedLabel" hidden>(Archived)&nbsp;</span>
             <h1 class="board-title" id="boardTitle"></h1>
         </div>
         <div class="board-header-right">
             <div class="board-members-preview" id="boardMembersPreview"></div>
-            <button type="button" class="board-burger-btn" id="boardBurgerBtn" aria-label="Board controls" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            </button>
             <div class="board-header-controls" id="boardHeaderControls">
                 <label class="archived-toggle" title="Show archived cards">
                     <input type="checkbox" id="showArchivedToggle">
@@ -25,9 +25,12 @@ if (!$boardId) {
                 </label>
                 <?php if (Auth::isAdmin()): ?>
                 <button class="btn btn-sm btn-secondary" id="manageMembersBtn">Members</button>
-                <?php endif; ?>
-                <?php if (Auth::isAdmin()): ?>
-                <button class="btn btn-sm btn-secondary" id="boardMenuBtn">&#8943;</button>
+                <button class="btn btn-sm btn-secondary mobile-only" id="mobileEditLabels">Edit Labels</button>
+                <button class="btn btn-sm btn-secondary mobile-only" id="mobileEditDescription">Edit Description</button>
+                <button class="btn btn-sm btn-secondary mobile-only" id="mobileChangeBackground">Change Background</button>
+                <button class="btn btn-sm btn-secondary mobile-only" id="mobileArchiveBoard">Archive Board</button>
+                <button class="btn btn-sm btn-secondary mobile-only" id="mobileRestoreBoard" hidden>Restore Board</button>
+                <button class="btn btn-sm btn-secondary desktop-only" id="boardMenuBtn">&#8943;</button>
                 <?php endif; ?>
             </div>
         </div>

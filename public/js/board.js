@@ -52,6 +52,11 @@ const Board = {
         document.getElementById('boardTitle').textContent = board.title;
         const archivedLbl = document.getElementById('boardArchivedLabel');
         if (archivedLbl) archivedLbl.hidden = board.is_archived != 1;
+        // Mobile burger panel: only one of Archive/Restore should be visible.
+        const archBtn = document.getElementById('mobileArchiveBoard');
+        const restBtn = document.getElementById('mobileRestoreBoard');
+        if (archBtn) archBtn.hidden = board.is_archived == 1;
+        if (restBtn) restBtn.hidden = board.is_archived != 1;
 
         // Members preview
         const preview = document.getElementById('boardMembersPreview');
@@ -511,6 +516,14 @@ const Board = {
 
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());
+
+        // Mobile burger panel direct actions (admin) — these reuse the same
+        // handlers the desktop kebab menu fires.
+        document.getElementById('mobileEditLabels')?.addEventListener('click', () => this.showLabelsEditor());
+        document.getElementById('mobileEditDescription')?.addEventListener('click', () => this.showEditDescriptionModal());
+        document.getElementById('mobileChangeBackground')?.addEventListener('click', () => this.showBackgroundPicker());
+        document.getElementById('mobileArchiveBoard')?.addEventListener('click', () => this.archiveBoard());
+        document.getElementById('mobileRestoreBoard')?.addEventListener('click', () => this.restoreBoard());
 
         // Board menu
         document.getElementById('boardMenuBtn')?.addEventListener('click', () => this.showBoardMenu());
