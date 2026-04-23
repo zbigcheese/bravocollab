@@ -229,8 +229,8 @@ class CardController extends Controller
         $sameBoard = ($sourceBoardId === $targetBoardId);
         $card = $this->cardModel->find($cardId);
 
-        $listModel  = new BoardList();
-        $newPosition = $listModel->getNextPosition('list_id', $targetListId);
+        // Bottom of the target list — we're adding a card to it.
+        $newPosition = $this->cardModel->getNextPosition('list_id', $targetListId);
 
         if (!$sameBoard) {
             $db = Database::get();
