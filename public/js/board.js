@@ -648,7 +648,8 @@ const Board = {
                 cardsContainer.innerHTML = list.cards.map(c => this.cardHtml(c)).join('');
                 this.initSortable();
                 textarea.value = '';
-                textarea.focus();
+                // Open the new card so the creator can fill in details right away.
+                CardModal.open(parseInt(res.card.id));
             }
         } catch (e) {
             App.showToast(e.message, 'error');
