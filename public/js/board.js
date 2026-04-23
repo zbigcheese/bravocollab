@@ -210,7 +210,12 @@ const Board = {
             });
         }
 
-        // Card sorting (within and between lists)
+        // Card sorting (within and between lists).
+        // On touch devices we require a long-press before drag starts so the
+        // user can scroll the list vertically / board horizontally just by
+        // swiping across cards. If the finger moves past touchStartThreshold
+        // before the delay expires, Sortable cancels and native scroll takes
+        // over. Mouse users bypass the delay (delayOnTouchOnly: true).
         document.querySelectorAll('.list-cards').forEach(el => {
             const s = new Sortable(el, {
                 group: 'cards',
@@ -220,6 +225,10 @@ const Board = {
                 preventOnFilter: false,
                 ghostClass: 'sortable-ghost',
                 dragClass: 'sortable-drag',
+                chosenClass: 'sortable-chosen',
+                delay: 400,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
                 onEnd: (evt) => this.onCardMove(evt),
             });
             this.cardSortables.push(s);

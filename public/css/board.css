@@ -600,6 +600,17 @@
     box-shadow: var(--shadow-lg);
 }
 
+/* On touch devices Sortable adds .sortable-chosen after the long-press
+   delay fires but before the finger moves — give the user a clear cue
+   that drag is now armed. */
+@media (hover: none) and (pointer: coarse) {
+    .card-item.sortable-chosen {
+        transform: scale(1.03);
+        box-shadow: 0 6px 14px rgba(9, 30, 66, 0.25);
+        transition: transform 0.12s, box-shadow 0.12s;
+    }
+}
+
 .card-labels {
     display: flex;
     flex-wrap: wrap;
