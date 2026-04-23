@@ -240,30 +240,34 @@ class CardController extends Controller
             $db->prepare('DELETE FROM card_labels WHERE card_id = :cid')
                ->execute(['cid' => $cardId]);
 
-            // Drop assignees who aren't members of the target board (admins allowed).
-            $db->prepare(
-                "DELETE FROM card_assignments
-                 WHERE card_id = :cid
-                   AND user_id NOT IN (
-                       SELECT user_id FROM board_members WHERE board_id = :bid
-                   )
-                   AND user_id NOT IN (
-                       SELECT id FROM users WHERE role = 'admin'
-                   )"
-            )->execute(['cid' => $cardId, 'bid' => $targetBoardId]);
+            // Users who can legitimately stay attached on the target board:
+            // members of the target board + all site admins.
+            $stmt = $db->prepare('SELECT user_id AS uid FROM board_members WHERE board_id = :bid');
+            $stmt->execute(['bid' => $targetBoardId]);
+            $allowed = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
-            // Clear coordinator if they aren't a member of the target board (admins allowed).
-            $db->prepare(
-                "UPDATE cards SET coordinator_id = NULL
-                 WHERE id = :cid
-                   AND coordinator_id IS NOT NULL
-                   AND coordinator_id NOT IN (
-                       SELECT user_id FROM board_members WHERE board_id = :bid
-                   )
-                   AND coordinator_id NOT IN (
-                       SELECT id FROM users WHERE role = 'admin'
-                   )"
-            )->execute(['cid' => $cardId, 'bid' => $targetBoardId]);
+            $stmt = $db->query("SELECT id FROM users WHERE role = 'admin'");
+            $allowed = array_unique(array_merge($allowed, array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN))));
+            $allowedSet = array_flip($allowed); // O(1) lookup
+
+            // Drop assignees not in the allowed set.
+            $stmt = $db->prepare('SELECT user_id FROM card_assignments WHERE card_id = :cid');
+            $stmt->execute(['cid' => $cardId]);
+            $currentAssignees = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+            $toDrop = array_values(array_filter($currentAssignees, fn($uid) => !isset($allowedSet[$uid])));
+            if (!empty($toDrop)) {
+                $placeholders = implode(',', array_fill(0, count($toDrop), '?'));
+                $params = array_merge([$cardId], $toDrop);
+                $db->prepare("DELETE FROM card_assignments WHERE card_id = ? AND user_id IN ($placeholders)")
+                   ->execute($params);
+            }
+
+            // Clear coordinator if not in allowed set.
+            $coordId = isset($card['coordinator_id']) ? (int) $card['coordinator_id'] : 0;
+            if ($coordId > 0 && !isset($allowedSet[$coordId])) {
+                $db->prepare('UPDATE cards SET coordinator_id = NULL WHERE id = :cid')
+                   ->execute(['cid' => $cardId]);
+            }
         }
 
         $this->cardModel->update($cardId, [
