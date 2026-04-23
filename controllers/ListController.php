@@ -101,6 +101,28 @@ class ListController extends Controller
         $this->json(['success' => true]);
     }
 
+    public function forBoard(): void
+    {
+        $this->requireAuth();
+        $this->requireGet();
+
+        $boardId = (int) ($_GET['board_id'] ?? 0);
+        if (!$boardId) {
+            $this->json(['error' => 'board_id is required'], 400);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        $stmt = Database::get()->prepare(
+            'SELECT id, title, position FROM lists
+             WHERE board_id = :bid AND is_archived = 0
+             ORDER BY position ASC'
+        );
+        $stmt->execute(['bid' => $boardId]);
+
+        $this->json(['lists' => $stmt->fetchAll()]);
+    }
+
     public function reorder(): void
     {
         $this->requireAuth();

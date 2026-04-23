@@ -81,7 +81,7 @@ const CardModal = {
                             <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
-                                : '<button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
+                                : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
                             <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-light);">
                                 Created by <strong style="color:var(--color-text);">${App.escapeHtml(c.creator_name)}</strong><br>
                                 ${App.formatDate(c.created_at)}
@@ -543,6 +543,7 @@ const CardModal = {
         document.getElementById('sidebarDueDate')?.addEventListener('click', () => this.showDueDatePicker());
         document.getElementById('sidebarAttachment')?.addEventListener('click', () => this.triggerAttachmentUpload());
         document.getElementById('sidebarWatch')?.addEventListener('click', () => this.toggleWatch());
+        document.getElementById('sidebarMoveToBoard')?.addEventListener('click', () => this.showMoveToBoardDialog());
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
         document.getElementById('sidebarRestore')?.addEventListener('click', () => this.restoreCard());
     },
@@ -1487,6 +1488,116 @@ const CardModal = {
     },
 
     // ---- Archive ----
+    async showMoveToBoardDialog() {
+        const currentBoardId = parseInt(this.currentCard.board_id || Board.boardId);
+        const cardTitle = this.currentCard.title;
+
+        let boards = [];
+        try {
+            const res = await App.api('boards.list', {}, 'GET');
+            boards = (res.boards || []).filter(b => b.is_archived != 1);
+        } catch (e) {
+            App.showToast('Failed to load boards', 'error');
+            return;
+        }
+        if (boards.length === 0) {
+            App.showToast('No boards available', 'error');
+            return;
+        }
+
+        const boardOptions = boards.map(b => {
+            const selected = parseInt(b.id) === currentBoardId ? ' selected' : '';
+            const suffix = parseInt(b.id) === currentBoardId ? ' (current)' : '';
+            return `<option value="${b.id}"${selected}>${App.escapeHtml(b.title)}${suffix}</option>`;
+        }).join('');
+
+        const body = `
+            <p style="margin:0 0 12px;color:var(--color-text-light);font-size:13px;">Moving "<strong style="color:var(--color-text)">${App.escapeHtml(cardTitle)}</strong>"</p>
+            <div class="form-group">
+                <label for="moveBoardSelect" style="font-weight:600;margin-bottom:4px;display:block;">Board</label>
+                <select id="moveBoardSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size:14px;">
+                    ${boardOptions}
+                </select>
+            </div>
+            <div class="form-group" style="margin-top:12px;">
+                <label for="moveListSelect" style="font-weight:600;margin-bottom:4px;display:block;">List</label>
+                <select id="moveListSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size:14px;">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <p style="margin:12px 0 0;color:var(--color-text-light);font-size:12px;">When moving to a different board, labels are removed (they're board-specific), and any assignees or coordinator who aren't members of the target board are unassigned.</p>
+        `;
+
+        const footer = `<button class="btn btn-primary" id="moveCardConfirmBtn" disabled>Move</button>`;
+        const modal = App.createModal('moveCardModal', 'Move card', body, footer);
+
+        const boardSelect = modal.querySelector('#moveBoardSelect');
+        const listSelect  = modal.querySelector('#moveListSelect');
+        const confirmBtn  = modal.querySelector('#moveCardConfirmBtn');
+
+        const loadLists = async (boardId) => {
+            listSelect.innerHTML = '<option value="">Loading...</option>';
+            confirmBtn.disabled = true;
+            try {
+                const res = await App.api('lists.for_board', { board_id: boardId }, 'GET');
+                const lists = res.lists || [];
+                if (lists.length === 0) {
+                    listSelect.innerHTML = '<option value="">(no lists on this board)</option>';
+                    return;
+                }
+                listSelect.innerHTML = lists.map(l =>
+                    `<option value="${l.id}">${App.escapeHtml(l.title)}</option>`
+                ).join('');
+                confirmBtn.disabled = false;
+            } catch (e) {
+                listSelect.innerHTML = '<option value="">(failed to load)</option>';
+            }
+        };
+
+        boardSelect.addEventListener('change', () => loadLists(parseInt(boardSelect.value)));
+        loadLists(parseInt(boardSelect.value));
+
+        confirmBtn.addEventListener('click', async () => {
+            const targetBoardId = parseInt(boardSelect.value);
+            const targetListId  = parseInt(listSelect.value);
+            if (!targetBoardId || !targetListId) return;
+
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Moving...';
+            this.suppressSSE();
+
+            const cardId = this.currentCard.id;
+            const sameBoard = targetBoardId === currentBoardId;
+
+            try {
+                await App.api('cards.move_to_board', {
+                    card_id: cardId,
+                    target_board_id: targetBoardId,
+                    target_list_id: targetListId,
+                });
+
+                modal.remove();
+                this.closeModal();
+
+                if (sameBoard) {
+                    // Same-board — the server emits card_moved; also refresh proactively
+                    // so the user sees the change without waiting for the SSE poll.
+                    Board?.refreshBoardData?.();
+                    App.showToast('Card moved', 'success');
+                } else {
+                    // Remove immediately from the current board view; SSE will follow.
+                    Board?.handleCardArchived?.({ card_id: cardId });
+                    const target = boards.find(b => parseInt(b.id) === targetBoardId);
+                    App.showToast(`Moved to ${target ? target.title : 'board'}`, 'success');
+                }
+            } catch (e) {
+                App.showToast(e.message || 'Failed to move card', 'error');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Move';
+            }
+        });
+    },
+
     async archiveCard() {
         this.suppressSSE();
         try {

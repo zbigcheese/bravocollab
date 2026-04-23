@@ -195,6 +195,118 @@ class CardController extends Controller
         $this->json(['success' => true]);
     }
 
+    public function moveToBoard(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId        = (int) ($data['card_id'] ?? 0);
+        $targetBoardId = (int) ($data['target_board_id'] ?? 0);
+        $targetListId  = (int) ($data['target_list_id'] ?? 0);
+
+        if (!$cardId || !$targetBoardId || !$targetListId) {
+            $this->json(['error' => 'card_id, target_board_id and target_list_id are required'], 400);
+            return;
+        }
+
+        $sourceBoardId = $this->getBoardIdForCard($cardId);
+        if (!$sourceBoardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        // User must be a member of BOTH boards (or admin).
+        $this->requireBoardAccess($sourceBoardId);
+        $this->requireBoardAccess($targetBoardId);
+
+        // Verify target list actually lives on the target board.
+        if ($this->getBoardIdForList($targetListId) !== $targetBoardId) {
+            $this->json(['error' => 'Target list does not belong to the target board'], 400);
+            return;
+        }
+
+        $sameBoard = ($sourceBoardId === $targetBoardId);
+        $card = $this->cardModel->find($cardId);
+
+        $listModel  = new BoardList();
+        $newPosition = $listModel->getNextPosition('list_id', $targetListId);
+
+        if (!$sameBoard) {
+            $db = Database::get();
+
+            // Labels are board-scoped — the old label IDs are invalid on the target
+            // board so we strip all label associations before the move.
+            $db->prepare('DELETE FROM card_labels WHERE card_id = :cid')
+               ->execute(['cid' => $cardId]);
+
+            // Drop assignees who aren't members of the target board (admins allowed).
+            $db->prepare(
+                "DELETE FROM card_assignments
+                 WHERE card_id = :cid
+                   AND user_id NOT IN (
+                       SELECT user_id FROM board_members WHERE board_id = :bid
+                   )
+                   AND user_id NOT IN (
+                       SELECT id FROM users WHERE role = 'admin'
+                   )"
+            )->execute(['cid' => $cardId, 'bid' => $targetBoardId]);
+
+            // Clear coordinator if they aren't a member of the target board (admins allowed).
+            $db->prepare(
+                "UPDATE cards SET coordinator_id = NULL
+                 WHERE id = :cid
+                   AND coordinator_id IS NOT NULL
+                   AND coordinator_id NOT IN (
+                       SELECT user_id FROM board_members WHERE board_id = :bid
+                   )
+                   AND coordinator_id NOT IN (
+                       SELECT id FROM users WHERE role = 'admin'
+                   )"
+            )->execute(['cid' => $cardId, 'bid' => $targetBoardId]);
+        }
+
+        $this->cardModel->update($cardId, [
+            'list_id'  => $targetListId,
+            'position' => $newPosition,
+        ]);
+
+        if ($sameBoard) {
+            // Same-board move — reuse the regular card_moved event.
+            $this->publishSSE($sourceBoardId, SSE_CARD_MOVED, [
+                'card_id'        => $cardId,
+                'target_list_id' => $targetListId,
+                'position'       => $newPosition,
+            ]);
+            $this->logActivity($sourceBoardId, $cardId, 'card_moved', [
+                'title' => $card['title'],
+            ]);
+        } else {
+            // Cross-board: remove from source view, insert into target view.
+            $summary = $this->cardModel->getSummary($cardId);
+            if ($summary) {
+                $summary['list_id'] = $targetListId;
+            }
+            $this->publishSSE($sourceBoardId, SSE_CARD_ARCHIVED, ['card_id' => $cardId]);
+            $this->publishSSE($targetBoardId, SSE_CARD_CREATED, ['card' => $summary]);
+            $this->logActivity($sourceBoardId, $cardId, 'card_moved_out', [
+                'title'           => $card['title'],
+                'target_board_id' => $targetBoardId,
+            ]);
+            $this->logActivity($targetBoardId, $cardId, 'card_moved_in', [
+                'title'           => $card['title'],
+                'source_board_id' => $sourceBoardId,
+            ]);
+        }
+
+        $this->json([
+            'success'         => true,
+            'target_board_id' => $targetBoardId,
+            'target_list_id'  => $targetListId,
+            'same_board'      => $sameBoard,
+        ]);
+    }
+
     public function archive(): void
     {
         $this->requireAuth();
