@@ -72,7 +72,26 @@ const Board = {
 
     renderLists() {
         const container = document.getElementById('listsContainer');
+
+        // Snapshot scroll state so an edit (anywhere in the board) doesn't
+        // jump every list back to the top. We capture per-list vertical
+        // scroll keyed by list_id, plus the horizontal scroll of the canvas.
+        const scrollState = {};
+        container.querySelectorAll('.list-cards').forEach(el => {
+            const id = el.dataset.listId;
+            if (id) scrollState[id] = el.scrollTop;
+        });
+        const canvas = document.getElementById('boardCanvas');
+        const canvasScrollLeft = canvas ? canvas.scrollLeft : 0;
+
         container.innerHTML = this.data.lists.map(list => this.listHtml(list)).join('');
+
+        // Restore scroll positions before sortables reinit so the layout is final.
+        container.querySelectorAll('.list-cards').forEach(el => {
+            const id = el.dataset.listId;
+            if (id && scrollState[id] !== undefined) el.scrollTop = scrollState[id];
+        });
+        if (canvas) canvas.scrollLeft = canvasScrollLeft;
 
         // Reinit sortables
         this.initSortable();

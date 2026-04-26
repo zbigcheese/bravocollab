@@ -69,11 +69,13 @@ const BoardViews = {
 
     // Returns the CSS class suffix (with leading space) describing a calendar
     // card's completion/due state. Order of priority:
-    //   complete       -> dimmed + strikethrough
-    //   overdue (past) -> red bg, white text
-    //   due today      -> orange bg
+    //   complete or archived -> dimmed + strikethrough (no severity flag)
+    //   overdue (past)       -> red bg, white text
+    //   due today            -> orange bg
+    // Archived cards are intentionally treated like done: an old card that
+    // never got a complete check shouldn't keep screaming red/orange.
     _calCardStateCls(card, todayKey) {
-        if (card.due_complete == 1) return ' cal-card-done';
+        if (card.due_complete == 1 || card.is_archived == 1) return ' cal-card-done';
         const dueKey = card.due_date ? card.due_date.substring(0, 10) : '';
         if (!dueKey) return '';
         if (dueKey < todayKey) return ' cal-card-overdue';
