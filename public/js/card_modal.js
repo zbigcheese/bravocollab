@@ -34,6 +34,20 @@ const CardModal = {
             const url = new URL(window.location);
             url.searchParams.set('card', cardId);
             history.replaceState(null, '', url);
+
+            // Fire-and-forget: mark any unread notifications for this card
+            // as read, then refresh the bell badge / dropdown if loaded.
+            // Wrapped so a failure here can never block the modal from opening.
+            App.api('notifications.mark_card_read', { card_id: cardId })
+                .then((r) => {
+                    if (!r || r.marked <= 0 || typeof Notifications === 'undefined') return;
+                    Notifications.loadCount?.();
+                    // Only refresh the open dropdown — avoid an extra request
+                    // when the user isn't even looking at the list.
+                    const dd = document.getElementById('notificationDropdown');
+                    if (dd && dd.classList.contains('open')) Notifications.loadList?.();
+                })
+                .catch(() => { /* non-fatal */ });
         } catch (e) {
             App.showToast('Failed to load card', 'error');
         }

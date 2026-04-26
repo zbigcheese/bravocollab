@@ -58,4 +58,36 @@ class NotificationController extends Controller
 
         $this->json(['success' => true]);
     }
+
+    /**
+     * Mark every unread notification referencing the given card as read.
+     * Triggered whenever the user opens a card (board click, deep-link from
+     * an email, etc.) so the bell badge clears automatically once the
+     * relevant card has been viewed.
+     */
+    public function markCardRead(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['card_id'] ?? 0);
+        if (!$cardId) {
+            $this->json(['error' => 'card_id required'], 400);
+            return;
+        }
+
+        $db = Database::get();
+        $stmt = $db->prepare(
+            "UPDATE notifications
+             SET is_read = 1
+             WHERE user_id = :uid
+               AND is_read = 0
+               AND JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.card_id')) = :cid"
+        );
+        $stmt->execute(['uid' => Auth::userId(), 'cid' => (string) $cardId]);
+
+        $this->json(['success' => true, 'marked' => $stmt->rowCount()]);
+    }
 }
