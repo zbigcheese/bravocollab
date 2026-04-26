@@ -315,14 +315,19 @@ const CardModal = {
     },
 
     renderSingleComment(cm, isReply = false) {
-        // Edit and Delete are both strictly own-comments — admins included.
-        // If user_id is missing from the row (e.g. optimistic local insert
-        // before a re-fetch), default to showing the buttons; the server
-        // still enforces ownership.
-        const knownAuthor = cm.user_id !== undefined && cm.user_id !== null;
-        const isOwn = !knownAuthor || parseInt(cm.user_id) === App.userId;
-        const editBtn   = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
-        const deleteBtn = isOwn ? `<button class="delete-comment" data-comment-id="${cm.id}">Delete</button>` : '';
+        // Edit and Delete are strictly own-comments — admins included. Server
+        // enforces this. The client-side check is purely a UX hint that hides
+        // buttons we know won't work — so if EITHER side of the comparison is
+        // unreliable (App.userId not yet populated, or user_id absent from
+        // the row), default to showing the buttons. Worst case: a click hits
+        // the API and gets a 403 toast. That beats silently hiding controls
+        // on the user's own comments.
+        const myId       = parseInt(App.userId);
+        const authorId   = cm.user_id != null ? parseInt(cm.user_id) : NaN;
+        const haveBoth   = Number.isFinite(myId) && myId > 0 && Number.isFinite(authorId);
+        const isOwn      = !haveBoth || authorId === myId;
+        const editBtn    = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
+        const deleteBtn  = isOwn ? `<button class="delete-comment" data-comment-id="${cm.id}">Delete</button>` : '';
 
         return `
             <div class="comment-item ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
