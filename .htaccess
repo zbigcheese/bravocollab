@@ -1,5 +1,21 @@
 Options -Indexes
 
+# Google OAuth callback receives query values like "code=4/0Ae…" with raw
+# slashes that match default ModSecurity / OWASP CRS injection rules and
+# get blocked at the WAF before PHP even runs. Disable ModSecurity for
+# this single request only. Both module names are tried so it works on
+# cPanel servers (mod_security2) and on rare older hosts (mod_security).
+<IfModule mod_security2.c>
+    <If "%{QUERY_STRING} =~ /page=google_callback/">
+        SecRuleEngine Off
+    </If>
+</IfModule>
+<IfModule mod_security.c>
+    <If "%{QUERY_STRING} =~ /page=google_callback/">
+        SecFilterEngine Off
+    </If>
+</IfModule>
+
 # Security headers
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
