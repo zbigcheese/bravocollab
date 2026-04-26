@@ -33,15 +33,6 @@ $_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isC
             </a>
         </div>
         <div class="navbar-right">
-            <?php /* Hidden for now — flip the condition back to Auth::isAdmin()
-                      to re-expose. JS handler in footer.php and the endpoint
-                      in UserController::testWhatsNext are still wired and
-                      will work the moment the button is rendered again. */ ?>
-            <?php if (false && Auth::isAdmin()): ?>
-            <button type="button" id="testDailyEmailBtn" class="navbar-test-btn" title="Send the 'what's next' digest to your own email now (no dedupe)">
-                test: dailyemail
-            </button>
-            <?php endif; ?>
             <?php if ($_gcalConfigured): ?>
             <div class="calendar-menu<?php echo $_gcalConnected ? ' is-connected' : ''; ?>" id="calendarMenu">
                 <button type="button" class="calendar-menu-trigger" id="calendarMenuTrigger"
@@ -95,7 +86,6 @@ $_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isC
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
-                    <a href="index.php?page=settings_calendar" class="user-menu-link">Calendar settings</a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="index.php?page=admin_users" class="user-menu-link">Manage users</a>
                     <?php endif; ?>
