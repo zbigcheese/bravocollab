@@ -33,7 +33,11 @@ $_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isC
             </a>
         </div>
         <div class="navbar-right">
-            <?php if (Auth::isAdmin()): ?>
+            <?php /* Hidden for now — flip the condition back to Auth::isAdmin()
+                      to re-expose. JS handler in footer.php and the endpoint
+                      in UserController::testWhatsNext are still wired and
+                      will work the moment the button is rendered again. */ ?>
+            <?php if (false && Auth::isAdmin()): ?>
             <button type="button" id="testDailyEmailBtn" class="navbar-test-btn" title="Send the 'what's next' digest to your own email now (no dedupe)">
                 test: dailyemail
             </button>
