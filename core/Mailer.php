@@ -175,11 +175,24 @@ class Mailer
      */
     public static function sendWhatsNext(string $toEmail, string $displayName, array $sections): bool
     {
+        $built = self::buildWhatsNext($displayName, $sections);
+        if ($built === null) return false;
+        return self::send($toEmail, $built['subject'], $built['body']);
+    }
+
+    /**
+     * Build (but don't send) the "what's next" email. Returns
+     * ['subject' => ..., 'body' => ...] or null if there's nothing to send.
+     * Exposed so the admin test endpoint can preview the rendered email and
+     * collect diagnostics from the underlying mail() call.
+     */
+    public static function buildWhatsNext(string $displayName, array $sections): ?array
+    {
         $config  = require __DIR__ . '/../config/config.php';
         $appName = $config['app_name'];
         $baseUrl = rtrim($config['base_url'], '/');
 
-        if (empty($sections)) return false;
+        if (empty($sections)) return null;
 
         $subject = "What's next today — {$appName}";
 
@@ -240,7 +253,7 @@ class Mailer
             . '</p>'
         );
 
-        return self::send($toEmail, $subject, $body);
+        return ['subject' => $subject, 'body' => $body];
     }
 
     private static function notificationText(string $type, array $data): string
@@ -307,17 +320,48 @@ class Mailer
 
     public static function send(string $to, string $subject, string $htmlBody): bool
     {
+        return self::sendWithDiagnostics($to, $subject, $htmlBody)['ok'];
+    }
+
+    /**
+     * Same as send() but returns detailed info about what was attempted and
+     * whatever PHP/the MTA reported. Used by the admin "test: dailyemail"
+     * endpoint to surface why a "sent successfully" message can still result
+     * in no email arriving.
+     *
+     * Returns: ['ok' => bool, 'to' => ..., 'subject' => ..., 'from' => ...,
+     *           'headers' => [...], 'body_length' => int, 'body_preview' => str,
+     *           'mail_return' => bool, 'last_error' => array|null]
+     */
+    public static function sendWithDiagnostics(string $to, string $subject, string $htmlBody): array
+    {
         $config = require __DIR__ . '/../config/config.php';
 
+        $from = $config['mail_from_name'] . ' <' . $config['mail_from'] . '>';
         $headers = [
             'MIME-Version: 1.0',
             'Content-Type: text/html; charset=UTF-8',
-            'From: ' . $config['mail_from_name'] . ' <' . $config['mail_from'] . '>',
+            'From: ' . $from,
             'Reply-To: ' . $config['mail_from'],
             'X-Mailer: BravoCollab',
         ];
 
-        return @mail($to, $subject, $htmlBody, implode("\r\n", $headers));
+        // Clear any prior error so we know whatever we read after is from this call.
+        error_clear_last();
+        $result = mail($to, $subject, $htmlBody, implode("\r\n", $headers));
+        $lastError = error_get_last();
+
+        return [
+            'ok'           => (bool) $result,
+            'to'           => $to,
+            'subject'      => $subject,
+            'from'         => $from,
+            'headers'      => $headers,
+            'body_length'  => strlen($htmlBody),
+            'body_preview' => mb_substr(strip_tags($htmlBody), 0, 600),
+            'mail_return'  => (bool) $result,
+            'last_error'   => $lastError,
+        ];
     }
 
     private static function buildHtml(string $appName, string $title, string $content): string

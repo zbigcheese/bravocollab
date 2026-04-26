@@ -25,6 +25,8 @@
         });
 
         // TEMPORARY: admin-only "test: dailyemail" trigger.
+        // Renders a detailed report so we can see what was prepared and what
+        // mail() actually returned (which is not a delivery guarantee).
         document.getElementById('testDailyEmailBtn')?.addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             const original = btn.textContent;
@@ -32,7 +34,7 @@
             btn.textContent = 'sending…';
             try {
                 const res = await App.api('users.test_whats_next', {});
-                App.showToast(res.message || 'Done', res.sent ? 'success' : 'info');
+                showTestEmailReport(res);
             } catch (err) {
                 App.showToast(err.message || 'Failed', 'error');
             } finally {
@@ -40,4 +42,85 @@
                 btn.textContent = original;
             }
         });
+
+        function showTestEmailReport(res) {
+            const esc = App.escapeHtml;
+
+            const sectionsHtml = (res.sections || []).map(sec => {
+                const cards = (sec.cards || []).map(c =>
+                    `<li><strong>${esc(c.title)}</strong>
+                       <span style="color:#5e6c84;font-size:12px;">— ${esc(c.board_title)} (due ${esc(c.due_date || '')})</span>
+                     </li>`).join('');
+                const items = (sec.items || []).map(it =>
+                    `<li>&#9745; ${esc(it.content)}
+                       <span style="color:#5e6c84;font-size:12px;">— ${esc(it.card_title)} / ${esc(it.board_title)} (due ${esc(it.due_date || '')})</span>
+                     </li>`).join('');
+                const empty = !cards && !items
+                    ? '<li style="color:#999;font-style:italic;">(empty)</li>' : '';
+                return `
+                    <div style="margin:10px 0;">
+                        <div style="font-weight:700;color:#172b4d;margin-bottom:4px;">${esc(sec.label)}</div>
+                        <ul style="margin:0;padding-left:20px;line-height:1.55;">${cards}${items}${empty}</ul>
+                    </div>
+                `;
+            }).join('') || '<p style="color:#999;font-style:italic;">No sections built (nothing assigned in the next 8 days).</p>';
+
+            const email = res.email || {};
+            const lastErr = email.last_error
+                ? `<pre style="background:#FFF4F4;color:#a00;padding:8px;border-radius:4px;font-size:12px;white-space:pre-wrap;margin:6px 0 0;">${esc(JSON.stringify(email.last_error, null, 2))}</pre>`
+                : '<span style="color:#5e6c84;">none</span>';
+
+            const status = res.sent
+                ? '<span style="color:#fff;background:#61BD4F;padding:2px 8px;border-radius:3px;font-weight:700;font-size:12px;">mail() OK</span>'
+                : (res.reason === 'no_data'
+                    ? '<span style="color:#fff;background:#5e6c84;padding:2px 8px;border-radius:3px;font-weight:700;font-size:12px;">SKIPPED</span>'
+                    : '<span style="color:#fff;background:#EB5A46;padding:2px 8px;border-radius:3px;font-weight:700;font-size:12px;">mail() FAILED</span>');
+
+            const headersHtml = email.headers
+                ? `<pre style="background:#f4f5f7;padding:8px;border-radius:4px;font-size:12px;white-space:pre-wrap;margin:4px 0;">${esc(email.headers.join('\n'))}</pre>`
+                : '<span style="color:#999;">—</span>';
+
+            const bodyPreview = email.body_preview
+                ? `<pre style="background:#f4f5f7;padding:8px;border-radius:4px;font-size:12px;white-space:pre-wrap;max-height:160px;overflow:auto;margin:4px 0;">${esc(email.body_preview)}…</pre>`
+                : '<span style="color:#999;">—</span>';
+
+            const content = `
+                <div style="font-size:13px;color:#172b4d;">
+                    <p style="margin:0 0 12px;">${status} <span style="margin-left:8px;">${esc(res.message || '')}</span></p>
+                    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;width:140px;">Recipient</td><td>${esc(res.recipient || '')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">CET now</td><td>${esc(res.cet_now || '')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Sections</td><td>${res.sections_count}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Cards / items</td><td>${res.cards_total} card(s), ${res.items_total} item(s)</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Subject</td><td>${esc(email.subject || '—')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Body length</td><td>${email.body_length || 0} chars</td></tr>
+                    </table>
+
+                    <div style="margin-top:14px;">
+                        <div style="font-weight:700;color:#172b4d;margin-bottom:4px;">Prepared sections</div>
+                        ${sectionsHtml}
+                    </div>
+
+                    <details style="margin-top:14px;">
+                        <summary style="cursor:pointer;font-weight:700;">Mail headers</summary>
+                        ${headersHtml}
+                    </details>
+
+                    <details style="margin-top:8px;">
+                        <summary style="cursor:pointer;font-weight:700;">Body preview (text-only, first 600 chars)</summary>
+                        ${bodyPreview}
+                    </details>
+
+                    <details style="margin-top:8px;">
+                        <summary style="cursor:pointer;font-weight:700;">PHP last_error after mail()</summary>
+                        ${lastErr}
+                    </details>
+
+                    <p style="color:#5e6c84;font-size:12px;margin-top:14px;">
+                        <strong>If mail() returned OK but nothing arrives:</strong> check spam folder, then your MTA queue / mail.log on the server. Shared cPanel hosts often silently drop messages whose From doesn't match the domain, or rate-limit after a few sends in quick succession.
+                    </p>
+                </div>
+            `;
+            App.createModal('testEmailReportModal', 'test: dailyemail — diagnostics', content);
+        }
     </script>

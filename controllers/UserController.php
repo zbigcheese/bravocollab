@@ -35,24 +35,70 @@ class UserController extends Controller
         $cetNow = new DateTime('now', new DateTimeZone('Europe/Belgrade'));
         $sections = Mailer::buildWhatsNextSectionsForUser($db, $uid, $cetNow);
 
+        // Always surface the prepared sections so the admin can confirm what
+        // would have gone out, regardless of send outcome.
+        $sectionSummary = array_map(function ($sec) {
+            return [
+                'label'  => $sec['label'],
+                'cards'  => array_map(fn($c) => [
+                    'id'          => (int) $c['id'],
+                    'title'       => $c['title'],
+                    'due_date'    => $c['due_date'],
+                    'board_title' => $c['board_title'],
+                ], $sec['cards']),
+                'items'  => array_map(fn($it) => [
+                    'id'          => (int) $it['id'],
+                    'content'     => $it['content'],
+                    'due_date'    => $it['due_date'],
+                    'card_title'  => $it['card_title'],
+                    'board_title' => $it['board_title'],
+                ], $sec['items']),
+            ];
+        }, $sections);
+
         if (empty($sections)) {
             $this->json([
-                'success' => true,
-                'sent'    => false,
-                'message' => 'No upcoming items in the next 8 days — nothing to send.',
+                'success'         => true,
+                'sent'            => false,
+                'reason'          => 'no_data',
+                'message'         => 'No upcoming items in the next 8 days — nothing to send.',
+                'recipient'       => $user['email'],
+                'cet_now'         => $cetNow->format('Y-m-d H:i:s T'),
+                'sections'        => [],
+                'sections_count'  => 0,
+                'cards_total'     => 0,
+                'items_total'     => 0,
             ]);
             return;
         }
 
-        $sent = Mailer::sendWhatsNext($user['email'], $user['display_name'], $sections);
+        $built = Mailer::buildWhatsNext($user['display_name'], $sections);
+        $diag  = Mailer::sendWithDiagnostics($user['email'], $built['subject'], $built['body']);
+
+        $cardsTotal = array_sum(array_map(fn($s) => count($s['cards']), $sections));
+        $itemsTotal = array_sum(array_map(fn($s) => count($s['items']), $sections));
 
         $this->json([
-            'success' => $sent,
-            'sent'    => $sent,
-            'message' => $sent
-                ? 'Sent to ' . $user['email']
-                : 'Mail send failed (mail() returned false). Check server mail config.',
+            'success'        => true,
+            'sent'           => $diag['ok'],
+            'message'        => $diag['ok']
+                ? "mail() accepted the message for {$diag['to']} (this is not a delivery guarantee — check spam, MX/SPF, or the mail queue if it doesn't arrive)"
+                : 'mail() returned false — the MTA refused the message',
+            'recipient'      => $user['email'],
+            'cet_now'        => $cetNow->format('Y-m-d H:i:s T'),
             'sections_count' => count($sections),
+            'cards_total'    => $cardsTotal,
+            'items_total'    => $itemsTotal,
+            'sections'       => $sectionSummary,
+            'email'          => [
+                'subject'      => $diag['subject'],
+                'from'         => $diag['from'],
+                'headers'      => $diag['headers'],
+                'body_length'  => $diag['body_length'],
+                'body_preview' => $diag['body_preview'],
+                'mail_return'  => $diag['mail_return'],
+                'last_error'   => $diag['last_error'],
+            ],
         ]);
     }
 
