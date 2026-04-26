@@ -17,6 +17,7 @@ Options -Indexes
     RewriteRule ^controllers/ - [F,L]
     RewriteRule ^sql/ - [F,L]
     RewriteRule ^views/ - [F,L]
+    RewriteRule ^sessions/ - [F,L]
 </IfModule>
 
 # Block sensitive file extensions

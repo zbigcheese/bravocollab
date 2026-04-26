@@ -16,6 +16,24 @@ class Auth
         $config = require __DIR__ . '/../config/config.php';
         $lifetime = (int) ($config['session_lifetime'] ?? 7200);
 
+        // Move sessions out of the shared cPanel directory
+        // (/var/cpanel/php/sessions/...) which PHP's GC can't read across
+        // tenants and which spams "ps_files_cleanup_dir: Permission denied"
+        // notices every time GC fires. Our own dir under the project root
+        // is owned by us, GC works cleanly, and it's protected from the web
+        // by the .htaccess we drop on first creation.
+        $sessionDir = __DIR__ . '/../sessions';
+        if (!is_dir($sessionDir)) {
+            @mkdir($sessionDir, 0700, true);
+            @file_put_contents(
+                $sessionDir . '/.htaccess',
+                "Require all denied\n# Apache 2.2 fallback\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n"
+            );
+        }
+        if (is_dir($sessionDir) && is_writable($sessionDir)) {
+            ini_set('session.save_path', $sessionDir);
+        }
+
         // Raise PHP's server-side session GC lifetime to match our idle window,
         // so session files aren't deleted by shared-host GC before our 2h
         // idle-timeout check has a chance to run. Must be set BEFORE session_start().

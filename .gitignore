@@ -8,6 +8,9 @@ uploads/thumbnails/*
 # Local config (contains DB credentials)
 config/config.php
 
+# Session files (auto-created on first run, owned by web user)
+sessions/
+
 # OS files
 .DS_Store
 Thumbs.db
