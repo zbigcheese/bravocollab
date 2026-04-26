@@ -24,6 +24,55 @@
             window.location.href = 'index.php?page=login';
         });
 
+        // Calendar-sync menu toggle (desktop standalone trigger).
+        (function () {
+            const trigger  = document.getElementById('calendarMenuTrigger');
+            const dropdown = document.getElementById('calendarMenuDropdown');
+            if (!trigger || !dropdown) return;
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const open = dropdown.classList.toggle('open');
+                trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#calendarMenu')) {
+                    dropdown.classList.remove('open');
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
+            });
+        })();
+
+        // Wire the calendar action buttons (both desktop and mobile copies).
+        async function calendarSyncNow(btn) {
+            if (!btn) return;
+            const original = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Syncing…';
+            try {
+                const res = await App.api('google_calendar.sync_now', {});
+                const r = res.result || {};
+                App.showToast(`Synced: ${r.created||0} created, ${r.updated||0} updated, ${r.deleted||0} removed.`, 'success');
+            } catch (err) {
+                App.showToast(err.message || 'Sync failed', 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = original;
+            }
+        }
+        async function calendarDisconnect() {
+            if (!confirm('Disconnect Google Calendar? The BravoCollab calendar will be removed from your Google account.')) return;
+            try {
+                await App.api('google_calendar.disconnect', {});
+                window.location.reload();
+            } catch (e) {
+                App.showToast(e.message || 'Failed to disconnect', 'error');
+            }
+        }
+        document.getElementById('calMenuSyncNow')?.addEventListener('click',
+            (e) => calendarSyncNow(e.currentTarget));
+        document.getElementById('calMenuSyncNowMobile')?.addEventListener('click',
+            (e) => calendarSyncNow(e.currentTarget));
+        document.getElementById('calMenuDisconnect')?.addEventListener('click', calendarDisconnect);
+        document.getElementById('calMenuDisconnectMobile')?.addEventListener('click', calendarDisconnect);
+
         // TEMPORARY: admin-only "test: dailyemail" trigger.
         // Renders a detailed report so we can see what was prepared and what
         // mail() actually returned (which is not a delivery guarantee).

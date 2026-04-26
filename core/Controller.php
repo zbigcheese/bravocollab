@@ -268,4 +268,35 @@ class Controller
         $row = $stmt->fetch();
         return $row ? (int) $row['board_id'] : null;
     }
+
+    /**
+     * Real-time push to Google Calendar for any user(s) connected. Run as
+     * the very last step of a controller method — uses fastcgi_finish_request
+     * when available so the JSON response goes back to the browser BEFORE
+     * we hit Google's API. Failures are isolated and logged; they cannot
+     * affect the response the client sees.
+     */
+    protected function pushGoogleSync(string $type, int $entityId): void
+    {
+        if (function_exists('fastcgi_finish_request')) {
+            @fastcgi_finish_request();
+        } else {
+            // Best-effort flush for non-FPM SAPIs so the body at least starts
+            // streaming to the client before we make the outbound call.
+            if (function_exists('ob_get_level')) {
+                while (ob_get_level() > 0) { @ob_end_flush(); }
+            }
+            @flush();
+        }
+        try {
+            require_once __DIR__ . '/GoogleCalendar.php';
+            if ($type === 'card') {
+                GoogleCalendar::syncCardForAll($entityId);
+            } elseif ($type === 'item') {
+                GoogleCalendar::syncItemForAll($entityId);
+            }
+        } catch (Throwable $e) {
+            error_log("Google {$type} sync failed: " . $e->getMessage());
+        }
+    }
 }

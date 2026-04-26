@@ -300,6 +300,229 @@ class GoogleCalendar
     }
 
     /**
+     * Real-time sync entry point. Reconciles a single card across every
+     * user who currently holds, or recently held, an event for it. Called
+     * from the card controllers right after the data mutation. Idempotent
+     * and per-user-isolated — one user's failure can't break another's
+     * sync.
+     */
+    public static function syncCardForAll(int $cardId): void
+    {
+        self::ensureSchema();
+        $stmt = Database::get()->prepare(
+            'SELECT DISTINCT u.user_id FROM (
+                SELECT ca.user_id FROM card_assignments ca WHERE ca.card_id = :cid_a
+                UNION
+                SELECT b.created_by AS user_id
+                FROM cards c
+                JOIN lists l ON c.list_id = l.id
+                JOIN boards b ON b.id = l.board_id
+                WHERE c.id = :cid_b AND b.is_personal = 1
+                UNION
+                SELECT user_id FROM google_calendar_events
+                WHERE entity_type = "card" AND entity_id = :cid_e
+             ) u
+             JOIN google_calendar_accounts gca ON gca.user_id = u.user_id'
+        );
+        $stmt->execute(['cid_a' => $cardId, 'cid_b' => $cardId, 'cid_e' => $cardId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            try {
+                self::syncEntityForUser((int) $uid, 'card', $cardId);
+            } catch (Throwable $e) {
+                error_log("Google sync card {$cardId} failed for user {$uid}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /** Same shape as syncCardForAll but for a single checklist item. */
+    public static function syncItemForAll(int $itemId): void
+    {
+        self::ensureSchema();
+        $stmt = Database::get()->prepare(
+            'SELECT DISTINCT u.user_id FROM (
+                SELECT ci.assigned_to AS user_id
+                FROM checklist_items ci
+                WHERE ci.id = :iid_a AND ci.assigned_to IS NOT NULL
+                UNION
+                SELECT b.created_by AS user_id
+                FROM checklist_items ci
+                JOIN checklists ch ON ci.checklist_id = ch.id
+                JOIN cards c ON ch.card_id = c.id
+                JOIN lists l ON c.list_id = l.id
+                JOIN boards b ON b.id = l.board_id
+                WHERE ci.id = :iid_b AND b.is_personal = 1
+                UNION
+                SELECT user_id FROM google_calendar_events
+                WHERE entity_type = "item" AND entity_id = :iid_e
+             ) u
+             JOIN google_calendar_accounts gca ON gca.user_id = u.user_id'
+        );
+        $stmt->execute(['iid_a' => $itemId, 'iid_b' => $itemId, 'iid_e' => $itemId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            try {
+                self::syncEntityForUser((int) $uid, 'item', $itemId);
+            } catch (Throwable $e) {
+                error_log("Google sync item {$itemId} failed for user {$uid}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Reconcile a single entity for a single user. Used by both the cron
+     * pass (via syncUser) and the real-time hooks (via syncCardForAll /
+     * syncItemForAll). Decides between create / patch / delete / no-op
+     * based on the desired state vs. the existing event mapping.
+     */
+    public static function syncEntityForUser(int $userId, string $entityType, int $entityId): void
+    {
+        $account = self::getAccount($userId);
+        if (!$account) return;
+
+        $token = self::validAccessToken($userId);
+        $calendarId = $account['calendar_id'];
+
+        $desired = self::desiredEntityFor($userId, $entityType, $entityId);
+
+        $stmt = Database::get()->prepare(
+            'SELECT * FROM google_calendar_events
+             WHERE user_id = :uid AND entity_type = :et AND entity_id = :eid LIMIT 1'
+        );
+        $stmt->execute(['uid' => $userId, 'et' => $entityType, 'eid' => $entityId]);
+        $existing = $stmt->fetch();
+
+        if ($desired === null) {
+            // Should NOT be in calendar — delete event if mapped.
+            if ($existing) {
+                try {
+                    self::apiCallRaw(
+                        $token, 'DELETE',
+                        '/calendars/' . rawurlencode($calendarId)
+                            . '/events/' . rawurlencode($existing['google_event_id'])
+                    );
+                } catch (Throwable $e) { /* probably already gone */ }
+                Database::get()->prepare('DELETE FROM google_calendar_events WHERE id = :id')
+                   ->execute(['id' => $existing['id']]);
+            }
+            return;
+        }
+
+        $hash = self::hashEntity($desired);
+        $body = self::entityToEventBody($desired);
+
+        if (!$existing) {
+            $res = self::apiCallRaw(
+                $token, 'POST',
+                '/calendars/' . rawurlencode($calendarId) . '/events',
+                $body
+            );
+            if (!empty($res['id'])) {
+                Database::get()->prepare(
+                    'INSERT INTO google_calendar_events
+                     (user_id, entity_type, entity_id, google_event_id, payload_hash)
+                     VALUES (:uid, :et, :eid, :geid, :hash)'
+                )->execute([
+                    'uid' => $userId, 'et' => $entityType, 'eid' => $entityId,
+                    'geid' => $res['id'], 'hash' => $hash,
+                ]);
+            }
+            return;
+        }
+
+        if ($existing['payload_hash'] === $hash) return; // no-op
+
+        $res = self::apiCallRaw(
+            $token, 'PATCH',
+            '/calendars/' . rawurlencode($calendarId)
+                . '/events/' . rawurlencode($existing['google_event_id']),
+            $body
+        );
+        if (!empty($res['id'])) {
+            Database::get()->prepare(
+                'UPDATE google_calendar_events SET payload_hash = :hash WHERE id = :id'
+            )->execute(['hash' => $hash, 'id' => $existing['id']]);
+        }
+    }
+
+    /**
+     * Returns the desired-state row for a single (user, entity) pair, or
+     * null if the entity should NOT be in the user's calendar (no due_date,
+     * archived, unassigned, etc.).
+     */
+    private static function desiredEntityFor(int $userId, string $type, int $entityId): ?array
+    {
+        $db = Database::get();
+
+        if ($type === 'card') {
+            $stmt = $db->prepare(
+                "SELECT c.id, c.title, c.description, c.due_date,
+                        c.due_complete, c.is_archived, l.board_id, b.title AS board_title
+                 FROM cards c
+                 JOIN lists l ON c.list_id = l.id
+                 JOIN boards b ON b.id = l.board_id
+                 LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+                 WHERE c.id = :cid
+                   AND c.due_date IS NOT NULL
+                   AND c.is_archived = 0
+                   AND b.is_archived = 0
+                   AND (ca.user_id = :uid_a2
+                        OR (b.is_personal = 1 AND b.created_by = :uid_p))
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'cid' => $entityId, 'uid_a' => $userId,
+                'uid_a2' => $userId, 'uid_p' => $userId,
+            ]);
+            $r = $stmt->fetch();
+            if (!$r) return null;
+            return [
+                'entity_type' => 'card',
+                'entity_id'   => (int) $r['id'],
+                'title'       => $r['title'],
+                'description' => $r['description'] ?? '',
+                'due_date'    => $r['due_date'],
+                'completed'   => (int) $r['due_complete'] === 1,
+                'board_id'    => (int) $r['board_id'],
+                'board_title' => $r['board_title'],
+                'card_id'     => (int) $r['id'],
+            ];
+        }
+
+        // item
+        $stmt = $db->prepare(
+            "SELECT ci.id, ci.content, ci.due_date, ci.is_checked,
+                    ch.card_id, c.title AS card_title,
+                    l.board_id, b.title AS board_title
+             FROM checklist_items ci
+             JOIN checklists ch ON ci.checklist_id = ch.id
+             JOIN cards c ON ch.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE ci.id = :iid
+               AND ci.due_date IS NOT NULL
+               AND c.is_archived = 0
+               AND b.is_archived = 0
+               AND (ci.assigned_to = :uid_a
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p))
+             LIMIT 1"
+        );
+        $stmt->execute(['iid' => $entityId, 'uid_a' => $userId, 'uid_p' => $userId]);
+        $r = $stmt->fetch();
+        if (!$r) return null;
+        return [
+            'entity_type' => 'item',
+            'entity_id'   => (int) $r['id'],
+            'title'       => $r['content'],
+            'description' => '',
+            'due_date'    => $r['due_date'],
+            'completed'   => (int) $r['is_checked'] === 1,
+            'board_id'    => (int) $r['board_id'],
+            'board_title' => $r['board_title'],
+            'card_id'     => (int) $r['card_id'],
+            'card_title'  => $r['card_title'],
+        ];
+    }
+
+    /**
      * Desired set of (entity_type, entity_id, due_date, completed, …) for
      * the user. Same filters as the daily digest plus personal-board cards.
      */

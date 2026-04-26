@@ -91,6 +91,117 @@ a:hover {
     gap: 16px;
 }
 
+/* ---- Calendar sync menu in the navbar ---- */
+.calendar-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.calendar-menu-trigger {
+    position: relative;
+    background: transparent;
+    border: 0;
+    padding: 6px;
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.12s, background 0.12s;
+}
+.calendar-menu-trigger svg { width: 20px; height: 20px; display: block; }
+.calendar-menu-trigger:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+/* Active (connected) state — full opacity icon, subtle green dot. */
+.calendar-menu.is-connected .calendar-menu-trigger { color: #fff; }
+.calendar-menu.is-connected .calendar-menu-trigger::after {
+    content: "";
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 8px; height: 8px;
+    background: #61BD4F;
+    border: 2px solid #F16820;
+    border-radius: 50%;
+}
+
+.calendar-menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 240px;
+    background: #fff;
+    color: var(--color-text);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    margin-top: 6px;
+    padding: 8px 0;
+    display: none;
+    z-index: 200;
+}
+.calendar-menu-dropdown.open { display: block; }
+
+.calendar-menu-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px 10px;
+    font-size: 13px;
+    color: var(--color-text-light);
+    border-bottom: 1px solid var(--color-border);
+}
+.calendar-menu-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #c1c7d0;
+    flex-shrink: 0;
+}
+.calendar-menu.is-connected .calendar-menu-dot,
+.calendar-menu-dot.is-on { background: #61BD4F; }
+
+.calendar-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--color-text);
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+}
+.calendar-menu-item:hover { background: var(--color-bg); }
+.calendar-menu-item.primary { color: var(--color-primary-dark); font-weight: 600; }
+.calendar-menu-item.subtle  { color: var(--color-text-light); font-size: 12px; }
+
+/* Hide the standalone calendar trigger on small viewports — its actions
+   are mirrored inside the user menu dropdown via .user-menu-mobile-cal. */
+@media (max-width: 768px) {
+    .calendar-menu { display: none; }
+}
+
+/* The mobile calendar block lives inside the user dropdown. Hide it on
+   desktop so the standalone trigger is the canonical entry point there. */
+.user-menu-mobile-cal { display: none; }
+@media (max-width: 768px) {
+    .user-menu-mobile-cal {
+        display: block;
+        border-top: 1px solid var(--color-border);
+        border-bottom: 1px solid var(--color-border);
+        padding: 4px 0;
+        margin: 4px 0;
+    }
+    .user-menu-mobile-cal-header {
+        display: flex; align-items: center; gap: 6px;
+        padding: 6px 14px;
+        font-size: 12px; color: var(--color-text-light);
+        text-transform: uppercase; letter-spacing: 0.04em;
+    }
+}
+
 /* TEMPORARY admin-only debug button in the navbar (test: dailyemail). */
 .navbar-test-btn {
     background: rgba(0, 0, 0, 0.18);

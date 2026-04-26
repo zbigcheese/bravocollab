@@ -54,6 +54,7 @@ class CardController extends Controller
         $this->logActivity($boardId, $cardId, 'card_created', ['title' => $title]);
 
         $this->json(['success' => true, 'card' => $card]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function get(): void
@@ -154,6 +155,7 @@ class CardController extends Controller
         $this->logActivity($boardId, $cardId, 'card_updated', $updates);
 
         $this->json(['success' => true, 'card' => $card]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function move(): void
@@ -193,6 +195,9 @@ class CardController extends Controller
         ]);
 
         $this->json(['success' => true]);
+        // List change can flip personal/non-personal status which affects
+        // the calendar event, so always push.
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function moveToBoard(): void
@@ -309,6 +314,9 @@ class CardController extends Controller
             'target_list_id'  => $targetListId,
             'same_board'      => $sameBoard,
         ]);
+        // Cross-board moves change the assignee set (we strip non-members),
+        // so multiple users may need their calendar events deleted/created.
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function archive(): void
@@ -334,6 +342,7 @@ class CardController extends Controller
         $this->logActivity($boardId, $cardId, 'card_archived', ['title' => $card['title']]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function watch(): void
@@ -407,6 +416,7 @@ class CardController extends Controller
         $this->logActivity($boardId, $cardId, 'card_updated', ['restored' => true, 'title' => $card['title']]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function assign(): void
@@ -451,6 +461,7 @@ class CardController extends Controller
         $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $this->cardModel->find($cardId)]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function unassign(): void
@@ -477,6 +488,7 @@ class CardController extends Controller
         $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $this->cardModel->find($cardId)]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('card', $cardId);
     }
 
     public function setCoordinator(): void

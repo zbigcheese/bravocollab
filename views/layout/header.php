@@ -16,6 +16,13 @@ $navUser   = Auth::currentUser() ?: [];
 $userEmail = $navUser['email'] ?? '';
 $userRole  = $navUser['role']  ?? 'member';
 $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
+
+// Calendar-sync status — drives the navbar icon's active/inactive state and
+// the dropdown that opens on click. Server-rendered so first paint is correct
+// without an extra fetch.
+require_once __DIR__ . '/../../core/GoogleCalendar.php';
+$_gcalConfigured = GoogleCalendar::isConfigured();
+$_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isConnected(Auth::userId());
 ?>
 <body>
     <nav class="navbar">
@@ -31,6 +38,33 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
                 test: dailyemail
             </button>
             <?php endif; ?>
+            <?php if ($_gcalConfigured): ?>
+            <div class="calendar-menu<?php echo $_gcalConnected ? ' is-connected' : ''; ?>" id="calendarMenu">
+                <button type="button" class="calendar-menu-trigger" id="calendarMenuTrigger"
+                        aria-haspopup="true" aria-expanded="false"
+                        title="<?php echo $_gcalConnected ? 'Google Calendar connected' : 'Google Calendar — not connected'; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8"  y1="2" x2="8"  y2="6"/>
+                        <line x1="3"  y1="10" x2="21" y2="10"/>
+                    </svg>
+                </button>
+                <div class="calendar-menu-dropdown" id="calendarMenuDropdown" role="menu">
+                    <div class="calendar-menu-status">
+                        <span class="calendar-menu-dot"></span>
+                        <span><?php echo $_gcalConnected ? 'Connected to Google Calendar' : 'Not connected'; ?></span>
+                    </div>
+                    <?php if ($_gcalConnected): ?>
+                        <button type="button" class="calendar-menu-item" id="calMenuSyncNow">Sync now</button>
+                        <button type="button" class="calendar-menu-item" id="calMenuDisconnect">Disconnect</button>
+                    <?php else: ?>
+                        <a href="index.php?page=google_connect" class="calendar-menu-item primary">Connect Google Calendar</a>
+                    <?php endif; ?>
+                    <a href="index.php?page=settings_calendar" class="calendar-menu-item subtle">Open settings…</a>
+                </div>
+            </div>
+            <?php endif; ?>
             <div class="user-menu" id="userMenu">
                 <button type="button" class="user-menu-trigger" id="userMenuTrigger" aria-haspopup="true" aria-expanded="false">
                     <svg class="user-menu-avatar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -43,7 +77,21 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
                         <div class="user-menu-email" title="<?php echo htmlspecialchars($userEmail); ?>"><?php echo htmlspecialchars($userEmail); ?></div>
                         <span class="user-menu-role user-menu-role-<?php echo htmlspecialchars($userRole); ?>"><?php echo $roleLabel; ?></span>
                     </div>
-                    <a href="index.php?page=settings_calendar" class="user-menu-link">Calendar sync</a>
+                    <?php if ($_gcalConfigured): ?>
+                    <div class="user-menu-mobile-cal" role="group" aria-label="Calendar sync">
+                        <div class="user-menu-mobile-cal-header">
+                            <span class="calendar-menu-dot <?php echo $_gcalConnected ? 'is-on' : ''; ?>"></span>
+                            <?php echo $_gcalConnected ? 'Calendar connected' : 'Calendar not connected'; ?>
+                        </div>
+                        <?php if ($_gcalConnected): ?>
+                            <button type="button" class="user-menu-link" id="calMenuSyncNowMobile">Sync calendar now</button>
+                            <button type="button" class="user-menu-link" id="calMenuDisconnectMobile">Disconnect calendar</button>
+                        <?php else: ?>
+                            <a href="index.php?page=google_connect" class="user-menu-link">Connect Google Calendar</a>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                    <a href="index.php?page=settings_calendar" class="user-menu-link">Calendar settings</a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="index.php?page=admin_users" class="user-menu-link">Manage users</a>
                     <?php endif; ?>

@@ -134,6 +134,7 @@ class ChecklistController extends Controller
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $checklist['card_id']]);
 
         $this->json(['success' => true, 'item_id' => $itemId]);
+        $this->pushGoogleSync('item', $itemId);
     }
 
     public function toggleItem(): void
@@ -171,6 +172,7 @@ class ChecklistController extends Controller
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $item['card_id']]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('item', $itemId);
     }
 
     public function deleteItem(): void
@@ -201,6 +203,9 @@ class ChecklistController extends Controller
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $item['card_id']]);
 
         $this->json(['success' => true]);
+        // syncItemForAll runs against existing event mappings so it still
+        // finds the now-orphaned event and removes it from Google.
+        $this->pushGoogleSync('item', $itemId);
     }
 
     public function updateItem(): void
@@ -265,5 +270,6 @@ class ChecklistController extends Controller
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $item['card_id']]);
 
         $this->json(['success' => true]);
+        $this->pushGoogleSync('item', $itemId);
     }
 }
