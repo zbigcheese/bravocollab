@@ -29,15 +29,18 @@ class BoardController extends Controller
         $isAdmin = Auth::isAdmin();
         $db      = Database::get();
 
-        // Scope to boards the user can see.
+        // Scope to boards the user can see. Personal boards are excluded
+        // from the dashboard "recent updates" stream — they're single-user
+        // spaces where the user's own actions aren't useful "news."
         if ($isAdmin) {
-            $boardIds = $db->query('SELECT id FROM boards WHERE is_archived = 0')
-                           ->fetchAll(PDO::FETCH_COLUMN);
+            $boardIds = $db->query(
+                'SELECT id FROM boards WHERE is_archived = 0 AND is_personal = 0'
+            )->fetchAll(PDO::FETCH_COLUMN);
         } else {
             $stmt = $db->prepare(
                 'SELECT b.id FROM boards b
                  JOIN board_members bm ON b.id = bm.board_id
-                 WHERE bm.user_id = :uid AND b.is_archived = 0'
+                 WHERE bm.user_id = :uid AND b.is_archived = 0 AND b.is_personal = 0'
             );
             $stmt->execute(['uid' => $userId]);
             $boardIds = $stmt->fetchAll(PDO::FETCH_COLUMN);

@@ -170,19 +170,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         grid.innerHTML = boards.map(b => {
-            const updates = updatesByBoard[b.id] || [];
+            const isPersonal = b.is_personal == 1;
+            // Personal board never carries an updates list (it's single-user)
+            // and its tile stretches to match the visual height of a regular
+            // board tile + its 3 updates so the grid stays even.
+            const updates = isPersonal ? [] : (updatesByBoard[b.id] || []);
             updateSignatures[b.id] = signatureOf(updates);
             const updatesHtml = updates.length
                 ? `<div class="board-updates">${updates.map(u => renderUpdate(b.id, u)).join('')}</div>`
                 : '';
             const archivedCls = b.is_archived == 1 ? ' board-tile-wrap-archived' : '';
+            const personalCls = isPersonal ? ' board-tile-wrap-personal' : '';
             const archivedPrefix = b.is_archived == 1
                 ? '<span class="board-tile-archived-tag">(Archived)&nbsp;</span>' : '';
+            const metaHtml = isPersonal
+                ? ''
+                : `<div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>`;
+            const tileExtraCls = isPersonal ? ' board-tile-personal' : '';
             return `
-                <div class="board-tile-wrap${archivedCls}" data-board-id="${b.id}">
-                    <a href="index.php?page=board&id=${b.id}" class="board-tile" style="background-color:${App.escapeHtml(b.background_color)}">
+                <div class="board-tile-wrap${archivedCls}${personalCls}" data-board-id="${b.id}">
+                    <a href="index.php?page=board&id=${b.id}" class="board-tile${tileExtraCls}" style="background-color:${App.escapeHtml(b.background_color)}">
                         <div class="board-tile-title">${archivedPrefix}${App.escapeHtml(b.title)}</div>
-                        <div class="board-tile-meta">${b.member_count} member${b.member_count != 1 ? 's' : ''}</div>
+                        ${metaHtml}
                     </a>
                     ${updatesHtml}
                 </div>
