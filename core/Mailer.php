@@ -328,44 +328,119 @@ class Mailer
     }
 
     /**
-     * Same as send() but returns detailed info about what was attempted and
-     * whatever PHP/the MTA reported. Used by the admin "test: dailyemail"
-     * endpoint to surface why a "sent successfully" message can still result
-     * in no email arriving.
+     * Send mail with deliverability-friendly defaults:
+     *   - multipart/alternative (plaintext + HTML) — HTML-only is a spam signal
+     *   - explicit Date and Message-ID headers — many MTAs add them but not all
+     *   - RFC 2047 subject encoding when subject contains non-ASCII bytes
+     *   - envelope sender pinned to mail_from via sendmail's -f flag, so SPF
+     *     for the From-domain is actually consulted (default envelope is
+     *     username@server-host, which is what kills most cPanel deliverability)
      *
-     * Returns: ['ok' => bool, 'to' => ..., 'subject' => ..., 'from' => ...,
-     *           'headers' => [...], 'body_length' => int, 'body_preview' => str,
-     *           'mail_return' => bool, 'last_error' => array|null]
+     * Returns rich diagnostics for the admin test endpoint.
      */
     public static function sendWithDiagnostics(string $to, string $subject, string $htmlBody): array
     {
         $config = require __DIR__ . '/../config/config.php';
 
-        $from = $config['mail_from_name'] . ' <' . $config['mail_from'] . '>';
+        $fromAddr = $config['mail_from'];
+        $fromName = $config['mail_from_name'];
+        $from     = $fromName . ' <' . $fromAddr . '>';
+        $fromHost = (substr(strrchr($fromAddr, '@') ?: '', 1)) ?: 'localhost';
+
+        $boundary = 'bc-' . bin2hex(random_bytes(8));
+        $plainBody = self::htmlToText($htmlBody);
+
+        $body =
+            "This is a multi-part message in MIME format.\r\n"
+            . "--{$boundary}\r\n"
+            . "Content-Type: text/plain; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $plainBody . "\r\n\r\n"
+            . "--{$boundary}\r\n"
+            . "Content-Type: text/html; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $htmlBody . "\r\n\r\n"
+            . "--{$boundary}--\r\n";
+
+        $messageId = '<' . bin2hex(random_bytes(12)) . '.' . time() . '@' . $fromHost . '>';
+        $encodedSubject = self::encodeSubject($subject);
+
         $headers = [
             'MIME-Version: 1.0',
-            'Content-Type: text/html; charset=UTF-8',
+            'Date: ' . date('r'),
+            'Message-ID: ' . $messageId,
+            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
             'From: ' . $from,
-            'Reply-To: ' . $config['mail_from'],
+            'Reply-To: ' . $fromAddr,
             'X-Mailer: BravoCollab',
         ];
 
+        // Pin the SMTP envelope sender (Mail FROM) to the From-domain mailbox
+        // so receiving servers check SPF against bravo.org.rs (where the SPF
+        // record exists) rather than the cPanel server's hostname.
+        $envelopeFrom = filter_var($fromAddr, FILTER_VALIDATE_EMAIL) ?: '';
+        $additionalParams = $envelopeFrom !== '' ? '-f ' . $envelopeFrom : '';
+
         // Clear any prior error so we know whatever we read after is from this call.
         error_clear_last();
-        $result = mail($to, $subject, $htmlBody, implode("\r\n", $headers));
+        $result = mail($to, $encodedSubject, $body, implode("\r\n", $headers), $additionalParams);
         $lastError = error_get_last();
 
         return [
-            'ok'           => (bool) $result,
-            'to'           => $to,
-            'subject'      => $subject,
-            'from'         => $from,
-            'headers'      => $headers,
-            'body_length'  => strlen($htmlBody),
-            'body_preview' => mb_substr(strip_tags($htmlBody), 0, 600),
-            'mail_return'  => (bool) $result,
-            'last_error'   => $lastError,
+            'ok'                 => (bool) $result,
+            'to'                 => $to,
+            'subject'            => $subject,
+            'subject_encoded'    => $encodedSubject,
+            'from'               => $from,
+            'envelope_from'      => $envelopeFrom,
+            'additional_params'  => $additionalParams,
+            'message_id'         => $messageId,
+            'headers'            => $headers,
+            'body_length'        => strlen($body),
+            'html_length'        => strlen($htmlBody),
+            'plain_length'       => strlen($plainBody),
+            'body_preview'       => mb_substr($plainBody, 0, 600),
+            'mail_return'        => (bool) $result,
+            'last_error'         => $lastError,
         ];
+    }
+
+    /**
+     * Subject lines containing non-ASCII bytes need RFC 2047 encoding,
+     * otherwise mail() passes the raw bytes and many MTAs / clients render
+     * them as `?` or ditch the message entirely. ASCII subjects are returned
+     * unchanged so we don't add overhead for the common case.
+     */
+    private static function encodeSubject(string $subject): string
+    {
+        if (preg_match('/[\x80-\xff]/', $subject)) {
+            return '=?UTF-8?B?' . base64_encode($subject) . '?=';
+        }
+        return $subject;
+    }
+
+    /**
+     * Best-effort HTML → plain text for the multipart/alternative fallback.
+     * Doesn't need to be perfect — just readable enough that mail clients
+     * with HTML disabled, plus spam scanners that score on text content,
+     * see something coherent.
+     */
+    private static function htmlToText(string $html): string
+    {
+        // Drop non-content sections entirely so their markup doesn't leak.
+        $text = preg_replace('/<(head|style|script)\b[^>]*>.*?<\/\1>/is', '', $html);
+        // Replace block-level tags with newlines and list items with bullets.
+        $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
+        $text = preg_replace('/<li[^>]*>/i', '- ', $text);
+        $text = preg_replace('/<\/(p|div|h[1-6]|li|tr|ul|ol|table)>/i', "\n", $text);
+        $text = preg_replace('/<\/h[1-6]>/i', "\n\n", $text);
+        $text = strip_tags($text);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Collapse internal whitespace and runs of blank lines.
+        $text = preg_replace('/[ \t]+/', ' ', $text);
+        $text = preg_replace('/\n[ \t]+/', "\n", $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+        return trim($text);
     }
 
     private static function buildHtml(string $appName, string $title, string $content): string

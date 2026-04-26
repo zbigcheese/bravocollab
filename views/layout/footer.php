@@ -88,12 +88,17 @@
                 <div style="font-size:13px;color:#172b4d;">
                     <p style="margin:0 0 12px;">${status} <span style="margin-left:8px;">${esc(res.message || '')}</span></p>
                     <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
-                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;width:140px;">Recipient</td><td>${esc(res.recipient || '')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;width:160px;">Recipient</td><td>${esc(res.recipient || '')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">From (header)</td><td>${esc(email.from || '—')}</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Envelope From</td><td>${esc(email.envelope_from || '—')} <span style="color:#5e6c84;font-size:11px;">(used for SPF check)</span></td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">sendmail args</td><td><code style="font-size:11px;">${esc(email.additional_params || '—')}</code></td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Message-ID</td><td><code style="font-size:11px;">${esc(email.message_id || '—')}</code></td></tr>
                         <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">CET now</td><td>${esc(res.cet_now || '')}</td></tr>
                         <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Sections</td><td>${res.sections_count}</td></tr>
                         <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Cards / items</td><td>${res.cards_total} card(s), ${res.items_total} item(s)</td></tr>
                         <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Subject</td><td>${esc(email.subject || '—')}</td></tr>
-                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Body length</td><td>${email.body_length || 0} chars</td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Subject (encoded)</td><td><code style="font-size:11px;word-break:break-all;">${esc(email.subject_encoded || '—')}</code></td></tr>
+                        <tr><td style="padding:3px 8px 3px 0;color:#5e6c84;">Body lengths</td><td>${email.body_length || 0} chars total (HTML ${email.html_length || 0} + plain ${email.plain_length || 0})</td></tr>
                     </table>
 
                     <div style="margin-top:14px;">
