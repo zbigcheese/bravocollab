@@ -160,7 +160,9 @@ class CommentController extends Controller
             return;
         }
 
-        if ($comment['user_id'] !== Auth::userId() && !Auth::isAdmin()) {
+        // Strictly own-comments — admins included. Same rationale as edit:
+        // even moderators shouldn't silently remove someone else's words.
+        if ((int) $comment['user_id'] !== Auth::userId()) {
             $this->json(['error' => 'You can only delete your own comments'], 403);
             return;
         }

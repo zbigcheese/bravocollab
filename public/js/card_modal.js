@@ -315,11 +315,14 @@ const CardModal = {
     },
 
     renderSingleComment(cm, isReply = false) {
-        // Edit is strictly own-comments (admins included). Delete stays open
-        // to admins via the existing server check; we don't gate it here so
-        // they can still moderate.
-        const isOwn = parseInt(cm.user_id) === App.userId;
-        const editBtn = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
+        // Edit and Delete are both strictly own-comments — admins included.
+        // If user_id is missing from the row (e.g. optimistic local insert
+        // before a re-fetch), default to showing the buttons; the server
+        // still enforces ownership.
+        const knownAuthor = cm.user_id !== undefined && cm.user_id !== null;
+        const isOwn = !knownAuthor || parseInt(cm.user_id) === App.userId;
+        const editBtn   = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
+        const deleteBtn = isOwn ? `<button class="delete-comment" data-comment-id="${cm.id}">Delete</button>` : '';
 
         return `
             <div class="comment-item ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
@@ -333,7 +336,7 @@ const CardModal = {
                     <div class="comment-actions">
                         ${!isReply ? `<button class="reply-comment" data-comment-id="${cm.id}" data-author="${App.escapeHtml(cm.author_name)}">Reply</button>` : ''}
                         ${editBtn}
-                        <button class="delete-comment" data-comment-id="${cm.id}">Delete</button>
+                        ${deleteBtn}
                     </div>
                 </div>
             </div>
@@ -737,6 +740,7 @@ const CardModal = {
                     const newComment = {
                         id: res.comment_id,
                         parent_id: parentCommentId,
+                        user_id: App.userId,
                         body,
                         author_name: document.querySelector('.user-name')?.textContent || 'You',
                         created_at: new Date().toISOString(),
@@ -786,6 +790,7 @@ const CardModal = {
                 const newComment = {
                     id: res.comment_id,
                     parent_id: parentId,
+                    user_id: App.userId,
                     body: body,
                     author_name: document.querySelector('.user-name')?.textContent || 'You',
                     created_at: new Date().toISOString(),
