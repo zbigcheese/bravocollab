@@ -51,6 +51,13 @@ if (Auth::isLoggedIn() && ($page === 'login' || $page === '')) {
     exit;
 }
 
+// Self-heal: every authenticated page load makes sure the current user has
+// their personal board. Idempotent (a single SELECT when one already exists).
+if (Auth::isLoggedIn()) {
+    require_once __DIR__ . '/models/Board.php';
+    (new Board())->ensurePersonalBoard(Auth::userId());
+}
+
 // Page routing
 $pageMap = [
     'login'           => 'auth/login.php',

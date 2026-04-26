@@ -4,9 +4,23 @@ if (!$boardId) {
     header('Location: index.php?page=dashboard');
     exit;
 }
+
+// Detect "this is the current user's personal board" so the JS can grant
+// owner-as-admin UX (label/description/background editing) and switch off
+// the member-related controls.
+require_once __DIR__ . '/../../models/Board.php';
+$_pageBoard = (new Board())->find($boardId);
+$_isPersonalOwner = $_pageBoard
+    && (int) ($_pageBoard['is_personal'] ?? 0) === 1
+    && (int) $_pageBoard['created_by'] === Auth::userId();
+$_isPersonal = $_pageBoard && (int) ($_pageBoard['is_personal'] ?? 0) === 1;
+$_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
 ?>
 <link rel="stylesheet" href="public/css/board_views.css">
-<div class="board-wrapper" id="boardWrapper" data-board-id="<?php echo $boardId; ?>" data-is-admin="<?php echo Auth::isAdmin() ? '1' : '0'; ?>">
+<div class="board-wrapper" id="boardWrapper"
+     data-board-id="<?php echo $boardId; ?>"
+     data-is-admin="<?php echo $_canAdmin ? '1' : '0'; ?>"
+     data-is-personal="<?php echo $_isPersonal ? '1' : '0'; ?>">
     <div class="board-header" id="boardHeader">
         <div class="board-header-left">
             <button type="button" class="board-burger-btn" id="boardBurgerBtn" aria-label="Board controls" aria-expanded="false">
@@ -23,13 +37,17 @@ if (!$boardId) {
                     <span class="archived-toggle-slider"></span>
                     <span class="archived-toggle-label">Show archived</span>
                 </label>
-                <?php if (Auth::isAdmin()): ?>
+                <?php if ($_canAdmin): ?>
+                <?php if (!$_isPersonal): ?>
                 <button class="btn btn-sm btn-secondary" id="manageMembersBtn">Members</button>
+                <?php endif; ?>
                 <button class="btn btn-sm btn-secondary mobile-only" id="mobileEditLabels">Edit Labels</button>
                 <button class="btn btn-sm btn-secondary mobile-only" id="mobileEditDescription">Edit Description</button>
                 <button class="btn btn-sm btn-secondary mobile-only" id="mobileChangeBackground">Change Background</button>
+                <?php if (!$_isPersonal): ?>
                 <button class="btn btn-sm btn-secondary mobile-only" id="mobileArchiveBoard">Archive Board</button>
                 <button class="btn btn-sm btn-secondary mobile-only" id="mobileRestoreBoard" hidden>Restore Board</button>
+                <?php endif; ?>
                 <button class="btn btn-sm btn-secondary desktop-only" id="boardMenuBtn">&#8943;</button>
                 <?php endif; ?>
             </div>

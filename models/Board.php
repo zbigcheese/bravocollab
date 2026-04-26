@@ -6,13 +6,20 @@ class Board extends Model
 
     public function getForUser(int $userId, bool $isAdmin = false): array
     {
+        // Personal boards are strictly visible to their owner — even site
+        // admins don't see someone else's personal board listed. Within each
+        // user's view their own personal board floats to the very top
+        // (is_personal DESC), then non-archived regular boards by recency.
         if ($isAdmin) {
             return $this->query(
                 'SELECT b.*, u.display_name as creator_name,
                     (SELECT COUNT(*) FROM board_members bm WHERE bm.board_id = b.id) as member_count
                  FROM boards b
                  JOIN users u ON b.created_by = u.id
-                 ORDER BY b.is_archived ASC, b.updated_at DESC'
+                 WHERE NOT (b.is_personal = 1 AND b.created_by != :user_id)
+                 ORDER BY (b.is_personal = 1 AND b.created_by = :user_id_2) DESC,
+                          b.is_archived ASC, b.updated_at DESC',
+                ['user_id' => $userId, 'user_id_2' => $userId]
             )->fetchAll();
         }
 
@@ -23,9 +30,50 @@ class Board extends Model
              JOIN board_members bm ON b.id = bm.board_id
              JOIN users u ON b.created_by = u.id
              WHERE bm.user_id = :user_id
-             ORDER BY b.is_archived ASC, b.updated_at DESC',
-            ['user_id' => $userId]
+             ORDER BY (b.is_personal = 1 AND b.created_by = :user_id_2) DESC,
+                      b.is_archived ASC, b.updated_at DESC',
+            ['user_id' => $userId, 'user_id_2' => $userId]
         )->fetchAll();
+    }
+
+    /**
+     * Ensure the given user has their own personal board. Idempotent —
+     * called on every authenticated page load by index.php so newly-onboarded
+     * users get one without manual setup. Returns the board id.
+     */
+    public function ensurePersonalBoard(int $userId): int
+    {
+        $stmt = $this->query(
+            'SELECT id FROM boards WHERE created_by = :uid AND is_personal = 1 LIMIT 1',
+            ['uid' => $userId]
+        );
+        $existing = $stmt->fetch();
+        if ($existing) return (int) $existing['id'];
+
+        $boardId = $this->insert([
+            'title'            => "\u{2B50} My Board",
+            'description'      => '',
+            'background_color' => '#519839',
+            'created_by'       => $userId,
+            'is_personal'      => 1,
+        ]);
+
+        $db = Database::get();
+
+        // The user is also a board member — keeps existing access checks
+        // (board_members lookups) working uniformly.
+        $db->prepare(
+            'INSERT INTO board_members (board_id, user_id, role) VALUES (:bid, :uid, :role)'
+        )->execute(['bid' => $boardId, 'uid' => $userId, 'role' => BOARD_ROLE_OWNER]);
+
+        // Default labels mirror what BoardController::create does for
+        // regular boards, so the personal board feels equally outfitted.
+        foreach (DEFAULT_LABEL_COLORS as $color) {
+            $db->prepare('INSERT INTO labels (board_id, color) VALUES (:bid, :color)')
+               ->execute(['bid' => $boardId, 'color' => $color]);
+        }
+
+        return $boardId;
     }
 
     public function getWithDetails(int $boardId): ?array

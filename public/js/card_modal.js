@@ -12,6 +12,13 @@ const CardModal = {
         this._suppressUntil = Date.now() + 3000; // 3 second window
     },
 
+    // True if the open card belongs to the current user's personal board.
+    // Used to suppress all member-related affordances (assign, coordinator,
+    // watch, mention autocomplete) — they don't apply in single-user space.
+    isPersonalBoard() {
+        return Boolean(typeof Board !== 'undefined' && Board.isPersonal);
+    },
+
     isSuppressed() {
         return Date.now() < this._suppressUntil;
     },
@@ -60,8 +67,8 @@ const CardModal = {
                 <div class="modal-body">
                     <div class="card-detail-layout">
                         <div class="card-detail-main">
-                            ${this.renderCoordinatorSection()}
-                            ${this.renderMembersSection()}
+                            ${this.isPersonalBoard() ? '' : this.renderCoordinatorSection()}
+                            ${this.isPersonalBoard() ? '' : this.renderMembersSection()}
                             ${this.renderLabelsSection()}
                             ${this.renderDueDateSection()}
                             ${this.renderDescriptionSection()}
@@ -77,9 +84,11 @@ const CardModal = {
                             <button class="btn btn-secondary btn-sm" id="sidebarAttachment">Attachment</button>
                             <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0;">
                             <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
-                            <button class="btn btn-secondary btn-sm" id="sidebarMembers">Assign</button>
-                            <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Set Coordinator</button>
-                            <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
+                            ${this.isPersonalBoard() ? '' : `
+                                <button class="btn btn-secondary btn-sm" id="sidebarMembers">Assign</button>
+                                <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Set Coordinator</button>
+                                <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
+                            `}
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
@@ -375,7 +384,7 @@ const CardModal = {
                 </div>
                 <div class="comment-form" style="margin-bottom:12px;">
                     <div style="position:relative;">
-                        <textarea id="newComment" placeholder="Write a comment... Use @ to mention members"></textarea>
+                        <textarea id="newComment" placeholder="${this.isPersonalBoard() ? 'Write a note...' : 'Write a comment... Use @ to mention members'}"></textarea>
                         <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                     </div>
                     <button class="btn btn-primary btn-sm" id="submitComment" style="margin-top:6px;">Comment</button>
@@ -505,11 +514,13 @@ const CardModal = {
             if (e.key === 'Enter' && e.ctrlKey) this.addComment();
         });
 
-        // @mention autocomplete
-        this.initMentionAutocomplete(
-            document.getElementById('newComment'),
-            document.getElementById('mentionDropdown')
-        );
+        // @mention autocomplete — irrelevant on personal boards (no one to tag)
+        if (!this.isPersonalBoard()) {
+            this.initMentionAutocomplete(
+                document.getElementById('newComment'),
+                document.getElementById('mentionDropdown')
+            );
+        }
 
         // Delegated actions
         overlay.addEventListener('click', (e) => {
@@ -727,9 +738,12 @@ const CardModal = {
         const textarea = form.querySelector('.inline-reply-textarea');
         textarea.focus();
 
-        // Wire up @mention for this textarea too
+        // Wire up @mention for this textarea too — but only on regular
+        // boards. Personal boards have no other members to tag.
         const dropdown = form.querySelector('.inline-reply-mention-dropdown');
-        this.initMentionAutocompleteOn(textarea, dropdown);
+        if (!this.isPersonalBoard()) {
+            this.initMentionAutocompleteOn(textarea, dropdown);
+        }
 
         form.querySelector('.inline-reply-submit').addEventListener('click', async () => {
             const body = textarea.value.trim();
@@ -824,7 +838,9 @@ const CardModal = {
                 }
 
                 textarea.value = '';
-                textarea.placeholder = 'Write a comment... Use @ to mention members';
+                textarea.placeholder = this.isPersonalBoard()
+                    ? 'Write a note...'
+                    : 'Write a comment... Use @ to mention members';
                 this._replyToId = null;
                 this.refreshBoardCard();
             }
@@ -862,8 +878,11 @@ const CardModal = {
         // Place caret at end so the user can keep typing.
         editArea.selectionStart = editArea.selectionEnd = originalText.length;
         // Wire @mention autocomplete to this specific textarea + dropdown pair
-        // so adding a new tag mid-edit works.
-        this.initMentionAutocomplete(editArea, dropdown);
+        // so adding a new tag mid-edit works. Skipped on personal boards
+        // (no other members to mention).
+        if (!this.isPersonalBoard()) {
+            this.initMentionAutocomplete(editArea, dropdown);
+        }
 
         const restoreDisplay = (body) => {
             commentEl.classList.remove('is-editing');

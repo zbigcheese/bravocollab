@@ -87,9 +87,11 @@ CREATE TABLE IF NOT EXISTS `boards` (
     `background_color` VARCHAR(7) DEFAULT '#0079BF',
     `created_by`       INT UNSIGNED NOT NULL,
     `is_archived`      TINYINT(1) NOT NULL DEFAULT 0,
+    `is_personal`      TINYINT(1) NOT NULL DEFAULT 0,
     `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_personal` (`created_by`, `is_personal`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `board_members` (

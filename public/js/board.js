@@ -8,6 +8,7 @@ const Board = {
     cardSortables: [],
 
     isAdmin: false,
+    isPersonal: false,
 
     async init() {
         const wrapper = document.getElementById('boardWrapper');
@@ -15,6 +16,7 @@ const Board = {
 
         this.boardId = parseInt(wrapper.dataset.boardId);
         this.isAdmin = wrapper.dataset.isAdmin === '1';
+        this.isPersonal = wrapper.dataset.isPersonal === '1';
         await this.load();
         this.bindEvents();
         this.initDragScroll();
@@ -59,11 +61,18 @@ const Board = {
         if (archBtn) archBtn.hidden = board.is_archived == 1;
         if (restBtn) restBtn.hidden = board.is_archived != 1;
 
-        // Members preview
+        // Members preview — irrelevant for personal boards (single-user space)
+        // so we suppress it entirely to keep the header clean.
         const preview = document.getElementById('boardMembersPreview');
-        preview.innerHTML = board.members.slice(0, 5).map(m => App.avatarHtml(m.display_name, 'sm')).join('');
-        if (board.members.length > 5) {
-            preview.innerHTML += `<span class="avatar avatar-sm" style="background:#666">+${board.members.length - 5}</span>`;
+        if (this.isPersonal) {
+            preview.style.display = 'none';
+            preview.innerHTML = '';
+        } else {
+            preview.style.display = '';
+            preview.innerHTML = board.members.slice(0, 5).map(m => App.avatarHtml(m.display_name, 'sm')).join('');
+            if (board.members.length > 5) {
+                preview.innerHTML += `<span class="avatar avatar-sm" style="background:#666">+${board.members.length - 5}</span>`;
+            }
         }
 
         // Lists
@@ -200,8 +209,9 @@ const Board = {
             <input type="checkbox" class="card-complete-checkbox" data-card-id="${card.id}"${card.due_complete == 1 ? ' checked' : ''} title="Mark as complete" aria-label="Mark as complete">
         `;
 
-        // Eye icon toggles watch state. 0.5 opacity when not watching, 1 when watching.
-        const watchIcon = `
+        // Eye icon toggles watch state. Hidden on personal boards — there's
+        // no one to notify, so the concept doesn't apply.
+        const watchIcon = this.isPersonal ? '' : `
             <button type="button" class="card-watch-icon${watchingCls}" data-card-id="${card.id}" title="Watch this card" aria-label="Watch this card">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -800,9 +810,13 @@ const Board = {
             menuItems += '<button class="context-menu-item" data-action="labels">Edit Labels</button>';
             menuItems += '<button class="context-menu-item" data-action="description">Edit Description</button>';
             menuItems += '<button class="context-menu-item" data-action="background">Change Background</button>';
-            menuItems += this.data?.is_archived == 1
-                ? '<button class="context-menu-item" data-action="restore">Restore Board</button>'
-                : '<button class="context-menu-item danger" data-action="archive">Archive Board</button>';
+            // Personal boards aren't archivable — they're a fixed user-space
+            // artifact that auto-recreates anyway.
+            if (!this.isPersonal) {
+                menuItems += this.data?.is_archived == 1
+                    ? '<button class="context-menu-item" data-action="restore">Restore Board</button>'
+                    : '<button class="context-menu-item danger" data-action="archive">Archive Board</button>';
+            }
         }
         if (!menuItems) {
             // Nothing to show for regular members
@@ -826,6 +840,8 @@ const Board = {
             this.showBackgroundPicker();
         });
 
+        // Archive / restore actions are only present in the menu for
+        // non-personal boards (see menuItems construction above).
         menu.querySelector('[data-action="archive"]')?.addEventListener('click', () => {
             menu.remove();
             this.archiveBoard();

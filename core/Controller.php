@@ -26,18 +26,83 @@ class Controller
     {
         $this->requireAuth();
         $db = Database::get();
+
+        // Personal boards override the usual "admins see everything" rule —
+        // they're strictly visible to their owner, no one else (not even
+        // site admins). Done as a single extra SELECT, indexed.
+        $bStmt = $db->prepare('SELECT `is_personal`, `created_by` FROM `boards` WHERE `id` = :id');
+        $bStmt->execute(['id' => $boardId]);
+        $board = $bStmt->fetch();
+        if (!$board) {
+            $this->json(['error' => 'Board not found'], 404);
+            exit;
+        }
+        if ((int) $board['is_personal'] === 1) {
+            if ((int) $board['created_by'] !== Auth::userId()) {
+                $this->json(['error' => 'Board access denied'], 403);
+                exit;
+            }
+            return;
+        }
+
         $stmt = $db->prepare(
             'SELECT 1 FROM `board_members` WHERE `board_id` = :board_id AND `user_id` = :user_id LIMIT 1'
         );
         $stmt->execute(['board_id' => $boardId, 'user_id' => Auth::userId()]);
 
         if (!$stmt->fetch()) {
-            // Admins can access any board
+            // Admins can access any non-personal board
             if (!Auth::isAdmin()) {
                 $this->json(['error' => 'Board access denied'], 403);
                 exit;
             }
         }
+    }
+
+    /**
+     * Admin-level operations on a board (rename, change background, edit
+     * description, manage labels, archive lists). Allowed for site admins
+     * AND for the owner of a personal board (they're the de facto admin
+     * of their own space).
+     */
+    protected function requireBoardAdmin(int $boardId): void
+    {
+        $this->requireAuth();
+        if (Auth::isAdmin()) {
+            // Still need to enforce personal-board ownership for admins:
+            // a site admin is NOT allowed to administer someone else's
+            // personal board. Fall through to the ownership check below.
+            $db = Database::get();
+            $stmt = $db->prepare('SELECT `is_personal`, `created_by` FROM `boards` WHERE `id` = :id');
+            $stmt->execute(['id' => $boardId]);
+            $board = $stmt->fetch();
+            if (!$board) {
+                $this->json(['error' => 'Board not found'], 404);
+                exit;
+            }
+            if ((int) $board['is_personal'] === 1
+                && (int) $board['created_by'] !== Auth::userId()
+            ) {
+                $this->json(['error' => 'Board access denied'], 403);
+                exit;
+            }
+            return;
+        }
+
+        // Non-admin: only the owner of a personal board qualifies.
+        $db = Database::get();
+        $stmt = $db->prepare('SELECT `is_personal`, `created_by` FROM `boards` WHERE `id` = :id');
+        $stmt->execute(['id' => $boardId]);
+        $board = $stmt->fetch();
+        if ($board
+            && (int) $board['is_personal'] === 1
+            && (int) $board['created_by'] === Auth::userId()
+        ) {
+            return;
+        }
+
+        $this->json(['error' => 'Admin access required'], 403);
+        exit;
     }
 
     protected function validateCSRF(): void

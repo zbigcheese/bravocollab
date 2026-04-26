@@ -19,7 +19,7 @@ class LabelController extends Controller
 
     public function create(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -28,7 +28,8 @@ class LabelController extends Controller
         $name = trim($data['name'] ?? '');
         $color = $data['color'] ?? '#0079BF';
 
-        $this->requireBoardAccess($boardId);
+        // Personal-board owners are admins of their own board.
+        $this->requireBoardAdmin($boardId);
 
         $v = new Validator();
         $v->hexColor($color);
@@ -49,7 +50,7 @@ class LabelController extends Controller
 
     public function update(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -65,7 +66,7 @@ class LabelController extends Controller
             return;
         }
 
-        $this->requireBoardAccess($label['board_id']);
+        $this->requireBoardAdmin($label['board_id']);
 
         $updates = [];
         if (array_key_exists('name', $data)) $updates['name'] = trim($data['name']) ?: null;
@@ -96,7 +97,7 @@ class LabelController extends Controller
 
     public function delete(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -112,7 +113,7 @@ class LabelController extends Controller
             return;
         }
 
-        $this->requireBoardAccess($label['board_id']);
+        $this->requireBoardAdmin($label['board_id']);
 
         $db->prepare('DELETE FROM labels WHERE id = :id')->execute(['id' => $id]);
 

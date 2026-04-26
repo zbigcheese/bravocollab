@@ -153,13 +153,14 @@ class BoardController extends Controller
 
     public function update(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
         $data = $this->getJSON();
         $id = (int) ($data['id'] ?? 0);
-        $this->requireBoardAccess($id);
+        // Personal-board owners are admins of their own board.
+        $this->requireBoardAdmin($id);
 
         $updates = [];
         if (isset($data['title'])) {
@@ -184,24 +185,39 @@ class BoardController extends Controller
 
     public function archive(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
         $data = $this->getJSON();
         $id = (int) ($data['id'] ?? 0);
+
+        // Personal boards are non-archivable / non-deletable by design —
+        // they're a fixed user-space artifact that auto-recreates anyway.
+        $board = $this->boardModel->find($id);
+        if (!$board) {
+            $this->json(['error' => 'Board not found'], 404);
+            return;
+        }
+        if ((int) ($board['is_personal'] ?? 0) === 1) {
+            $this->json(['error' => 'Personal boards cannot be archived'], 400);
+            return;
+        }
+
+        $this->requireBoardAdmin($id);
         $this->boardModel->update($id, ['is_archived' => 1]);
         $this->json(['success' => true]);
     }
 
     public function restore(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
         $data = $this->getJSON();
         $id = (int) ($data['id'] ?? 0);
+        $this->requireBoardAdmin($id);
         $this->boardModel->update($id, ['is_archived' => 0]);
         $this->json(['success' => true]);
     }

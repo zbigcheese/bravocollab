@@ -79,7 +79,7 @@ class ListController extends Controller
 
     public function archive(): void
     {
-        $this->requireAdmin();
+        $this->requireAuth();
         $this->requirePost();
         $this->validateCSRF();
 
@@ -92,7 +92,8 @@ class ListController extends Controller
             return;
         }
 
-        $this->requireBoardAccess($list['board_id']);
+        // Personal-board owners are admins of their own board.
+        $this->requireBoardAdmin($list['board_id']);
         $this->listModel->update($id, ['is_archived' => 1]);
 
         $this->publishSSE($list['board_id'], SSE_LIST_ARCHIVED, ['list_id' => $id]);

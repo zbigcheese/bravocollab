@@ -106,38 +106,53 @@ class Mailer
             $window[] = $d->format('Y-m-d');
         }
 
+        // Cards: include both assignment-based picks AND everything in the
+        // user's personal board (no assignments exist there). LEFT JOIN +
+        // OR keeps the query single-pass; DISTINCT guards against the rare
+        // case where a personal-board card is also assigned (it can't be
+        // through the UI today, but the SQL is defensive).
         $cardsStmt = $db->prepare(
-            'SELECT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
+            'SELECT DISTINCT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
              FROM cards c
-             JOIN card_assignments ca ON ca.card_id = c.id
              JOIN lists l ON c.list_id = l.id
              JOIN boards b ON b.id = l.board_id
-             WHERE ca.user_id = :uid
+             LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+             WHERE (ca.user_id = :uid_a2
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p))
                AND c.is_archived = 0
                AND c.due_complete = 0
                AND b.is_archived = 0
                AND DATE(c.due_date) BETWEEN :start AND :end
              ORDER BY c.due_date ASC'
         );
-        $cardsStmt->execute(['uid' => $userId, 'start' => $window[0], 'end' => $window[7]]);
+        $cardsStmt->execute([
+            'uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId,
+            'start' => $window[0], 'end' => $window[7],
+        ]);
         $cards = $cardsStmt->fetchAll();
 
+        // Same shape for checklist items: assigned-to-me OR sitting on a
+        // card in my personal board.
         $itemsStmt = $db->prepare(
-            'SELECT ci.id, ci.content, ci.due_date, ch.card_id,
+            'SELECT DISTINCT ci.id, ci.content, ci.due_date, ch.card_id,
                     c.title AS card_title, l.board_id, b.title AS board_title
              FROM checklist_items ci
              JOIN checklists ch ON ci.checklist_id = ch.id
              JOIN cards c ON ch.card_id = c.id
              JOIN lists l ON c.list_id = l.id
              JOIN boards b ON b.id = l.board_id
-             WHERE ci.assigned_to = :uid
+             WHERE (ci.assigned_to = :uid_a
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p))
                AND ci.is_checked = 0
                AND c.is_archived = 0
                AND b.is_archived = 0
                AND ci.due_date BETWEEN :start AND :end
              ORDER BY ci.due_date ASC'
         );
-        $itemsStmt->execute(['uid' => $userId, 'start' => $window[0], 'end' => $window[7]]);
+        $itemsStmt->execute([
+            'uid_a' => $userId, 'uid_p' => $userId,
+            'start' => $window[0], 'end' => $window[7],
+        ]);
         $items = $itemsStmt->fetchAll();
 
         $sections = [];
