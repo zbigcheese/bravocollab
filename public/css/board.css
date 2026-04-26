@@ -542,14 +542,32 @@
 .card-item {
     background: var(--color-white);
     border-radius: var(--radius-sm);
-    /* Extra right padding reserves room for the absolute watch-icon so long
-       titles and labels never render underneath it. */
-    padding: 8px 30px 8px 12px;
+    /* Extra right padding reserves room for the absolute complete-checkbox
+       and watch-icon stacked at the right edge, so long titles and labels
+       never render underneath them. */
+    padding: 8px 52px 8px 12px;
     margin-bottom: 8px;
     cursor: pointer;
     box-shadow: 0 1px 2px rgba(9,30,66,0.12);
     transition: box-shadow 0.15s, transform 0.1s;
     position: relative;
+}
+
+.card-complete-checkbox {
+    position: absolute;
+    top: 6px;
+    right: 30px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.card-item.is-complete .card-title {
+    text-decoration: line-through;
+    color: var(--color-text-light);
 }
 
 .card-watch-icon {

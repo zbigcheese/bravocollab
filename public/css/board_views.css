@@ -156,6 +156,32 @@
     opacity: 0.7;
 }
 
+/* Completion / due-state colors. Highest specificity wins:
+   .cal-card-done is "soft" (gray + strikethrough) and applies even on outside
+   cells; the bright red/orange variants are ignored when the card is done. */
+.cal-card.cal-card-done {
+    text-decoration: line-through;
+    opacity: 0.55;
+}
+
+.cal-card.cal-card-overdue {
+    background: var(--color-danger);
+    color: #fff;
+}
+.cal-card.cal-card-overdue:hover {
+    background: var(--color-danger);
+    filter: brightness(1.05);
+}
+
+.cal-card.cal-card-today {
+    background: #FF9F1A;
+    color: #fff;
+}
+.cal-card.cal-card-today:hover {
+    background: #FF9F1A;
+    filter: brightness(1.05);
+}
+
 /* Accordion: hide cards beyond the first 3 when collapsed; reveal on expand. */
 .cal-cell.cal-collapsed:not(.cal-expanded) .cal-card-hidden {
     display: none;

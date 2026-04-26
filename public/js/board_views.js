@@ -67,6 +67,20 @@ const BoardViews = {
         return (card.labels && card.labels[0] && card.labels[0].color) ? card.labels[0].color : '#5bc0de';
     },
 
+    // Returns the CSS class suffix (with leading space) describing a calendar
+    // card's completion/due state. Order of priority:
+    //   complete       -> dimmed + strikethrough
+    //   overdue (past) -> red bg, white text
+    //   due today      -> orange bg
+    _calCardStateCls(card, todayKey) {
+        if (card.due_complete == 1) return ' cal-card-done';
+        const dueKey = card.due_date ? card.due_date.substring(0, 10) : '';
+        if (!dueKey) return '';
+        if (dueKey < todayKey) return ' cal-card-overdue';
+        if (dueKey === todayKey) return ' cal-card-today';
+        return '';
+    },
+
     _dateKey(d) {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -123,11 +137,15 @@ const BoardViews = {
             const k = this._dateKey(d);
             const cards = byDate[k] || [];
             const collapsed = cards.length > 4;
-            const cardsHtml = cards.map((c, i) => `
-                <div class="cal-card${collapsed && i >= 3 ? ' cal-card-hidden' : ''}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
-                    ${App.escapeHtml(c.title)}
-                </div>
-            `).join('');
+            const cardsHtml = cards.map((c, i) => {
+                const stateCls = this._calCardStateCls(c, todayKey);
+                const hidden = collapsed && i >= 3 ? ' cal-card-hidden' : '';
+                return `
+                    <div class="cal-card${stateCls}${hidden}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
+                        ${App.escapeHtml(c.title)}
+                    </div>
+                `;
+            }).join('');
             const toggle = collapsed
                 ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
                 : '';
@@ -240,11 +258,15 @@ const BoardViews = {
                     // Accordion: when more than 4 cards, show only 3 by default and
                     // reveal the rest behind a "+ N more" toggle.
                     const collapsed = cards.length > 4;
-                    const cardsHtml = cards.map((c, i) => `
-                        <div class="cal-card${collapsed && i >= 3 ? ' cal-card-hidden' : ''}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
-                            ${App.escapeHtml(c.title)}
-                        </div>
-                    `).join('');
+                    const cardsHtml = cards.map((c, i) => {
+                        const stateCls = this._calCardStateCls(c, todayKey);
+                        const hidden = collapsed && i >= 3 ? ' cal-card-hidden' : '';
+                        return `
+                            <div class="cal-card${stateCls}${hidden}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
+                                ${App.escapeHtml(c.title)}
+                            </div>
+                        `;
+                    }).join('');
                     const toggle = collapsed
                         ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
                         : '';

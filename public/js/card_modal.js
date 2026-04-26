@@ -52,6 +52,7 @@ const CardModal = {
             <div class="modal">
                 <div class="modal-header">
                     ${archivedLabel}
+                    <input type="checkbox" class="card-detail-complete-check" id="cardCompleteCheck"${c.due_complete == 1 ? ' checked' : ''} title="Mark as complete" aria-label="Mark as complete">
                     <textarea class="card-detail-title" id="cardTitle" rows="1">${App.escapeHtml(c.title)}</textarea>
                     <button class="modal-close" id="closeCardModal">&times;</button>
                 </div>
@@ -170,10 +171,9 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                     <h3>Due Date</h3>
                 </div>
-                <label class="due-date-display ${cls}" style="cursor:pointer;">
-                    <input type="checkbox" ${c.due_complete ? 'checked' : ''} id="dueCompleteCheck" style="margin-right:4px;">
+                <span class="due-date-display ${cls}">
                     ${new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </label>
+                </span>
             </div>
         `;
     },
@@ -465,13 +465,20 @@ const CardModal = {
             }
         });
 
-        // Due complete toggle
-        document.getElementById('dueCompleteCheck')?.addEventListener('change', async (e) => {
+        // Mark-as-complete checkbox in the header.
+        document.getElementById('cardCompleteCheck')?.addEventListener('change', async (e) => {
             const complete = e.target.checked;
             this.suppressSSE();
-            await App.api('cards.update', { id: c.id, due_complete: complete });
-            c.due_complete = complete;
-            this.refreshBoardCard();
+            try {
+                await App.api('cards.update', { id: c.id, due_complete: complete });
+                c.due_complete = complete ? 1 : 0;
+                // Re-render the due date section so its color reflects complete state.
+                this.updateDueDateDOM();
+                this.refreshBoardCard();
+            } catch (err) {
+                e.target.checked = !complete;
+                App.showToast(err.message || 'Failed to update card', 'error');
+            }
         });
 
         // Comments
@@ -1448,19 +1455,10 @@ const CardModal = {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                 <h3>Due Date</h3>
             </div>
-            <label class="due-date-display ${cls}" style="cursor:pointer;">
-                <input type="checkbox" ${c.due_complete ? 'checked' : ''} id="dueCompleteCheck" style="margin-right:4px;">
+            <span class="due-date-display ${cls}">
                 ${new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </label>
+            </span>
         `;
-        // Re-bind checkbox
-        document.getElementById('dueCompleteCheck')?.addEventListener('change', async (e) => {
-            const complete = e.target.checked;
-            this.suppressSSE();
-            await App.api('cards.update', { id: c.id, due_complete: complete });
-            c.due_complete = complete;
-            this.refreshBoardCard();
-        });
     },
 
     // ---- Watch ----

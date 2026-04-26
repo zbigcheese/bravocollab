@@ -173,7 +173,13 @@ const Board = {
 
         const hasBadges = badges || assigneesHtml;
         const archivedCls = card.is_archived == 1 ? ' card-archived' : '';
+        const completeCls = card.due_complete == 1 ? ' is-complete' : '';
         const watchingCls = card.is_watching == 1 ? ' is-watching' : '';
+
+        // Mark-as-complete checkbox sits to the left of the watch icon.
+        const completeCheckbox = `
+            <input type="checkbox" class="card-complete-checkbox" data-card-id="${card.id}"${card.due_complete == 1 ? ' checked' : ''} title="Mark as complete" aria-label="Mark as complete">
+        `;
 
         // Eye icon toggles watch state. 0.5 opacity when not watching, 1 when watching.
         const watchIcon = `
@@ -183,7 +189,8 @@ const Board = {
         `;
 
         return `
-            <div class="card-item${archivedCls}" data-card-id="${card.id}" data-list-id="${card.list_id}">
+            <div class="card-item${archivedCls}${completeCls}" data-card-id="${card.id}" data-list-id="${card.list_id}">
+                ${completeCheckbox}
                 ${watchIcon}
                 ${labelsHtml}
                 <div class="card-title">${App.escapeHtml(card.title)}</div>
@@ -348,6 +355,15 @@ const Board = {
 
         // Delegated events on board container
         container.addEventListener('click', (e) => {
+            // Mark-as-complete checkbox -> toggle without opening the modal.
+            // The native click already flipped checked, so read the new state.
+            const completeBox = e.target.closest('.card-complete-checkbox');
+            if (completeBox) {
+                e.stopPropagation();
+                this.toggleCardComplete(parseInt(completeBox.dataset.cardId), completeBox.checked, completeBox);
+                return;
+            }
+
             // Watch eye icon -> toggle watch without opening the modal.
             const watchBtn = e.target.closest('.card-watch-icon');
             if (watchBtn) {
@@ -1158,6 +1174,52 @@ const Board = {
         };
         document.addEventListener('mouseup', end);
         window.addEventListener('blur', end);
+    },
+
+    async toggleCardComplete(cardId, complete, checkboxEl) {
+        // Find the card so we can mutate it locally and revert on failure.
+        let card = null;
+        for (const list of (this.data?.lists || [])) {
+            const c = list.cards.find(x => parseInt(x.id) === cardId);
+            if (c) { card = c; break; }
+        }
+        const previous = card ? (card.due_complete == 1) : !complete;
+
+        try {
+            await App.api('cards.update', { id: cardId, due_complete: complete });
+            if (card) card.due_complete = complete ? 1 : 0;
+
+            // Card thumbnail visual: strikethrough title via .is-complete class,
+            // and the due-date badge swaps to its `complete` styling.
+            const cardEl = checkboxEl.closest('.card-item');
+            if (cardEl) {
+                cardEl.classList.toggle('is-complete', complete);
+                const dueBadge = cardEl.querySelector('.card-badges .card-badge');
+                // Best-effort: the first badge is the due-date badge when present.
+                // Toggling here keeps things snappy; the SSE update will re-render
+                // authoritative state within ~2s anyway.
+                if (dueBadge && card?.due_date) {
+                    dueBadge.classList.remove('overdue', 'due-today', 'due-soon');
+                    dueBadge.classList.toggle('complete', complete);
+                }
+            }
+
+            // Sync the open card modal if it's showing this card.
+            if (typeof CardModal !== 'undefined' && CardModal.currentCard
+                && parseInt(CardModal.currentCard.id) === cardId) {
+                CardModal.currentCard.due_complete = complete ? 1 : 0;
+                const modalCheck = document.getElementById('cardCompleteCheck');
+                if (modalCheck) modalCheck.checked = complete;
+                CardModal.updateDueDateDOM?.();
+            }
+
+            // Refresh calendar/timeline if those views are active so colors update.
+            if (typeof BoardViews !== 'undefined') BoardViews.refresh();
+        } catch (e) {
+            // Roll back the optimistic checkbox state.
+            checkboxEl.checked = previous;
+            App.showToast(e.message || 'Failed to update card', 'error');
+        }
     },
 
     async toggleCardWatch(cardId, iconEl) {

@@ -136,6 +136,20 @@
 }
 
 /* Inline title editing */
+.card-detail-complete-check {
+    width: 22px;
+    height: 22px;
+    margin: 8px 8px 0 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.card-detail-title.is-complete,
+.card-detail-modal .modal-header:has(.card-detail-complete-check:checked) .card-detail-title {
+    text-decoration: line-through;
+    color: var(--color-text-light);
+}
+
 .card-detail-title {
     font-size: 20px;
     font-weight: 600;
