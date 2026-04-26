@@ -322,6 +322,40 @@ CREATE TABLE IF NOT EXISTS `whats_next_sent` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- GOOGLE CALENDAR INTEGRATION
+-- ============================================================
+
+-- One row per user with an active OAuth connection to Google Calendar.
+-- access_token expires after ~1h and is refreshed using refresh_token.
+-- calendar_id is the dedicated "BravoCollab" calendar we create at connect
+-- time so we never touch the user's primary calendar.
+CREATE TABLE IF NOT EXISTS `google_calendar_accounts` (
+    `user_id`        INT UNSIGNED PRIMARY KEY,
+    `access_token`   TEXT NOT NULL,
+    `refresh_token`  TEXT NOT NULL,
+    `expires_at`     DATETIME NOT NULL,
+    `calendar_id`    VARCHAR(255) NOT NULL,
+    `connected_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Maps each (user, BravoCollab entity) pair to its Google event id so
+-- subsequent syncs can update or delete the right event. UNIQUE prevents
+-- duplicate events for the same entity.
+CREATE TABLE IF NOT EXISTS `google_calendar_events` (
+    `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`         INT UNSIGNED NOT NULL,
+    `entity_type`     ENUM('card', 'item') NOT NULL,
+    `entity_id`       INT UNSIGNED NOT NULL,
+    `google_event_id` VARCHAR(255) NOT NULL,
+    `payload_hash`    CHAR(40) DEFAULT NULL,
+    `synced_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_user_entity` (`user_id`, `entity_type`, `entity_id`),
+    INDEX `idx_user` (`user_id`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- SSE EVENTS QUEUE
 -- ============================================================
 

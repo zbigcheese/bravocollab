@@ -223,6 +223,30 @@ if ($cetHour === 8) {
 }
 echo "Sent {$wnSent} 'what's next' digest emails.\n";
 
+// 7. Google Calendar sync — push assigned cards/items with due dates to
+//    each connected user's dedicated BravoCollab calendar. Cron-driven so
+//    we never block a user-facing action on a Google API call. Failures
+//    per-user are isolated; we log and move on.
+require_once __DIR__ . '/core/GoogleCalendar.php';
+GoogleCalendar::ensureSchema();
+$gcalAccounts = $db->query('SELECT user_id FROM google_calendar_accounts')->fetchAll(PDO::FETCH_COLUMN);
+$gcalSummary = ['users' => 0, 'created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0];
+foreach ($gcalAccounts as $gUid) {
+    $gcalSummary['users']++;
+    try {
+        $r = GoogleCalendar::syncUser((int) $gUid);
+        $gcalSummary['created']  += (int) ($r['created']  ?? 0);
+        $gcalSummary['updated']  += (int) ($r['updated']  ?? 0);
+        $gcalSummary['deleted']  += (int) ($r['deleted']  ?? 0);
+    } catch (Throwable $e) {
+        $gcalSummary['failed']++;
+        echo "Google sync failed for user {$gUid}: " . $e->getMessage() . "\n";
+    }
+}
+echo "Google Calendar: synced {$gcalSummary['users']} user(s) — "
+   . "{$gcalSummary['created']} created, {$gcalSummary['updated']} updated, "
+   . "{$gcalSummary['deleted']} removed, {$gcalSummary['failed']} failed.\n";
+
 echo "Cron job complete.\n";
 
 } catch (Throwable $e) {

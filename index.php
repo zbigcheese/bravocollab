@@ -67,13 +67,16 @@ if (Auth::isLoggedIn()) {
 
 // Page routing
 $pageMap = [
-    'login'           => 'auth/login.php',
-    'register'        => 'auth/register.php',
-    'forgot_password' => 'auth/forgot_password.php',
-    'reset_password'  => 'auth/reset_password.php',
-    'dashboard'       => 'dashboard/index.php',
-    'board'           => 'board/view.php',
-    'admin_users'     => 'admin/users.php',
+    'login'             => 'auth/login.php',
+    'register'          => 'auth/register.php',
+    'forgot_password'   => 'auth/forgot_password.php',
+    'reset_password'    => 'auth/reset_password.php',
+    'dashboard'         => 'dashboard/index.php',
+    'board'             => 'board/view.php',
+    'admin_users'       => 'admin/users.php',
+    'settings_calendar' => 'settings/calendar.php',
+    'google_connect'    => 'google/connect.php',
+    'google_callback'   => 'google/callback.php',
 ];
 
 if (!isset($pageMap[$page])) {
@@ -82,8 +85,13 @@ if (!isset($pageMap[$page])) {
 
 $viewFile = __DIR__ . '/views/' . $pageMap[$page];
 
+// Pages that perform a server-side redirect (HTTP 302) and must NOT have
+// the HTML layout flushed first — once any output is emitted, header() calls
+// silently fail.
+$layoutLessPages = ['google_connect', 'google_callback'];
+
 // For authenticated pages, wrap in layout
-if (in_array($page, $publicPages, true)) {
+if (in_array($page, $publicPages, true) || in_array($page, $layoutLessPages, true)) {
     require $viewFile;
 } else {
     require __DIR__ . '/views/layout/header.php';

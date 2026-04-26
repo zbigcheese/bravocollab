@@ -13,6 +13,7 @@ class Router
         'labels'       => 'LabelController',
         'notifications'=> 'NotificationController',
         'users'        => 'UserController',
+        'google_calendar' => 'GoogleCalendarController',
     ];
 
     public static function dispatch(): void

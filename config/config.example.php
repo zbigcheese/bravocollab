@@ -22,5 +22,12 @@ return [
     'invitation_expiry_days' => 7,
     'session_lifetime'       => 7200, // 2 hours
 
+    // Google Calendar OAuth — get these by creating an OAuth 2.0 Client ID
+    // (type: Web application) at https://console.cloud.google.com/apis/credentials.
+    // Authorized redirect URI must be exactly: <base_url>/index.php?page=google_callback
+    // Enable the "Google Calendar API" for the same project.
+    'google_client_id'     => '',
+    'google_client_secret' => '',
+
     'debug' => false,
 ];

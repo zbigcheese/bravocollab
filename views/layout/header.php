@@ -43,6 +43,7 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
                         <div class="user-menu-email" title="<?php echo htmlspecialchars($userEmail); ?>"><?php echo htmlspecialchars($userEmail); ?></div>
                         <span class="user-menu-role user-menu-role-<?php echo htmlspecialchars($userRole); ?>"><?php echo $roleLabel; ?></span>
                     </div>
+                    <a href="index.php?page=settings_calendar" class="user-menu-link">Calendar sync</a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="index.php?page=admin_users" class="user-menu-link">Manage users</a>
                     <?php endif; ?>
