@@ -1,18 +1,5 @@
 Options -Indexes
 
-# Google OAuth callback receives query values like "code=4/0Ae…" with raw
-# slashes that match default ModSecurity / OWASP CRS injection rules and
-# get blocked at the WAF before PHP runs. <Files> works in every Apache
-# config (unlike <If>) so we scope the WAF disable to this single file.
-<Files "google_oauth.php">
-    <IfModule mod_security2.c>
-        SecRuleEngine Off
-    </IfModule>
-    <IfModule mod_security.c>
-        SecFilterEngine Off
-    </IfModule>
-</Files>
-
 # Security headers
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
