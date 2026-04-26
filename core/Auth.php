@@ -30,18 +30,28 @@ class Auth
                 "Require all denied\n# Apache 2.2 fallback\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n"
             );
         }
+        $usingLocalDir = false;
         if (is_dir($sessionDir) && is_writable($sessionDir)) {
             ini_set('session.save_path', $sessionDir);
+            $usingLocalDir = true;
         }
 
         // Raise PHP's server-side session GC lifetime to match our idle window,
         // so session files aren't deleted by shared-host GC before our 2h
         // idle-timeout check has a chance to run. Must be set BEFORE session_start().
         ini_set('session.gc_maxlifetime', (string) $lifetime);
-        // Slightly higher GC probability so our own requests still clean up
-        // expired sessions in a timely way (default host values can be 0/1000).
-        ini_set('session.gc_probability', '1');
-        ini_set('session.gc_divisor', '100');
+        if ($usingLocalDir) {
+            // We own the dir — let PHP's GC trim old files at a low rate.
+            ini_set('session.gc_probability', '1');
+            ini_set('session.gc_divisor', '100');
+        } else {
+            // Stuck on the shared cPanel dir we can't read — disable PHP's
+            // GC entirely so it never triggers the "Permission denied" notice
+            // that spams the error log. cPanel runs its own session cleanup
+            // server-side anyway.
+            ini_set('session.gc_probability', '0');
+            ini_set('session.gc_divisor', '1');
+        }
 
         session_set_cookie_params([
             'lifetime' => 0,

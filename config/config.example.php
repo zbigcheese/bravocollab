@@ -24,7 +24,7 @@ return [
 
     // Google Calendar OAuth — get these by creating an OAuth 2.0 Client ID
     // (type: Web application) at https://console.cloud.google.com/apis/credentials.
-    // Authorized redirect URI must be exactly: <base_url>/index.php?page=google_callback
+    // Authorized redirect URI must be exactly: <base_url>/google_oauth.php
     // Enable the "Google Calendar API" for the same project.
     'google_client_id'     => '',
     'google_client_secret' => '',

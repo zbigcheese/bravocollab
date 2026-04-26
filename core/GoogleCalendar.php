@@ -735,8 +735,11 @@ class GoogleCalendar
 
     private static function redirectUri(): string
     {
+        // Standalone file (not routed through index.php) so we can scope a
+        // <Files> ModSecurity-disable rule to it via .htaccess. The cPanel
+        // WAF blocks OAuth code values that contain raw slashes.
         $config = self::config();
-        return rtrim($config['base_url'], '/') . '/index.php?page=google_callback';
+        return rtrim($config['base_url'], '/') . '/google_oauth.php';
     }
 
     private static function config(): array
