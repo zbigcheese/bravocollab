@@ -194,7 +194,11 @@ class Mailer
 
         if (empty($sections)) return null;
 
-        $subject = "What's next today — {$appName}";
+        // Date in CET so the subject lines up with the email body's "Today" anchor.
+        // Including the date makes each day's subject unique, which prevents
+        // Gmail from threading consecutive days' digests into one collapsed row.
+        $cetDate = (new DateTime('now', new DateTimeZone('Europe/Belgrade')))->format('M j');
+        $subject = "What's next — {$cetDate} — {$appName}";
 
         $sectionsHtml = '';
         foreach ($sections as $sec) {

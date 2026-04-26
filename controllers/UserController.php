@@ -73,6 +73,9 @@ class UserController extends Controller
         }
 
         $built = Mailer::buildWhatsNext($user['display_name'], $sections);
+        // Append a random tag so each test send is uniquely subject-lined and
+        // Gmail can't collapse / dedupe repeated tests within the same day.
+        $built['subject'] .= ' [test #' . random_int(1000, 9999) . ']';
         $diag  = Mailer::sendWithDiagnostics($user['email'], $built['subject'], $built['body']);
 
         $cardsTotal = array_sum(array_map(fn($s) => count($s['cards']), $sections));
