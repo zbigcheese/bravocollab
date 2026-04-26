@@ -23,4 +23,21 @@
             await App.api('auth.logout', {});
             window.location.href = 'index.php?page=login';
         });
+
+        // TEMPORARY: admin-only "test: dailyemail" trigger.
+        document.getElementById('testDailyEmailBtn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const original = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'sending…';
+            try {
+                const res = await App.api('users.test_whats_next', {});
+                App.showToast(res.message || 'Done', res.sent ? 'success' : 'info');
+            } catch (err) {
+                App.showToast(err.message || 'Failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = original;
+            }
+        });
     </script>

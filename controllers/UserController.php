@@ -12,6 +12,50 @@ class UserController extends Controller
         $this->userModel = new User();
     }
 
+    /**
+     * TEMPORARY admin-only debug endpoint: send the daily "what's next"
+     * digest to the calling admin right now, ignoring the dedupe table
+     * and NOT marking the row as sent. Wired to the "test: dailyemail"
+     * button in the navbar.
+     */
+    public function testWhatsNext(): void
+    {
+        $this->requireAdmin();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $db   = Database::get();
+        $uid  = Auth::userId();
+        $user = $this->userModel->find($uid);
+        if (!$user) {
+            $this->json(['error' => 'User not found'], 404);
+            return;
+        }
+
+        $cetNow = new DateTime('now', new DateTimeZone('Europe/Belgrade'));
+        $sections = Mailer::buildWhatsNextSectionsForUser($db, $uid, $cetNow);
+
+        if (empty($sections)) {
+            $this->json([
+                'success' => true,
+                'sent'    => false,
+                'message' => 'No upcoming items in the next 8 days — nothing to send.',
+            ]);
+            return;
+        }
+
+        $sent = Mailer::sendWhatsNext($user['email'], $user['display_name'], $sections);
+
+        $this->json([
+            'success' => $sent,
+            'sent'    => $sent,
+            'message' => $sent
+                ? 'Sent to ' . $user['email']
+                : 'Mail send failed (mail() returned false). Check server mail config.',
+            'sections_count' => count($sections),
+        ]);
+    }
+
     public function list(): void
     {
         $this->requireAuth();

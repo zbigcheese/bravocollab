@@ -90,6 +90,83 @@ class Mailer
     }
 
     /**
+     * Build the "what's next" sections for $userId across the 8-day window
+     * starting from $cetNow's date in CET. Returns a list of:
+     *   ['label' => 'Today, Apr 26', 'cards' => [...], 'items' => [...]]
+     * with empty days omitted. Used by both cron.php (8am CET digest) and
+     * the admin "test: dailyemail" endpoint.
+     */
+    public static function buildWhatsNextSectionsForUser(PDO $db, int $userId, DateTime $cetNow): array
+    {
+        $cetTz = $cetNow->getTimezone();
+
+        $window = [];
+        for ($i = 0; $i < 8; $i++) {
+            $d = (clone $cetNow)->setTime(0, 0, 0)->modify("+{$i} day");
+            $window[] = $d->format('Y-m-d');
+        }
+
+        $cardsStmt = $db->prepare(
+            'SELECT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
+             FROM cards c
+             JOIN card_assignments ca ON ca.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE ca.user_id = :uid
+               AND c.is_archived = 0
+               AND c.due_complete = 0
+               AND b.is_archived = 0
+               AND DATE(c.due_date) BETWEEN :start AND :end
+             ORDER BY c.due_date ASC'
+        );
+        $cardsStmt->execute(['uid' => $userId, 'start' => $window[0], 'end' => $window[7]]);
+        $cards = $cardsStmt->fetchAll();
+
+        $itemsStmt = $db->prepare(
+            'SELECT ci.id, ci.content, ci.due_date, ch.card_id,
+                    c.title AS card_title, l.board_id, b.title AS board_title
+             FROM checklist_items ci
+             JOIN checklists ch ON ci.checklist_id = ch.id
+             JOIN cards c ON ch.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE ci.assigned_to = :uid
+               AND ci.is_checked = 0
+               AND c.is_archived = 0
+               AND b.is_archived = 0
+               AND ci.due_date BETWEEN :start AND :end
+             ORDER BY ci.due_date ASC'
+        );
+        $itemsStmt->execute(['uid' => $userId, 'start' => $window[0], 'end' => $window[7]]);
+        $items = $itemsStmt->fetchAll();
+
+        $sections = [];
+        for ($i = 0; $i < 8; $i++) {
+            $dateStr  = $window[$i];
+            $dayCards = array_values(array_filter(
+                $cards, fn($c) => substr($c['due_date'], 0, 10) === $dateStr
+            ));
+            $dayItems = array_values(array_filter(
+                $items, fn($it) => $it['due_date'] === $dateStr
+            ));
+            if (empty($dayCards) && empty($dayItems)) continue;
+
+            $d = new DateTime($dateStr, $cetTz);
+            $formatted = $d->format('M j');
+            if     ($i === 0) $label = "Today, {$formatted}";
+            elseif ($i === 1) $label = "Tomorrow, {$formatted}";
+            else              $label = $formatted;
+
+            $sections[] = [
+                'label' => $label,
+                'cards' => $dayCards,
+                'items' => $dayItems,
+            ];
+        }
+        return $sections;
+    }
+
+    /**
      * Daily "what's next" overview. $sections is a list of:
      *   ['label' => 'Today, Apr 26', 'cards' => [...], 'items' => [...]]
      * Each card row carries id, title, due_date, board_id, board_title.

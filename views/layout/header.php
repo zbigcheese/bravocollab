@@ -25,6 +25,11 @@ $roleLabel = $userRole === 'admin' ? 'Administrator' : 'Member';
             </a>
         </div>
         <div class="navbar-right">
+            <?php if (Auth::isAdmin()): ?>
+            <button type="button" id="testDailyEmailBtn" class="navbar-test-btn" title="Send the 'what's next' digest to your own email now (no dedupe)">
+                test: dailyemail
+            </button>
+            <?php endif; ?>
             <div class="user-menu" id="userMenu">
                 <button type="button" class="user-menu-trigger" id="userMenuTrigger" aria-haspopup="true" aria-expanded="false">
                     <svg class="user-menu-avatar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
