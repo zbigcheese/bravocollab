@@ -229,6 +229,9 @@ const CardModal = {
                     <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
                     <span class="checklist-item-content">${App.escapeHtml(item.content)}</span>
                     <div class="cl-item-meta">${meta}</div>
+                    <button class="cl-item-edit-btn" data-item-id="${item.id}" data-checklist-id="${cl.id}" title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
                     <button class="cl-item-assign-btn" data-item-id="${item.id}" data-checklist-id="${cl.id}" title="Assign / Due date">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a5.5 5.5 0 0 1 11 0v2"/></svg>
                     </button>
@@ -312,6 +315,12 @@ const CardModal = {
     },
 
     renderSingleComment(cm, isReply = false) {
+        // Edit is strictly own-comments (admins included). Delete stays open
+        // to admins via the existing server check; we don't gate it here so
+        // they can still moderate.
+        const isOwn = parseInt(cm.user_id) === App.userId;
+        const editBtn = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
+
         return `
             <div class="comment-item ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
                 ${App.avatarHtml(cm.author_name, isReply ? 'sm' : '')}
@@ -323,7 +332,7 @@ const CardModal = {
                     <div class="comment-text">${this.formatCommentBody(cm.body)}</div>
                     <div class="comment-actions">
                         ${!isReply ? `<button class="reply-comment" data-comment-id="${cm.id}" data-author="${App.escapeHtml(cm.author_name)}">Reply</button>` : ''}
-                        <button class="edit-comment" data-comment-id="${cm.id}">Edit</button>
+                        ${editBtn}
                         <button class="delete-comment" data-comment-id="${cm.id}">Delete</button>
                     </div>
                 </div>
@@ -489,7 +498,10 @@ const CardModal = {
         });
 
         // @mention autocomplete
-        this.initMentionAutocomplete(document.getElementById('newComment'));
+        this.initMentionAutocomplete(
+            document.getElementById('newComment'),
+            document.getElementById('mentionDropdown')
+        );
 
         // Delegated actions
         overlay.addEventListener('click', (e) => {
@@ -515,6 +527,9 @@ const CardModal = {
 
             const addItemBtn = e.target.closest('.add-item-btn');
             if (addItemBtn) { this.addChecklistItem(parseInt(addItemBtn.dataset.checklistId)); return; }
+
+            const clItemEdit = e.target.closest('.cl-item-edit-btn');
+            if (clItemEdit) { this.editChecklistItem(parseInt(clItemEdit.dataset.itemId), parseInt(clItemEdit.dataset.checklistId)); return; }
 
             const clItemAssign = e.target.closest('.cl-item-assign-btn');
             if (clItemAssign) { this.showChecklistItemEditor(parseInt(clItemAssign.dataset.itemId), parseInt(clItemAssign.dataset.checklistId)); return; }
@@ -556,61 +571,118 @@ const CardModal = {
     },
 
     // ---- @mention autocomplete ----
-    initMentionAutocomplete(textarea) {
-        if (!textarea) return;
-        const dropdown = document.getElementById('mentionDropdown');
+    // Single entry point used for the main comment box, inline replies, and
+    // the comment-edit form. Always re-binds keyboard nav so the dropdown
+    // supports ArrowUp/Down to move, Enter/Tab to insert the highlighted
+    // member, Escape to close.
+    initMentionAutocomplete(textarea, dropdown) {
+        if (!textarea || !dropdown) return;
 
-        textarea.addEventListener('input', () => {
+        let members = [];
+        let selectedIndex = -1;
+
+        const closeDropdown = () => {
+            dropdown.style.display = 'none';
+            selectedIndex = -1;
+        };
+
+        const paintSelection = () => {
+            dropdown.querySelectorAll('.mention-option').forEach((opt, i) => {
+                opt.classList.toggle('selected', i === selectedIndex);
+            });
+        };
+
+        const insertMention = (name) => {
+            const cursorPos = textarea.selectionStart;
+            const before = textarea.value.substring(0, cursorPos);
+            const start = before.lastIndexOf('@');
+            if (start < 0) return;
+            textarea.value = textarea.value.substring(0, start)
+                + '@' + name + ' '
+                + textarea.value.substring(cursorPos);
+            textarea.selectionStart = textarea.selectionEnd = start + name.length + 2;
+            closeDropdown();
+            textarea.focus();
+        };
+
+        const refresh = () => {
             const val = textarea.value;
             const cursorPos = textarea.selectionStart;
-            // Find @ before cursor
             const beforeCursor = val.substring(0, cursorPos);
             const match = beforeCursor.match(/@(\w*)$/);
 
-            if (match) {
-                const query = match[1].toLowerCase();
-                const members = this.boardMembers.filter(m =>
-                    m.display_name.toLowerCase().includes(query)
-                ).slice(0, 6);
+            if (!match) {
+                closeDropdown();
+                return;
+            }
 
-                if (members.length > 0) {
-                    dropdown.innerHTML = members.map(m => `
-                        <div class="mention-option" data-name="${App.escapeHtml(m.display_name)}">
-                            ${App.avatarHtml(m.display_name, 'sm')}
-                            <span>${App.escapeHtml(m.display_name)}</span>
-                        </div>
-                    `).join('');
-                    dropdown.style.display = 'block';
+            const query = match[1].toLowerCase();
+            members = this.boardMembers.filter(m =>
+                m.display_name.toLowerCase().includes(query)
+            ).slice(0, 6);
 
-                    dropdown.querySelectorAll('.mention-option').forEach(opt => {
-                        opt.addEventListener('mousedown', (e) => {
-                            e.preventDefault();
-                            const name = opt.dataset.name;
-                            const start = beforeCursor.lastIndexOf('@');
-                            textarea.value = val.substring(0, start) + '@' + name + ' ' + val.substring(cursorPos);
-                            textarea.selectionStart = textarea.selectionEnd = start + name.length + 2;
-                            dropdown.style.display = 'none';
-                            textarea.focus();
-                        });
-                    });
-                } else {
-                    dropdown.style.display = 'none';
-                }
-            } else {
-                dropdown.style.display = 'none';
+            if (members.length === 0) {
+                closeDropdown();
+                return;
+            }
+
+            // First option is selected by default — Enter without arrow nav
+            // picks it. Hover or arrows can shift the selection.
+            selectedIndex = 0;
+            dropdown.innerHTML = members.map((m, i) => `
+                <div class="mention-option${i === 0 ? ' selected' : ''}" data-name="${App.escapeHtml(m.display_name)}" data-index="${i}">
+                    ${App.avatarHtml(m.display_name, 'sm')}
+                    <span>${App.escapeHtml(m.display_name)}</span>
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+
+            dropdown.querySelectorAll('.mention-option').forEach(opt => {
+                opt.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    insertMention(opt.dataset.name);
+                });
+                opt.addEventListener('mouseenter', () => {
+                    selectedIndex = parseInt(opt.dataset.index);
+                    paintSelection();
+                });
+            });
+        };
+
+        textarea.addEventListener('input', refresh);
+
+        textarea.addEventListener('keydown', (e) => {
+            if (dropdown.style.display !== 'block' || selectedIndex < 0) return;
+            const total = members.length;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % total;
+                paintSelection();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + total) % total;
+                paintSelection();
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                e.stopPropagation();
+                insertMention(members[selectedIndex].display_name);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeDropdown();
             }
         });
 
         textarea.addEventListener('blur', () => {
-            setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+            // Slight delay so a click on an option still fires.
+            setTimeout(closeDropdown, 200);
         });
+    },
 
-        textarea.addEventListener('keydown', (e) => {
-            if (dropdown.style.display === 'block' && e.key === 'Escape') {
-                dropdown.style.display = 'none';
-                e.stopPropagation();
-            }
-        });
+    // Backwards-compat shim — older call sites passed only the textarea and
+    // assumed the global #mentionDropdown element. Resolve it here.
+    initMentionAutocompleteOn(textarea, dropdown) {
+        this.initMentionAutocomplete(textarea, dropdown);
     },
 
     // ---- Inline reply form ----
@@ -695,53 +767,6 @@ const CardModal = {
         });
     },
 
-    // Reusable @mention init for any textarea+dropdown pair
-    initMentionAutocompleteOn(textarea, dropdown) {
-        textarea.addEventListener('input', () => {
-            const val = textarea.value;
-            const cursorPos = textarea.selectionStart;
-            const beforeCursor = val.substring(0, cursorPos);
-            const match = beforeCursor.match(/@(\w*)$/);
-
-            if (match) {
-                const query = match[1].toLowerCase();
-                const members = this.boardMembers.filter(m =>
-                    m.display_name.toLowerCase().includes(query)
-                ).slice(0, 6);
-
-                if (members.length > 0) {
-                    dropdown.innerHTML = members.map(m => `
-                        <div class="mention-option" data-name="${App.escapeHtml(m.display_name)}">
-                            ${App.avatarHtml(m.display_name, 'sm')}
-                            <span>${App.escapeHtml(m.display_name)}</span>
-                        </div>
-                    `).join('');
-                    dropdown.style.display = 'block';
-
-                    dropdown.querySelectorAll('.mention-option').forEach(opt => {
-                        opt.addEventListener('mousedown', (e) => {
-                            e.preventDefault();
-                            const name = opt.dataset.name;
-                            const start = beforeCursor.lastIndexOf('@');
-                            textarea.value = val.substring(0, start) + '@' + name + ' ' + val.substring(cursorPos);
-                            textarea.selectionStart = textarea.selectionEnd = start + name.length + 2;
-                            dropdown.style.display = 'none';
-                            textarea.focus();
-                        });
-                    });
-                } else {
-                    dropdown.style.display = 'none';
-                }
-            } else {
-                dropdown.style.display = 'none';
-            }
-        });
-
-        textarea.addEventListener('blur', () => {
-            setTimeout(() => { dropdown.style.display = 'none'; }, 200);
-        });
-    },
-
     // ---- Comments (local DOM updates) ----
     async addComment() {
         const textarea = document.getElementById('newComment');
@@ -803,36 +828,108 @@ const CardModal = {
         if (!comment) return;
 
         const commentEl = document.querySelector(`.comment-item[data-comment-id="${commentId}"] .comment-text`);
-        const originalText = comment.body;
+        if (!commentEl) return;
 
+        const originalText = comment.body;
+        // .is-editing strips the bordered/padded display chrome so the inner
+        // textarea+actions render cleanly without nested borders.
+        commentEl.classList.add('is-editing');
         commentEl.innerHTML = `
-            <textarea class="comment-form-edit" style="width:100%;min-height:60px;padding:8px;border:2px solid var(--color-primary);border-radius:4px;font-size:14px;font-family:var(--font-family);">${App.escapeHtml(originalText)}</textarea>
-            <div style="margin-top:6px;">
+            <div class="comment-edit-wrap">
+                <textarea class="comment-edit-textarea" rows="3"></textarea>
+                <div class="mention-dropdown comment-edit-mention-dropdown" style="display:none;"></div>
+            </div>
+            <div class="comment-edit-actions">
                 <button class="btn btn-primary btn-sm save-edit-comment">Save</button>
                 <button class="btn btn-secondary btn-sm cancel-edit-comment">Cancel</button>
             </div>
         `;
 
-        const editArea = commentEl.querySelector('textarea');
+        const editArea = commentEl.querySelector('.comment-edit-textarea');
+        const dropdown = commentEl.querySelector('.comment-edit-mention-dropdown');
+        editArea.value = originalText;
         editArea.focus();
+        // Place caret at end so the user can keep typing.
+        editArea.selectionStart = editArea.selectionEnd = originalText.length;
+        // Wire @mention autocomplete to this specific textarea + dropdown pair
+        // so adding a new tag mid-edit works.
+        this.initMentionAutocomplete(editArea, dropdown);
+
+        const restoreDisplay = (body) => {
+            commentEl.classList.remove('is-editing');
+            commentEl.innerHTML = this.formatCommentBody(body);
+        };
 
         commentEl.querySelector('.save-edit-comment').addEventListener('click', async () => {
             const newBody = editArea.value.trim();
             if (!newBody) return;
+            if (newBody === originalText) {
+                restoreDisplay(originalText);
+                return;
+            }
             this.suppressSSE();
             try {
                 await App.api('comments.update', { id: commentId, body: newBody });
                 comment.body = newBody;
                 comment.is_edited = true;
-                commentEl.textContent = newBody;
+                restoreDisplay(newBody);
+                // Refresh the "(edited)" timestamp if not already shown.
+                const timeEl = commentEl.closest('.comment-body')?.querySelector('.comment-time');
+                if (timeEl && !timeEl.textContent.includes('(edited)')) {
+                    timeEl.textContent += ' (edited)';
+                }
             } catch (e) {
                 App.showToast(e.message, 'error');
+                restoreDisplay(originalText);
             }
         });
 
         commentEl.querySelector('.cancel-edit-comment').addEventListener('click', () => {
-            commentEl.textContent = originalText;
+            restoreDisplay(originalText);
         });
+    },
+
+    editChecklistItem(itemId, checklistId) {
+        const list = this.currentCard.checklists.find(cl => cl.id === checklistId);
+        const item = list?.items.find(i => i.id === itemId);
+        if (!item) return;
+
+        const itemEl = document.querySelector(`.checklist-item[data-item-id="${itemId}"]`);
+        const contentEl = itemEl?.querySelector('.checklist-item-content');
+        if (!contentEl || contentEl.querySelector('input')) return; // already editing
+
+        const original = item.content;
+        contentEl.innerHTML = `<input type="text" class="cl-item-edit-input" value="${App.escapeHtml(original)}">`;
+        const input = contentEl.querySelector('input');
+        input.focus();
+        input.select();
+
+        let saving = false;
+        const restore = (text) => { contentEl.textContent = text; };
+
+        const save = async () => {
+            if (saving) return;
+            const newContent = input.value.trim();
+            if (!newContent || newContent === original) {
+                restore(original);
+                return;
+            }
+            saving = true;
+            try {
+                await App.api('checklists.update_item', { id: itemId, content: newContent });
+                item.content = newContent;
+                restore(newContent);
+            } catch (e) {
+                App.showToast(e.message, 'error');
+                restore(original);
+            }
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') { e.preventDefault(); saving = true; restore(original); }
+        });
+        input.addEventListener('blur', save);
     },
 
     async deleteComment(commentId) {
@@ -924,6 +1021,9 @@ const CardModal = {
                             <input type="checkbox" data-item-id="${newItem.id}" data-checklist-id="${checklistId}">
                             <span class="checklist-item-content">${App.escapeHtml(content)}</span>
                             <div class="cl-item-meta"></div>
+                            <button class="cl-item-edit-btn" data-item-id="${newItem.id}" data-checklist-id="${checklistId}" title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
                             <button class="cl-item-assign-btn" data-item-id="${newItem.id}" data-checklist-id="${checklistId}" title="Assign / Due date">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a5.5 5.5 0 0 1 11 0v2"/></svg>
                             </button>

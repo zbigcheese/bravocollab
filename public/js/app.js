@@ -3,6 +3,7 @@
  */
 const App = {
     csrfToken: document.querySelector('meta[name="csrf-token"]')?.content || '',
+    userId: parseInt(document.querySelector('meta[name="user-id"]')?.content || '0'),
 
     async api(action, data = {}, method = 'POST') {
         const opts = {

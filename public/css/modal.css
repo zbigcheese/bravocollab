@@ -508,6 +508,40 @@
     outline: none;
 }
 
+/* Inline comment edit: strip the bordered/padded display chrome from the
+   .comment-text wrapper so the edit form doesn't render with nested borders
+   and double padding (which is what BnPOLY4 was showing). */
+.comment-text.is-editing {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    white-space: normal;
+}
+
+.comment-edit-wrap {
+    position: relative;
+}
+
+.comment-edit-textarea {
+    width: 100%;
+    min-height: 70px;
+    padding: 8px 12px;
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-family: var(--font-family);
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.comment-edit-textarea:focus { outline: none; }
+
+.comment-edit-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 6px;
+}
+
 /* Label picker popover */
 .label-picker {
     display: flex;
@@ -673,10 +707,37 @@
 .checklist-item:hover .cl-item-assign-btn { opacity: 1; }
 .cl-item-assign-btn:hover { background: rgba(9,30,66,0.08); color: var(--color-text); }
 
+/* Edit pencil — same hover-to-reveal pattern as the assign button. */
+.cl-item-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-light);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.cl-item-edit-btn svg { display: block; }
+.checklist-item:hover .cl-item-edit-btn { opacity: 1; }
+.cl-item-edit-btn:hover { background: rgba(9,30,66,0.08); color: var(--color-text); }
+
+/* Inline content edit input — replaces the .checklist-item-content text. */
+.cl-item-edit-input {
+    width: 100%;
+    padding: 4px 6px;
+    border: 1px solid var(--color-primary);
+    border-radius: 3px;
+    font-size: 14px;
+    font-family: var(--font-family);
+    box-sizing: border-box;
+}
+
 /* On mobile there's no hover state — keep checklist item controls always
-   visible so users can actually delete or assign items by tapping. */
+   visible so users can actually delete, edit or assign items by tapping. */
 @media (max-width: 768px) {
     .checklist-item .delete-item,
+    .cl-item-edit-btn,
     .cl-item-assign-btn {
         opacity: 1;
     }
@@ -709,6 +770,16 @@
 
 .mention-option:hover {
     background: var(--color-primary-light);
+}
+
+/* Active selection during keyboard nav (or hover that updated the index).
+   Darker than :hover so it reads clearly even when the cursor is elsewhere. */
+.mention-option.selected {
+    background: var(--color-primary);
+    color: #fff;
+}
+.mention-option.selected .avatar {
+    box-shadow: 0 0 0 2px #fff;
 }
 
 .mention-tag {
