@@ -350,16 +350,24 @@ class Mailer
         $boundary = 'bc-' . bin2hex(random_bytes(8));
         $plainBody = self::htmlToText($htmlBody);
 
+        // Quoted-printable encoding both parts. The HTML in particular has
+        // long inline-styled lines that would otherwise blow past exim's
+        // 2048-byte SMTP line-length limit and get rejected at handoff.
+        // QP wraps lines at 76 chars with soft `=\r\n` breaks that the
+        // receiving client unfolds, so the rendered output is unaffected.
+        $plainEncoded = quoted_printable_encode(wordwrap($plainBody, 75, "\n", false));
+        $htmlEncoded  = quoted_printable_encode($htmlBody);
+
         $body =
             "This is a multi-part message in MIME format.\r\n"
             . "--{$boundary}\r\n"
             . "Content-Type: text/plain; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $plainBody . "\r\n\r\n"
+            . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+            . $plainEncoded . "\r\n\r\n"
             . "--{$boundary}\r\n"
             . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $htmlBody . "\r\n\r\n"
+            . "Content-Transfer-Encoding: quoted-printable\r\n\r\n"
+            . $htmlEncoded . "\r\n\r\n"
             . "--{$boundary}--\r\n";
 
         $messageId = '<' . bin2hex(random_bytes(12)) . '.' . time() . '@' . $fromHost . '>';
