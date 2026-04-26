@@ -89,6 +89,83 @@ class Mailer
         return self::send($toEmail, $subject, $body);
     }
 
+    /**
+     * Daily "what's next" overview. $sections is a list of:
+     *   ['label' => 'Today, Apr 26', 'cards' => [...], 'items' => [...]]
+     * Each card row carries id, title, due_date, board_id, board_title.
+     * Each item row carries id, content, due_date, card_id, card_title,
+     * board_id, board_title.
+     */
+    public static function sendWhatsNext(string $toEmail, string $displayName, array $sections): bool
+    {
+        $config  = require __DIR__ . '/../config/config.php';
+        $appName = $config['app_name'];
+        $baseUrl = rtrim($config['base_url'], '/');
+
+        if (empty($sections)) return false;
+
+        $subject = "What's next today — {$appName}";
+
+        $sectionsHtml = '';
+        foreach ($sections as $sec) {
+            $rows = '';
+
+            foreach ($sec['cards'] as $c) {
+                $url = $baseUrl . '/index.php?page=board&id=' . (int) $c['board_id']
+                     . '&card=' . (int) $c['id'];
+                $title      = htmlspecialchars($c['title'], ENT_QUOTES);
+                $boardTitle = htmlspecialchars($c['board_title'], ENT_QUOTES);
+                $rows .= '<li style="margin:8px 0;line-height:1.45;">'
+                       . '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
+                       .   'style="color:#026AA7;text-decoration:none;font-weight:600;">'
+                       .   $title
+                       . '</a>'
+                       . ' <span style="color:#5e6c84;font-size:12px;">— ' . $boardTitle . '</span>'
+                       . '</li>';
+            }
+
+            foreach ($sec['items'] as $it) {
+                $url = $baseUrl . '/index.php?page=board&id=' . (int) $it['board_id']
+                     . '&card=' . (int) $it['card_id'];
+                $content    = htmlspecialchars($it['content'], ENT_QUOTES);
+                $cardTitle  = htmlspecialchars($it['card_title'], ENT_QUOTES);
+                $boardTitle = htmlspecialchars($it['board_title'], ENT_QUOTES);
+                // List-style:none + inline checkbox glyph distinguishes tasks from cards.
+                $rows .= '<li style="margin:8px 0;line-height:1.45;list-style:none;">'
+                       . '<span style="color:#5e6c84;margin-right:6px;font-size:14px;" aria-hidden="true">&#9745;</span>'
+                       . '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
+                       .   'style="color:#026AA7;text-decoration:none;">'
+                       .   $content
+                       . '</a>'
+                       . ' <span style="color:#5e6c84;font-size:12px;">— ' . $cardTitle
+                       .   ' &middot; ' . $boardTitle . '</span>'
+                       . '</li>';
+            }
+
+            $label = htmlspecialchars($sec['label'], ENT_QUOTES);
+            $sectionsHtml .=
+                  '<h3 style="margin:22px 0 6px;color:#172b4d;font-size:15px;'
+                .          'border-bottom:1px solid #dfe1e6;padding-bottom:4px;">'
+                . $label
+                . '</h3>'
+                . '<ul style="padding-left:22px;margin:0;">' . $rows . '</ul>';
+        }
+
+        $greeting = 'Hi ' . htmlspecialchars($displayName, ENT_QUOTES) . ',';
+        $body = self::buildHtml(
+            $appName,
+            "What's next",
+              "<p>{$greeting}</p>"
+            . "<p>Here\u{2019}s what you have coming up:</p>"
+            . $sectionsHtml
+            . '<p style="color:#666;font-size:13px;margin-top:24px;">'
+            .   'Click any item to open it in ' . $appName . '.'
+            . '</p>'
+        );
+
+        return self::send($toEmail, $subject, $body);
+    }
+
     private static function notificationText(string $type, array $data): string
     {
         $actor = htmlspecialchars($data['actor_name'] ?? 'Someone', ENT_QUOTES);

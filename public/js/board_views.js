@@ -63,6 +63,34 @@ const BoardViews = {
         return cards;
     },
 
+    _allDueItems() {
+        return Array.isArray(Board.data?.due_items) ? Board.data.due_items : [];
+    },
+
+    // Style for an inline calendar task entry. Same priority logic as cards:
+    //   completed or on archived card -> dim + strikethrough (no severity)
+    //   overdue -> red + bold
+    //   due today -> orange + bold
+    _calTaskStateCls(item, todayKey) {
+        if (item.is_checked == 1 || item.card_archived == 1) return ' cal-task-done';
+        const dueKey = item.due_date ? item.due_date.substring(0, 10) : '';
+        if (!dueKey) return '';
+        if (dueKey < todayKey) return ' cal-task-overdue';
+        if (dueKey === todayKey) return ' cal-task-today';
+        return '';
+    },
+
+    _renderCalTask(item, todayKey, hidden) {
+        const stateCls = this._calTaskStateCls(item, todayKey);
+        const hiddenCls = hidden ? ' cal-card-hidden' : '';
+        return `
+            <div class="cal-task${stateCls}${hiddenCls}" data-card-id="${item.card_id}" title="${App.escapeHtml(item.content)} — ${App.escapeHtml(item.card_title)}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>${App.escapeHtml(item.content)}</span>
+            </div>
+        `;
+    },
+
     _labelColor(card) {
         return (card.labels && card.labels[0] && card.labels[0].color) ? card.labels[0].color : '#5bc0de';
     },
@@ -126,30 +154,48 @@ const BoardViews = {
         const days = Array.from({ length: 7 }, (_, i) =>
             new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i));
 
-        const byDate = {};
+        const cardsByDate = {};
         for (const card of this._allCards()) {
             if (!card.due_date) continue;
             const k = card.due_date.substring(0, 10);
-            (byDate[k] = byDate[k] || []).push(card);
+            (cardsByDate[k] = cardsByDate[k] || []).push(card);
+        }
+        const itemsByDate = {};
+        for (const item of this._allDueItems()) {
+            const k = item.due_date.substring(0, 10);
+            (itemsByDate[k] = itemsByDate[k] || []).push(item);
         }
         const todayKey = this._dateKey(new Date());
         const title = this._formatWeekRange(ws);
 
         const cellsHtml = days.map(d => {
             const k = this._dateKey(d);
-            const cards = byDate[k] || [];
-            const collapsed = cards.length > 4;
-            const cardsHtml = cards.map((c, i) => {
+            const cards = cardsByDate[k] || [];
+            const items = itemsByDate[k] || [];
+            const total = cards.length + items.length;
+            const collapsed = total > 4;
+            // Cards first, then tasks. The +N more accordion cuts at index 3
+            // across the combined sequence, so items can be hidden too.
+            let entryIdx = 0;
+            const parts = [];
+            for (const c of cards) {
                 const stateCls = this._calCardStateCls(c, todayKey);
-                const hidden = collapsed && i >= 3 ? ' cal-card-hidden' : '';
-                return `
+                const hidden = collapsed && entryIdx >= 3 ? ' cal-card-hidden' : '';
+                parts.push(`
                     <div class="cal-card${stateCls}${hidden}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
                         ${App.escapeHtml(c.title)}
                     </div>
-                `;
-            }).join('');
+                `);
+                entryIdx++;
+            }
+            for (const it of items) {
+                const hidden = collapsed && entryIdx >= 3;
+                parts.push(this._renderCalTask(it, todayKey, hidden));
+                entryIdx++;
+            }
+            const cardsHtml = parts.join('');
             const toggle = collapsed
-                ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
+                ? `<button type="button" class="cal-toggle" data-hidden-count="${total - 3}">+ ${total - 3} more</button>`
                 : '';
             const weekdayShort = d.toLocaleDateString(undefined, { weekday: 'short' });
             return `
@@ -186,7 +232,7 @@ const BoardViews = {
             this.calendarWeekStart = this._startOfWeek(new Date());
             this._renderCalendarWeek();
         });
-        pane.querySelectorAll('.cal-card').forEach(el => {
+        pane.querySelectorAll('.cal-card, .cal-task').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
         });
         pane.querySelectorAll('.cal-toggle').forEach(btn => {
@@ -234,12 +280,17 @@ const BoardViews = {
             cells.push({ date: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1), outside: true });
         }
 
-        // Index cards by yyyy-mm-dd of due_date
-        const byDate = {};
+        // Index cards and due-dated checklist items by yyyy-mm-dd.
+        const cardsByDate = {};
         for (const card of this._allCards()) {
             if (!card.due_date) continue;
             const k = card.due_date.substring(0, 10);
-            (byDate[k] = byDate[k] || []).push(card);
+            (cardsByDate[k] = cardsByDate[k] || []).push(card);
+        }
+        const itemsByDate = {};
+        for (const item of this._allDueItems()) {
+            const k = item.due_date.substring(0, 10);
+            (itemsByDate[k] = itemsByDate[k] || []).push(item);
         }
 
         const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -256,21 +307,32 @@ const BoardViews = {
                 ${dayNames.map(n => `<div class="cal-head">${n}</div>`).join('')}
                 ${cells.map(cell => {
                     const k = this._dateKey(cell.date);
-                    const cards = byDate[k] || [];
-                    // Accordion: when more than 4 cards, show only 3 by default and
-                    // reveal the rest behind a "+ N more" toggle.
-                    const collapsed = cards.length > 4;
-                    const cardsHtml = cards.map((c, i) => {
+                    const cards = cardsByDate[k] || [];
+                    const items = itemsByDate[k] || [];
+                    const total = cards.length + items.length;
+                    // Accordion: when more than 4 entries, show only 3 by default and
+                    // reveal the rest behind a "+ N more" toggle. Cards then tasks.
+                    const collapsed = total > 4;
+                    let entryIdx = 0;
+                    const parts = [];
+                    for (const c of cards) {
                         const stateCls = this._calCardStateCls(c, todayKey);
-                        const hidden = collapsed && i >= 3 ? ' cal-card-hidden' : '';
-                        return `
+                        const hidden = collapsed && entryIdx >= 3 ? ' cal-card-hidden' : '';
+                        parts.push(`
                             <div class="cal-card${stateCls}${hidden}" data-card-id="${c.id}" style="border-left-color:${this._labelColor(c)}" title="${App.escapeHtml(c.title)}">
                                 ${App.escapeHtml(c.title)}
                             </div>
-                        `;
-                    }).join('');
+                        `);
+                        entryIdx++;
+                    }
+                    for (const it of items) {
+                        const hidden = collapsed && entryIdx >= 3;
+                        parts.push(this._renderCalTask(it, todayKey, hidden));
+                        entryIdx++;
+                    }
+                    const cardsHtml = parts.join('');
                     const toggle = collapsed
-                        ? `<button type="button" class="cal-toggle" data-hidden-count="${cards.length - 3}">+ ${cards.length - 3} more</button>`
+                        ? `<button type="button" class="cal-toggle" data-hidden-count="${total - 3}">+ ${total - 3} more</button>`
                         : '';
                     const weekdayShort = cell.date.toLocaleDateString(undefined, { weekday: 'short' });
                     return `
@@ -300,7 +362,7 @@ const BoardViews = {
             this.calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             this.renderCalendar();
         });
-        pane.querySelectorAll('.cal-card').forEach(el => {
+        pane.querySelectorAll('.cal-card, .cal-task').forEach(el => {
             el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
         });
         pane.querySelectorAll('.cal-toggle').forEach(btn => {

@@ -106,9 +106,29 @@ class Board extends Model
             ['board_id' => $boardId]
         )->fetchAll();
 
-        $board['lists'] = $lists;
-        $board['members'] = $members;
-        $board['labels'] = $labels;
+        // Due-dated checklist items across the whole board. Calendar view
+        // renders these alongside cards; we surface card_archived so the
+        // client can dim items belonging to archived cards. Includes items
+        // on archived cards on purpose so they show with strikethrough
+        // styling rather than vanishing silently.
+        $dueItems = $this->query(
+            'SELECT ci.id, ci.checklist_id, ci.content, ci.is_checked, ci.due_date,
+                    ci.assigned_to, ua.display_name AS assigned_to_name,
+                    ch.card_id, c.is_archived AS card_archived, c.title AS card_title
+             FROM checklist_items ci
+             JOIN checklists ch ON ci.checklist_id = ch.id
+             JOIN cards c       ON ch.card_id = c.id
+             JOIN lists l       ON c.list_id  = l.id
+             LEFT JOIN users ua ON ci.assigned_to = ua.id
+             WHERE l.board_id = :board_id AND ci.due_date IS NOT NULL
+             ORDER BY ci.due_date ASC',
+            ['board_id' => $boardId]
+        )->fetchAll();
+
+        $board['lists']     = $lists;
+        $board['members']   = $members;
+        $board['labels']    = $labels;
+        $board['due_items'] = $dueItems;
 
         return $board;
     }

@@ -308,6 +308,17 @@ CREATE TABLE IF NOT EXISTS `cron_runs` (
     INDEX `idx_started_at` (`started_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Per-user dedupe for the daily 8am CET "what's next" digest. The composite PK
+-- enforces "at most one row per (user, date)" so concurrent cron runs can't
+-- send the email twice. Date is stored in CET to match the email's perspective.
+CREATE TABLE IF NOT EXISTS `whats_next_sent` (
+    `user_id`   INT UNSIGNED NOT NULL,
+    `sent_date` DATE NOT NULL,
+    `sent_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`user_id`, `sent_date`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 -- SSE EVENTS QUEUE
 -- ============================================================

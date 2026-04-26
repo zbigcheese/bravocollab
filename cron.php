@@ -24,6 +24,19 @@ require_once __DIR__ . '/core/Mailer.php';
 
 $db = Database::get();
 
+// Self-heal: ensure the whats_next_sent table exists for the daily 8am CET
+// digest. Idempotent; lets fresh `git pull` deployments run without a manual
+// schema migration step.
+$db->exec(
+    "CREATE TABLE IF NOT EXISTS `whats_next_sent` (
+        `user_id`   INT UNSIGNED NOT NULL,
+        `sent_date` DATE NOT NULL,
+        `sent_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`user_id`, `sent_date`),
+        FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+);
+
 // Log the start of this cron run; status will be updated at the end.
 $db->exec("INSERT INTO cron_runs (started_at, status) VALUES (NOW(), 'running')");
 $cronRunId = (int) $db->lastInsertId();
@@ -144,6 +157,141 @@ foreach ($digestUsers as $uid) {
     }
 }
 echo "Sent {$digestSent} notification digest emails.\n";
+
+// 6. Daily "What's next" overview at 8am CET, one per user per day.
+//    Triggers only when the user has at least one assignment (card or task)
+//    due today / tomorrow / day-after-tomorrow. Email body covers an 8-day
+//    window: today + next 7 days. Cron fires every 15min so during the
+//    08:00–08:59 CET hour we get up to 4 retry attempts; INSERT IGNORE on
+//    (user_id, sent_date) prevents duplicate sends.
+$cetTz   = new DateTimeZone('Europe/Belgrade');
+$cetNow  = new DateTime('now', $cetTz);
+$cetHour = (int) $cetNow->format('G');
+$cetDate = $cetNow->format('Y-m-d');
+$wnSent  = 0;
+
+if ($cetHour === 8) {
+    // Build the 8-day date window in CET (today=index 0, +7=index 7).
+    $window = [];
+    for ($i = 0; $i < 8; $i++) {
+        $d = (clone $cetNow)->setTime(0, 0, 0)->modify("+{$i} day");
+        $window[] = $d->format('Y-m-d');
+    }
+    $nearTermDates = [$window[0], $window[1], $window[2]]; // today, tomorrow, day after
+
+    $users = $db->query(
+        'SELECT id, email, display_name FROM users WHERE is_active = 1'
+    )->fetchAll();
+
+    $cardsStmt = $db->prepare(
+        'SELECT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
+         FROM cards c
+         JOIN card_assignments ca ON ca.card_id = c.id
+         JOIN lists l ON c.list_id = l.id
+         JOIN boards b ON b.id = l.board_id
+         WHERE ca.user_id = :uid
+           AND c.is_archived = 0
+           AND c.due_complete = 0
+           AND b.is_archived = 0
+           AND DATE(c.due_date) BETWEEN :start AND :end
+         ORDER BY c.due_date ASC'
+    );
+
+    $itemsStmt = $db->prepare(
+        'SELECT ci.id, ci.content, ci.due_date, ch.card_id,
+                c.title AS card_title, l.board_id, b.title AS board_title
+         FROM checklist_items ci
+         JOIN checklists ch ON ci.checklist_id = ch.id
+         JOIN cards c ON ch.card_id = c.id
+         JOIN lists l ON c.list_id = l.id
+         JOIN boards b ON b.id = l.board_id
+         WHERE ci.assigned_to = :uid
+           AND ci.is_checked = 0
+           AND c.is_archived = 0
+           AND b.is_archived = 0
+           AND ci.due_date BETWEEN :start AND :end
+         ORDER BY ci.due_date ASC'
+    );
+
+    $alreadySent = $db->prepare(
+        'SELECT 1 FROM whats_next_sent WHERE user_id = :uid AND sent_date = :sd'
+    );
+    $markSent = $db->prepare(
+        'INSERT IGNORE INTO whats_next_sent (user_id, sent_date) VALUES (:uid, :sd)'
+    );
+
+    foreach ($users as $user) {
+        $uid = (int) $user['id'];
+
+        $alreadySent->execute(['uid' => $uid, 'sd' => $cetDate]);
+        if ($alreadySent->fetch()) continue;
+
+        $cardsStmt->execute([
+            'uid'   => $uid,
+            'start' => $window[0],
+            'end'   => $window[7],
+        ]);
+        $cards = $cardsStmt->fetchAll();
+
+        $itemsStmt->execute([
+            'uid'   => $uid,
+            'start' => $window[0],
+            'end'   => $window[7],
+        ]);
+        $items = $itemsStmt->fetchAll();
+
+        // Trigger guard: must have something within today / tomorrow / day-after.
+        $hasNearTerm = false;
+        foreach ($cards as $c) {
+            if (in_array(substr($c['due_date'], 0, 10), $nearTermDates, true)) {
+                $hasNearTerm = true; break;
+            }
+        }
+        if (!$hasNearTerm) {
+            foreach ($items as $it) {
+                if (in_array($it['due_date'], $nearTermDates, true)) {
+                    $hasNearTerm = true; break;
+                }
+            }
+        }
+        if (!$hasNearTerm) continue;
+
+        // Bucket cards/items by date for the 8-day window. Empty buckets are
+        // skipped in the email so we don't render headings with no entries.
+        $sections = [];
+        for ($i = 0; $i < 8; $i++) {
+            $dateStr = $window[$i];
+            $dayCards = array_values(array_filter(
+                $cards,
+                fn($c) => substr($c['due_date'], 0, 10) === $dateStr
+            ));
+            $dayItems = array_values(array_filter(
+                $items,
+                fn($it) => $it['due_date'] === $dateStr
+            ));
+            if (empty($dayCards) && empty($dayItems)) continue;
+
+            $d = new DateTime($dateStr, $cetTz);
+            $formatted = $d->format('M j');
+            if     ($i === 0) $label = "Today, {$formatted}";
+            elseif ($i === 1) $label = "Tomorrow, {$formatted}";
+            else              $label = $formatted;
+
+            $sections[] = [
+                'label' => $label,
+                'cards' => $dayCards,
+                'items' => $dayItems,
+            ];
+        }
+        if (empty($sections)) continue;
+
+        if (Mailer::sendWhatsNext($user['email'], $user['display_name'], $sections)) {
+            $markSent->execute(['uid' => $uid, 'sd' => $cetDate]);
+            $wnSent++;
+        }
+    }
+}
+echo "Sent {$wnSent} 'what's next' digest emails.\n";
 
 echo "Cron job complete.\n";
 
