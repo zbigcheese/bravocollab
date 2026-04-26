@@ -43,6 +43,27 @@ class Board extends Model
      */
     public function ensurePersonalBoard(int $userId): int
     {
+        // Self-heal: add the is_personal column on first call if a manual
+        // schema migration hasn't been run yet. ALTERs are guarded by a
+        // static flag (per-process) so we only attempt them once per request,
+        // and the catch swallows the duplicate-column error (MySQL 1060) on
+        // already-migrated databases.
+        static $schemaChecked = false;
+        if (!$schemaChecked) {
+            $db0 = Database::get();
+            try {
+                $db0->exec(
+                    "ALTER TABLE `boards` ADD COLUMN `is_personal` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_archived`"
+                );
+            } catch (PDOException $e) { /* already present — fine */ }
+            try {
+                $db0->exec(
+                    "ALTER TABLE `boards` ADD INDEX `idx_personal` (`created_by`, `is_personal`)"
+                );
+            } catch (PDOException $e) { /* already present — fine */ }
+            $schemaChecked = true;
+        }
+
         $stmt = $this->query(
             'SELECT id FROM boards WHERE created_by = :uid AND is_personal = 1 LIMIT 1',
             ['uid' => $userId]

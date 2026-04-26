@@ -53,9 +53,16 @@ if (Auth::isLoggedIn() && ($page === 'login' || $page === '')) {
 
 // Self-heal: every authenticated page load makes sure the current user has
 // their personal board. Idempotent (a single SELECT when one already exists).
+// Wrapped so a failure here can never block the rest of the page from
+// rendering — at worst the personal board appears on the next reload.
 if (Auth::isLoggedIn()) {
-    require_once __DIR__ . '/models/Board.php';
-    (new Board())->ensurePersonalBoard(Auth::userId());
+    try {
+        require_once __DIR__ . '/core/Model.php';
+        require_once __DIR__ . '/models/Board.php';
+        (new Board())->ensurePersonalBoard(Auth::userId());
+    } catch (Throwable $e) {
+        error_log('ensurePersonalBoard failed: ' . $e->getMessage());
+    }
 }
 
 // Page routing
