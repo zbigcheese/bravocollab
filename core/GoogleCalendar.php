@@ -104,6 +104,11 @@ class GoogleCalendar
             'access_type'   => 'offline',
             'prompt'        => 'consent', // always re-issue refresh_token
             'state'         => $state,
+            // form_post asks Google to POST the response to redirect_uri
+            // instead of redirecting with query params. Sidesteps host WAFs
+            // that reject URLs containing literal "https://" in query values
+            // (the iss= and scope= params Google normally sends back).
+            'response_mode' => 'form_post',
         ];
         return self::AUTH_URL . '?' . http_build_query($params);
     }
