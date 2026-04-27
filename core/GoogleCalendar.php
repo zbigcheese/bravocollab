@@ -104,11 +104,13 @@ class GoogleCalendar
             'access_type'   => 'offline',
             'prompt'        => 'consent', // always re-issue refresh_token
             'state'         => $state,
-            // form_post asks Google to POST the response to redirect_uri
-            // instead of redirecting with query params. Sidesteps host WAFs
-            // that reject URLs containing literal "https://" in query values
-            // (the iss= and scope= params Google normally sends back).
-            'response_mode' => 'form_post',
+            // fragment mode puts the response params in the URL hash, which
+            // browsers never transmit to the server. Server only sees the
+            // clean redirect_uri — no query, no body. Sidesteps WAFs that
+            // reject "https://" anywhere in the request, on either query
+            // or POST body. JS on the callback page then extracts the hash
+            // and POSTs the data (base64-encoded) to our finish endpoint.
+            'response_mode' => 'fragment',
         ];
         return self::AUTH_URL . '?' . http_build_query($params);
     }

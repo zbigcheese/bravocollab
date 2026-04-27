@@ -34,6 +34,52 @@ class GoogleCalendarController extends Controller
         }
     }
 
+    /**
+     * JS handoff endpoint. The OAuth callback page reads code+state from the
+     * URL fragment, base64-encodes a JSON object {code, state}, and POSTs
+     * here. Encoding keeps "https://" out of the request body so the host's
+     * WAF doesn't reject it.
+     */
+    public function oauthFinish(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $payload = (string) ($data['payload'] ?? '');
+        if ($payload === '') {
+            $this->json(['error' => 'Missing payload'], 400);
+            return;
+        }
+
+        $decoded = base64_decode($payload, true);
+        if ($decoded === false) {
+            $this->json(['error' => 'Invalid base64 payload'], 400);
+            return;
+        }
+        $parsed = json_decode($decoded, true);
+        if (!is_array($parsed)) {
+            $this->json(['error' => 'Invalid JSON payload'], 400);
+            return;
+        }
+
+        $code  = (string) ($parsed['code']  ?? '');
+        $state = (string) ($parsed['state'] ?? '');
+        if ($code === '' || $state === '') {
+            $this->json(['error' => 'Missing code or state'], 400);
+            return;
+        }
+
+        try {
+            GoogleCalendar::handleCallback(Auth::userId(), $code, $state);
+            $this->json(['success' => true]);
+        } catch (Throwable $e) {
+            error_log('Google oauthFinish failed: ' . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function syncNow(): void
     {
         $this->requireAuth();

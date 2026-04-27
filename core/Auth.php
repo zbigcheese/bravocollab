@@ -58,7 +58,12 @@ class Auth
             'path'     => '/',
             'secure'   => isset($_SERVER['HTTPS']),
             'httponly' => true,
-            'samesite' => 'Strict',
+            // Lax (not Strict) so the cookie is included on top-level
+            // cross-site GET navigations — required for OAuth callbacks
+            // returning from accounts.google.com. Lax still blocks all
+            // cross-site POSTs and sub-resource requests, so the CSRF
+            // posture is essentially unchanged.
+            'samesite' => 'Lax',
         ]);
         session_start();
 
