@@ -111,6 +111,28 @@ class UserController extends Controller
         ]);
     }
 
+    public function preferences(): void
+    {
+        $this->requireAuth();
+        $this->requireGet();
+        require_once __DIR__ . '/../core/UserPreferences.php';
+        $this->json(['preferences' => UserPreferences::get(Auth::userId())]);
+    }
+
+    public function updatePreferences(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        require_once __DIR__ . '/../core/UserPreferences.php';
+        $data = $this->getJSON();
+        // Whitelist by passing the data directly — UserPreferences::update
+        // only honours known keys, so unrelated payload fields are ignored.
+        $next = UserPreferences::update(Auth::userId(), $data);
+        $this->json(['success' => true, 'preferences' => $next]);
+    }
+
     public function list(): void
     {
         $this->requireAuth();

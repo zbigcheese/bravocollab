@@ -52,9 +52,9 @@ if (Auth::isLoggedIn() && ($page === 'login' || $page === '')) {
 }
 
 // Self-heal: every authenticated page load makes sure the current user has
-// their personal board. Idempotent (a single SELECT when one already exists).
-// Wrapped so a failure here can never block the rest of the page from
-// rendering — at worst the personal board appears on the next reload.
+// their personal board AND that the user_preferences table exists (queries
+// in CommentController / Mailer / GoogleCalendar all reference it).
+// Idempotent and wrapped so a failure here can never block the page.
 if (Auth::isLoggedIn()) {
     try {
         require_once __DIR__ . '/core/Model.php';
@@ -62,6 +62,12 @@ if (Auth::isLoggedIn()) {
         (new Board())->ensurePersonalBoard(Auth::userId());
     } catch (Throwable $e) {
         error_log('ensurePersonalBoard failed: ' . $e->getMessage());
+    }
+    try {
+        require_once __DIR__ . '/core/UserPreferences.php';
+        UserPreferences::ensureSchema();
+    } catch (Throwable $e) {
+        error_log('UserPreferences ensureSchema failed: ' . $e->getMessage());
     }
 }
 
@@ -73,8 +79,9 @@ $pageMap = [
     'reset_password'    => 'auth/reset_password.php',
     'dashboard'         => 'dashboard/index.php',
     'board'             => 'board/view.php',
-    'admin_users'       => 'admin/users.php',
-    'settings_calendar' => 'settings/calendar.php',
+    'admin_users'         => 'admin/users.php',
+    'settings_preferences' => 'settings/preferences.php',
+    'settings_calendar'   => 'settings/calendar.php',
     'google_connect'    => 'google/connect.php',
     'google_callback'   => 'google/callback.php',
 ];

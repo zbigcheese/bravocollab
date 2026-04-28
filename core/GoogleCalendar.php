@@ -326,12 +326,23 @@ class GoogleCalendar
                 JOIN boards b ON b.id = l.board_id
                 WHERE c.id = :cid_b AND b.is_personal = 1
                 UNION
+                -- Coordinator (only if they opted in via user_preferences).
+                SELECT c.coordinator_id AS user_id
+                FROM cards c
+                LEFT JOIN user_preferences up ON up.user_id = c.coordinator_id
+                WHERE c.id = :cid_co
+                  AND c.coordinator_id IS NOT NULL
+                  AND COALESCE(up.notify_coordinator_cards, 0) = 1
+                UNION
                 SELECT user_id FROM google_calendar_events
                 WHERE entity_type = "card" AND entity_id = :cid_e
              ) u
              JOIN google_calendar_accounts gca ON gca.user_id = u.user_id'
         );
-        $stmt->execute(['cid_a' => $cardId, 'cid_b' => $cardId, 'cid_e' => $cardId]);
+        $stmt->execute([
+            'cid_a' => $cardId, 'cid_b' => $cardId,
+            'cid_co' => $cardId, 'cid_e' => $cardId,
+        ]);
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
             try {
                 self::syncEntityForUser((int) $uid, 'card', $cardId);
@@ -467,17 +478,21 @@ class GoogleCalendar
                  JOIN lists l ON c.list_id = l.id
                  JOIN boards b ON b.id = l.board_id
                  LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+                 LEFT JOIN user_preferences up ON up.user_id = :uid_pref
                  WHERE c.id = :cid
                    AND c.due_date IS NOT NULL
                    AND c.is_archived = 0
                    AND b.is_archived = 0
                    AND (ca.user_id = :uid_a2
-                        OR (b.is_personal = 1 AND b.created_by = :uid_p))
+                        OR (b.is_personal = 1 AND b.created_by = :uid_p)
+                        OR (c.coordinator_id = :uid_co
+                            AND COALESCE(up.notify_coordinator_cards, 0) = 1))
                  LIMIT 1"
             );
             $stmt->execute([
                 'cid' => $entityId, 'uid_a' => $userId,
                 'uid_a2' => $userId, 'uid_p' => $userId,
+                'uid_co' => $userId, 'uid_pref' => $userId,
             ]);
             $r = $stmt->fetch();
             if (!$r) return null;
@@ -538,9 +553,9 @@ class GoogleCalendar
         $db = Database::get();
         $out = [];
 
-        // Cards: assigned OR on user's personal board, with a due_date.
-        // Archived cards drop out (event removed from calendar). Completed
-        // cards stay but get STATUS=cancelled.
+        // Cards: assigned OR personal-board OR coordinator-with-opt-in,
+        // with a due_date. Archived cards drop out; completed cards stay
+        // but get STATUS=cancelled.
         $cardStmt = $db->prepare(
             "SELECT DISTINCT c.id, c.title, c.description, c.due_date,
                     c.due_complete, c.is_archived, l.board_id, b.title AS board_title
@@ -548,13 +563,19 @@ class GoogleCalendar
              JOIN lists l ON c.list_id = l.id
              JOIN boards b ON b.id = l.board_id
              LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+             LEFT JOIN user_preferences up ON up.user_id = :uid_pref
              WHERE c.due_date IS NOT NULL
                AND c.is_archived = 0
                AND b.is_archived = 0
                AND (ca.user_id = :uid_a2
-                    OR (b.is_personal = 1 AND b.created_by = :uid_p))"
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p)
+                    OR (c.coordinator_id = :uid_co
+                        AND COALESCE(up.notify_coordinator_cards, 0) = 1))"
         );
-        $cardStmt->execute(['uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId]);
+        $cardStmt->execute([
+            'uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId,
+            'uid_co' => $userId, 'uid_pref' => $userId,
+        ]);
         foreach ($cardStmt->fetchAll() as $r) {
             $out[] = [
                 'entity_type'  => 'card',

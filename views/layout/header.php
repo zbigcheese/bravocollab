@@ -86,6 +86,7 @@ $_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isC
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
+                    <a href="index.php?page=settings_preferences" class="user-menu-link">Settings</a>
                     <?php if (Auth::isAdmin()): ?>
                     <a href="index.php?page=admin_users" class="user-menu-link">Manage users</a>
                     <?php endif; ?>

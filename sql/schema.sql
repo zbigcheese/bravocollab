@@ -310,6 +310,19 @@ CREATE TABLE IF NOT EXISTS `cron_runs` (
     INDEX `idx_started_at` (`started_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Per-user opt-in/out preferences for notifications, the daily recap, and
+-- coordinator-relevant events. Absence of a row is treated as "all defaults"
+-- (notify_coordinator_cards = 0, both email toggles = 1) so existing users
+-- don't have to opt in to email behaviour they've always had.
+CREATE TABLE IF NOT EXISTS `user_preferences` (
+    `user_id`                  INT UNSIGNED PRIMARY KEY,
+    `notify_coordinator_cards` TINYINT(1) NOT NULL DEFAULT 0,
+    `email_notifications`      TINYINT(1) NOT NULL DEFAULT 1,
+    `daily_recap_email`        TINYINT(1) NOT NULL DEFAULT 1,
+    `updated_at`               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Per-user dedupe for the daily 8am CET "what's next" digest. The composite PK
 -- enforces "at most one row per (user, date)" so concurrent cron runs can't
 -- send the email twice. Date is stored in CET to match the email's perspective.

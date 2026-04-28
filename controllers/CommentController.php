@@ -44,14 +44,23 @@ class CommentController extends Controller
            ->execute(['card_id' => $cardId, 'user_id' => Auth::userId(), 'parent_id' => $parentId, 'body' => $body]);
         $commentId = (int) $db->lastInsertId();
 
-        // Notify card assignees + watchers (union; createNotification skips the actor).
-        // Distinct placeholder names — emulated PDO prepares disallow reusing the same name.
+        // Notify card assignees + watchers + the coordinator (only if they
+        // opted in via user_preferences.notify_coordinator_cards). The actor
+        // is filtered out by createNotification, so self-comments don't
+        // notify yourself.
         $recipients = $db->prepare(
             'SELECT user_id FROM card_assignments WHERE card_id = :cid_a
              UNION
-             SELECT user_id FROM card_watchers WHERE card_id = :cid_w'
+             SELECT user_id FROM card_watchers WHERE card_id = :cid_w
+             UNION
+             SELECT c.coordinator_id AS user_id
+             FROM cards c
+             LEFT JOIN user_preferences up ON up.user_id = c.coordinator_id
+             WHERE c.id = :cid_c
+               AND c.coordinator_id IS NOT NULL
+               AND COALESCE(up.notify_coordinator_cards, 0) = 1'
         );
-        $recipients->execute(['cid_a' => $cardId, 'cid_w' => $cardId]);
+        $recipients->execute(['cid_a' => $cardId, 'cid_w' => $cardId, 'cid_c' => $cardId]);
 
         $stmt = $db->prepare('SELECT title FROM cards WHERE id = :id');
         $stmt->execute(['id' => $cardId]);

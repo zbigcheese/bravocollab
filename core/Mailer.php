@@ -106,19 +106,20 @@ class Mailer
             $window[] = $d->format('Y-m-d');
         }
 
-        // Cards: include both assignment-based picks AND everything in the
-        // user's personal board (no assignments exist there). LEFT JOIN +
-        // OR keeps the query single-pass; DISTINCT guards against the rare
-        // case where a personal-board card is also assigned (it can't be
-        // through the UI today, but the SQL is defensive).
+        // Cards: assignment OR personal-board OR coordinator-with-opt-in.
+        // The coordinator branch is gated on user_preferences.notify_coordinator_cards,
+        // so coordinators who haven't opted in are excluded from the recap.
         $cardsStmt = $db->prepare(
             'SELECT DISTINCT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
              FROM cards c
              JOIN lists l ON c.list_id = l.id
              JOIN boards b ON b.id = l.board_id
              LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+             LEFT JOIN user_preferences up ON up.user_id = :uid_pref
              WHERE (ca.user_id = :uid_a2
-                    OR (b.is_personal = 1 AND b.created_by = :uid_p))
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p)
+                    OR (c.coordinator_id = :uid_co
+                        AND COALESCE(up.notify_coordinator_cards, 0) = 1))
                AND c.is_archived = 0
                AND c.due_complete = 0
                AND b.is_archived = 0
@@ -127,6 +128,7 @@ class Mailer
         );
         $cardsStmt->execute([
             'uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId,
+            'uid_co' => $userId, 'uid_pref' => $userId,
             'start' => $window[0], 'end' => $window[7],
         ]);
         $cards = $cardsStmt->fetchAll();

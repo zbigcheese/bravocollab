@@ -24,6 +24,12 @@ require_once __DIR__ . '/core/Mailer.php';
 
 $db = Database::get();
 
+// Self-heal: ensure the user_preferences table exists. The notification /
+// digest / recap queries below all reference it, so the cron must be safe
+// to run on a deployment that hasn't applied the schema migration yet.
+require_once __DIR__ . '/core/UserPreferences.php';
+UserPreferences::ensureSchema();
+
 // Self-heal: ensure the whats_next_sent table exists for the daily 8am CET
 // digest. Idempotent; lets fresh `git pull` deployments run without a manual
 // schema migration step.
@@ -96,14 +102,21 @@ $notifStmt = $db->prepare(
 
 $count = 0;
 foreach ($dueSoonCards as $card) {
-    // Notify assignees + watchers (union).
+    // Notify assignees + watchers + opted-in coordinators (union).
     // Distinct placeholder names — emulated PDO prepares disallow reusing the same name.
     $recipients = $db->prepare(
         'SELECT user_id FROM card_assignments WHERE card_id = :cid_a
          UNION
-         SELECT user_id FROM card_watchers WHERE card_id = :cid_w'
+         SELECT user_id FROM card_watchers WHERE card_id = :cid_w
+         UNION
+         SELECT c.coordinator_id AS user_id
+         FROM cards c
+         LEFT JOIN user_preferences up ON up.user_id = c.coordinator_id
+         WHERE c.id = :cid_c
+           AND c.coordinator_id IS NOT NULL
+           AND COALESCE(up.notify_coordinator_cards, 0) = 1'
     );
-    $recipients->execute(['cid_a' => $card['id'], 'cid_w' => $card['id']]);
+    $recipients->execute(['cid_a' => $card['id'], 'cid_w' => $card['id'], 'cid_c' => $card['id']]);
 
     foreach ($recipients->fetchAll() as $r) {
         $notifStmt->execute([
@@ -123,12 +136,16 @@ echo "Sent {$count} due-date reminder notifications.\n";
 
 // 5. Email digest for users whose oldest unread, not-yet-emailed notification is >= 1 hour old.
 //    When a user qualifies, we send ALL currently-unread, not-yet-emailed notifications in one email.
+//    Users who turned off email_notifications in their preferences are excluded — their
+//    notifications still pile up in-app, just not in email form.
 $digestUsers = $db->query(
-    "SELECT user_id
-     FROM notifications
-     WHERE is_read = 0 AND emailed_at IS NULL
-     GROUP BY user_id
-     HAVING MIN(created_at) <= DATE_SUB(NOW(), INTERVAL 1 HOUR)"
+    "SELECT n.user_id
+     FROM notifications n
+     LEFT JOIN user_preferences up ON up.user_id = n.user_id
+     WHERE n.is_read = 0 AND n.emailed_at IS NULL
+       AND COALESCE(up.email_notifications, 1) = 1
+     GROUP BY n.user_id
+     HAVING MIN(n.created_at) <= DATE_SUB(NOW(), INTERVAL 1 HOUR)"
 )->fetchAll(PDO::FETCH_COLUMN);
 
 $digestSent = 0;
@@ -177,8 +194,14 @@ if ($cetHour === 8) {
         $nearTermDates[] = (clone $cetNow)->setTime(0, 0, 0)->modify("+{$i} day")->format('Y-m-d');
     }
 
+    // Skip users who turned off the daily recap. COALESCE keeps users
+    // without a preferences row on the default (on).
     $users = $db->query(
-        'SELECT id, email, display_name FROM users WHERE is_active = 1'
+        'SELECT u.id, u.email, u.display_name
+         FROM users u
+         LEFT JOIN user_preferences up ON up.user_id = u.id
+         WHERE u.is_active = 1
+           AND COALESCE(up.daily_recap_email, 1) = 1'
     )->fetchAll();
 
     $alreadySent = $db->prepare(
