@@ -14,6 +14,8 @@ $prefs = UserPreferences::get(Auth::userId());
             Saved.
         </div>
 
+        <h2 class="settings-section-heading">Notification preferences</h2>
+
         <div class="pref-row">
             <div class="pref-row-text">
                 <div class="pref-row-title">Turn on notifications for cards I am the coordinator on</div>
@@ -67,6 +69,15 @@ $prefs = UserPreferences::get(Auth::userId());
 .settings-card h1 { margin: 0 0 12px; font-size: 22px; color: #172b4d; }
 .settings-lede { color: #5e6c84; line-height: 1.5; margin: 0 0 18px; }
 .settings-flash { padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.5; background: #E3FCEF; color: #006644; }
+
+.settings-section-heading {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #5e6c84;
+    margin: 18px 0 4px;
+    font-weight: 700;
+}
 
 .pref-row {
     display: flex; align-items: flex-start; gap: 18px;
