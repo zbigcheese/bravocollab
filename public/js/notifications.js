@@ -141,6 +141,8 @@ const Notifications = {
                 return `<strong>${actor}</strong> commented on <strong>${card}</strong>`;
             case 'comment_mention':
                 return `<strong>${actor}</strong> mentioned you in <strong>${card}</strong>`;
+            case 'comment_reply':
+                return `<strong>${actor}</strong> replied to your comment on <strong>${card}</strong>`;
             case 'due_soon':
                 return `<strong>${card}</strong> is due soon`;
             case 'due_overdue':
@@ -159,6 +161,7 @@ const Notifications = {
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0079BF" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>';
             case 'comment_added':
             case 'comment_mention':
+            case 'comment_reply':
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0079BF" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
             case 'due_soon':
             case 'due_overdue':
