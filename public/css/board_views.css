@@ -81,19 +81,16 @@
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    /* minmax(110px, auto) lets each row grow to fit the tallest cell on
-       dense days while enforcing a visual minimum on light days. Plain
-       `auto` would still grow but can flatten when no cell exceeds its
-       intrinsic content size. */
-    grid-auto-rows: minmax(110px, auto);
+    /* Use max-content as the upper bound so a cell with many entries
+       drives the row height without ambiguity. minmax(min, max-content)
+       resolves more deterministically than minmax(min, auto) when there
+       are flex children inside the cells. */
+    grid-auto-rows: minmax(110px, max-content);
     align-items: stretch;
     background: var(--color-border);
     border: 1px solid var(--color-border);
     border-radius: 6px;
-    /* overflow: hidden only clips the rounded-corner area of the grid;
-       it does NOT prevent rows from growing — the grid's own height
-       expands with content. Kept for the rounded-corner look. */
-    overflow: hidden;
+    overflow: hidden;       /* clips rounded corners only; vertical growth is unaffected */
     gap: 1px;
 }
 
@@ -145,7 +142,16 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
+    /* Don't allow the entries container to be compressed by an outer flex
+       parent — it must report its full intrinsic height to the grid row. */
+    min-height: 0;
+    flex-shrink: 0;
 }
+
+/* Each entry inside the cell — card or task — must keep its natural
+   height so they stack predictably and the cell tells the grid the
+   right size. Without flex-shrink:0 they can collapse on dense days. */
+.cal-cards > * { flex-shrink: 0; }
 
 .cal-card {
     background: #f4f5f7;
