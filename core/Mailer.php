@@ -157,7 +157,67 @@ class Mailer
         ]);
         $items = $itemsStmt->fetchAll();
 
+        // Overdue: cards / items whose due_date is strictly before today
+        // (CET) and that aren't completed or archived. Same user-relationship
+        // filters as the in-window queries: assignee, personal board, or
+        // opted-in coordinator. Surfaced as a single section at the top of
+        // the email so they don't get lost beneath the upcoming days.
+        $today = $cetNow->format('Y-m-d');
+
+        $overdueCardsStmt = $db->prepare(
+            'SELECT DISTINCT c.id, c.title, c.due_date, l.board_id, b.title AS board_title
+             FROM cards c
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             LEFT JOIN card_assignments ca ON ca.card_id = c.id AND ca.user_id = :uid_a
+             LEFT JOIN user_preferences up ON up.user_id = :uid_pref
+             WHERE (ca.user_id = :uid_a2
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p)
+                    OR (c.coordinator_id = :uid_co
+                        AND COALESCE(up.notify_coordinator_cards, 0) = 1))
+               AND c.is_archived = 0
+               AND c.due_complete = 0
+               AND b.is_archived = 0
+               AND DATE(c.due_date) < :today
+             ORDER BY c.due_date ASC'
+        );
+        $overdueCardsStmt->execute([
+            'uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId,
+            'uid_co' => $userId, 'uid_pref' => $userId,
+            'today' => $today,
+        ]);
+        $overdueCards = $overdueCardsStmt->fetchAll();
+
+        $overdueItemsStmt = $db->prepare(
+            'SELECT DISTINCT ci.id, ci.content, ci.due_date, ch.card_id,
+                    c.title AS card_title, l.board_id, b.title AS board_title
+             FROM checklist_items ci
+             JOIN checklists ch ON ci.checklist_id = ch.id
+             JOIN cards c ON ch.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE (ci.assigned_to = :uid_a
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p))
+               AND ci.is_checked = 0
+               AND c.is_archived = 0
+               AND b.is_archived = 0
+               AND ci.due_date < :today
+             ORDER BY ci.due_date ASC'
+        );
+        $overdueItemsStmt->execute([
+            'uid_a' => $userId, 'uid_p' => $userId, 'today' => $today,
+        ]);
+        $overdueItems = $overdueItemsStmt->fetchAll();
+
         $sections = [];
+        if (!empty($overdueCards) || !empty($overdueItems)) {
+            $sections[] = [
+                'label'      => 'Overdue',
+                'cards'      => $overdueCards,
+                'items'      => $overdueItems,
+                'is_overdue' => true,
+            ];
+        }
         for ($i = 0; $i < 8; $i++) {
             $dateStr  = $window[$i];
             $dayCards = array_values(array_filter(
@@ -220,18 +280,29 @@ class Mailer
         $sectionsHtml = '';
         foreach ($sections as $sec) {
             $rows = '';
+            // Overdue section gets per-item dates inline (since the section
+            // header isn't a single date) and a red headline color so it
+            // visually announces "fix these first."
+            $isOverdue = !empty($sec['is_overdue']);
 
             foreach ($sec['cards'] as $c) {
                 $url = $baseUrl . '/index.php?page=board&id=' . (int) $c['board_id']
                      . '&card=' . (int) $c['id'];
                 $title      = htmlspecialchars($c['title'], ENT_QUOTES);
                 $boardTitle = htmlspecialchars($c['board_title'], ENT_QUOTES);
+                $dateSuffix = '';
+                if ($isOverdue) {
+                    try {
+                        $d = new DateTime($c['due_date']);
+                        $dateSuffix = ' &middot; was due ' . htmlspecialchars($d->format('M j'), ENT_QUOTES);
+                    } catch (Throwable $e) { /* skip */ }
+                }
                 $rows .= '<li style="margin:8px 0;line-height:1.45;">'
                        . '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" '
                        .   'style="color:#026AA7;text-decoration:none;font-weight:600;">'
                        .   $title
                        . '</a>'
-                       . ' <span style="color:#5e6c84;font-size:12px;">— ' . $boardTitle . '</span>'
+                       . ' <span style="color:#5e6c84;font-size:12px;">— ' . $boardTitle . $dateSuffix . '</span>'
                        . '</li>';
             }
 
@@ -241,6 +312,13 @@ class Mailer
                 $content    = htmlspecialchars($it['content'], ENT_QUOTES);
                 $cardTitle  = htmlspecialchars($it['card_title'], ENT_QUOTES);
                 $boardTitle = htmlspecialchars($it['board_title'], ENT_QUOTES);
+                $dateSuffix = '';
+                if ($isOverdue) {
+                    try {
+                        $d = new DateTime($it['due_date']);
+                        $dateSuffix = ' &middot; was due ' . htmlspecialchars($d->format('M j'), ENT_QUOTES);
+                    } catch (Throwable $e) { /* skip */ }
+                }
                 // List-style:none + inline checkbox glyph distinguishes tasks from cards.
                 $rows .= '<li style="margin:8px 0;line-height:1.45;list-style:none;">'
                        . '<span style="color:#5e6c84;margin-right:6px;font-size:14px;" aria-hidden="true">&#9745;</span>'
@@ -249,13 +327,14 @@ class Mailer
                        .   $content
                        . '</a>'
                        . ' <span style="color:#5e6c84;font-size:12px;">— ' . $cardTitle
-                       .   ' &middot; ' . $boardTitle . '</span>'
+                       .   ' &middot; ' . $boardTitle . $dateSuffix . '</span>'
                        . '</li>';
             }
 
             $label = htmlspecialchars($sec['label'], ENT_QUOTES);
+            $headingColor = $isOverdue ? '#BF2600' : '#172b4d';
             $sectionsHtml .=
-                  '<h3 style="margin:22px 0 6px;color:#172b4d;font-size:15px;'
+                  '<h3 style="margin:22px 0 6px;color:' . $headingColor . ';font-size:15px;'
                 .          'border-bottom:1px solid #dfe1e6;padding-bottom:4px;">'
                 . $label
                 . '</h3>'

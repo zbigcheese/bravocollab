@@ -59,23 +59,42 @@ $showingToday = $anchor->format('Y-m-d') === $todayStr;
         </p>
 
         <?php foreach ($sections as $sec): ?>
-            <div class="wn-section">
+            <?php $isOverdue = !empty($sec['is_overdue']); ?>
+            <div class="wn-section <?php echo $isOverdue ? 'wn-section-overdue' : ''; ?>">
                 <h2 class="wn-section-heading"><?php echo htmlspecialchars($sec['label']); ?></h2>
                 <ul class="wn-list">
                     <?php foreach ($sec['cards'] as $c): ?>
+                        <?php
+                            $extra = '';
+                            if ($isOverdue) {
+                                try {
+                                    $d = new DateTime($c['due_date']);
+                                    $extra = ' &middot; was due ' . htmlspecialchars($d->format('M j'));
+                                } catch (Throwable $e) {}
+                            }
+                        ?>
                         <li class="wn-item wn-card">
                             <a href="index.php?page=board&id=<?php echo (int) $c['board_id']; ?>&card=<?php echo (int) $c['id']; ?>">
                                 <span class="wn-item-title"><?php echo htmlspecialchars($c['title']); ?></span>
-                                <span class="wn-item-meta"><?php echo htmlspecialchars($c['board_title']); ?></span>
+                                <span class="wn-item-meta"><?php echo htmlspecialchars($c['board_title']); echo $extra; ?></span>
                             </a>
                         </li>
                     <?php endforeach; ?>
                     <?php foreach ($sec['items'] as $it): ?>
+                        <?php
+                            $extra = '';
+                            if ($isOverdue) {
+                                try {
+                                    $d = new DateTime($it['due_date']);
+                                    $extra = ' &middot; was due ' . htmlspecialchars($d->format('M j'));
+                                } catch (Throwable $e) {}
+                            }
+                        ?>
                         <li class="wn-item wn-task">
                             <a href="index.php?page=board&id=<?php echo (int) $it['board_id']; ?>&card=<?php echo (int) $it['card_id']; ?>">
                                 <span class="wn-item-glyph" aria-hidden="true">&#9745;</span>
                                 <span class="wn-item-title"><?php echo htmlspecialchars($it['content']); ?></span>
-                                <span class="wn-item-meta"><?php echo htmlspecialchars($it['card_title']); ?> &middot; <?php echo htmlspecialchars($it['board_title']); ?></span>
+                                <span class="wn-item-meta"><?php echo htmlspecialchars($it['card_title']); ?> &middot; <?php echo htmlspecialchars($it['board_title']); echo $extra; ?></span>
                             </a>
                         </li>
                     <?php endforeach; ?>
@@ -109,6 +128,8 @@ $showingToday = $anchor->format('Y-m-d') === $todayStr;
     font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em;
     color: #5e6c84; margin: 0 0 8px; font-weight: 700;
 }
+.wn-section-overdue { border-left: 4px solid var(--color-danger); }
+.wn-section-overdue .wn-section-heading { color: var(--color-danger); }
 .wn-list { list-style: none; padding: 0; margin: 0; }
 .wn-item { padding: 8px 0; border-bottom: 1px solid var(--color-border); }
 .wn-item:last-child { border-bottom: none; }

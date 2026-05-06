@@ -221,23 +221,29 @@ if ($cetHour === 8) {
         $sections = Mailer::buildWhatsNextSectionsForUser($db, $uid, $cetNow);
         if (empty($sections)) continue;
 
-        // Trigger guard: must have something within today / tomorrow / day-after.
-        // Section labels start with the formatted date; we instead check the
-        // underlying card/item dates against the near-term anchor list.
-        $hasNearTerm = false;
+        // Trigger guard: send if there's anything overdue OR anything due
+        // within today / tomorrow / day-after. Overdue items always count
+        // (they're already a problem). Without overdue we still require a
+        // near-term entry so the email isn't sent for purely-distant work.
+        $hasReason = false;
         foreach ($sections as $sec) {
+            if (!empty($sec['is_overdue'])
+                && (count($sec['cards']) > 0 || count($sec['items']) > 0)
+            ) {
+                $hasReason = true; break;
+            }
             foreach ($sec['cards'] as $c) {
                 if (in_array(substr($c['due_date'], 0, 10), $nearTermDates, true)) {
-                    $hasNearTerm = true; break 2;
+                    $hasReason = true; break 2;
                 }
             }
             foreach ($sec['items'] as $it) {
                 if (in_array($it['due_date'], $nearTermDates, true)) {
-                    $hasNearTerm = true; break 2;
+                    $hasReason = true; break 2;
                 }
             }
         }
-        if (!$hasNearTerm) continue;
+        if (!$hasReason) continue;
 
         if (Mailer::sendWhatsNext($user['email'], $user['display_name'], $sections)) {
             $markSent->execute(['uid' => $uid, 'sd' => $cetDate]);
