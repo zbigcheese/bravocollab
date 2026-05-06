@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="public/css/board_views.css">
 <div class="dashboard" id="dashboard">
     <div class="dashboard-header">
         <h1>My Boards</h1>
@@ -17,7 +18,37 @@
             <div class="spinner"></div>
         </div>
     </div>
+
+    <section class="dashboard-cal-section" id="dashboardCalendarSection" hidden>
+        <div class="dashboard-cal-header">
+            <h2>Calendar</h2>
+            <div class="dashboard-cal-controls">
+                <select id="dashCalRange" class="dashboard-cal-range">
+                    <option value="month">Monthly</option>
+                    <option value="week">Weekly</option>
+                </select>
+                <div class="dashboard-view-switcher" role="tablist" aria-label="Switch overview">
+                    <button type="button" class="dashboard-view-switcher-btn active" data-view="calendar" role="tab">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            <line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/>
+                        </svg>
+                        <span>Calendar</span>
+                    </button>
+                    <button type="button" class="dashboard-view-switcher-btn" data-view="timeline" role="tab">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="3" y1="6" x2="15" y2="6"/><line x1="7" y1="12" x2="21" y2="12"/><line x1="5" y1="18" x2="17" y2="18"/>
+                        </svg>
+                        <span>Timeline</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="dashboardCalendarPane" class="dashboard-cal-pane"></div>
+        <div id="dashboardTimelinePane" class="dashboard-cal-pane" hidden></div>
+    </section>
 </div>
+<script src="public/js/dashboard_views.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {

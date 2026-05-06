@@ -92,6 +92,82 @@ class BoardController extends Controller
         $this->json(['updates' => (object) $grouped]);
     }
 
+    /**
+     * Combined calendar data for the dashboard overview — every card with a
+     * due date plus every checklist item with a due date, across every board
+     * the current user can see. Same access rules as boards.list (member-of
+     * for regular users, all non-personal-of-others for admins).
+     */
+    public function calendarData(): void
+    {
+        $this->requireAuth();
+        $this->requireGet();
+
+        $userId  = Auth::userId();
+        $isAdmin = Auth::isAdmin();
+        $db      = Database::get();
+
+        if ($isAdmin) {
+            $stmt = $db->prepare(
+                'SELECT id FROM boards
+                 WHERE is_archived = 0
+                   AND NOT (is_personal = 1 AND created_by != :uid)'
+            );
+            $stmt->execute(['uid' => $userId]);
+            $boardIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } else {
+            $stmt = $db->prepare(
+                'SELECT b.id FROM boards b
+                 JOIN board_members bm ON b.id = bm.board_id
+                 WHERE bm.user_id = :uid AND b.is_archived = 0'
+            );
+            $stmt->execute(['uid' => $userId]);
+            $boardIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        if (empty($boardIds)) {
+            $this->json(['cards' => [], 'items' => []]);
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($boardIds), '?'));
+
+        $cardsStmt = $db->prepare(
+            "SELECT c.id, c.title, c.due_date, c.start_date,
+                    c.due_complete, c.is_archived,
+                    l.board_id, b.title AS board_title, b.background_color AS board_color
+             FROM cards c
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE l.board_id IN ($placeholders)
+               AND c.due_date IS NOT NULL
+             ORDER BY c.due_date ASC"
+        );
+        $cardsStmt->execute($boardIds);
+        $cards = $cardsStmt->fetchAll();
+
+        $itemsStmt = $db->prepare(
+            "SELECT ci.id, ci.content, ci.due_date, ci.is_checked,
+                    ch.card_id, c.title AS card_title, c.is_archived AS card_archived,
+                    l.board_id, b.title AS board_title, b.background_color AS board_color
+             FROM checklist_items ci
+             JOIN checklists ch ON ci.checklist_id = ch.id
+             JOIN cards c ON ch.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             WHERE l.board_id IN ($placeholders)
+               AND ci.due_date IS NOT NULL
+             ORDER BY ci.due_date ASC"
+        );
+        $itemsStmt->execute($boardIds);
+        $items = $itemsStmt->fetchAll();
+
+        $this->json([
+            'cards' => $cards,
+            'items' => $items,
+        ]);
+    }
+
     public function get(): void
     {
         $this->requireAuth();
