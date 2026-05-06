@@ -632,10 +632,32 @@ class GoogleCalendar
         $cardUrl = $baseUrl . '/index.php?page=board&id=' . (int) $entity['board_id']
                  . '&card=' . (int) $entity['card_id'];
 
-        // All-day events. Google's "end" for all-day events is exclusive,
-        // so for a 1-day event end = start + 1 day.
-        $startDate = substr($entity['due_date'], 0, 10);
-        $end = (new DateTime($startDate))->modify('+1 day')->format('Y-m-d');
+        // If the stored due_date carries a non-midnight time component
+        // (cards do — the picker defaults to 17:00 and the user can pick
+        // any time), render it as a 1-hour timed event in the app's local
+        // timezone. Date-only values (checklist items, schema column DATE)
+        // and midnight-stamped datetimes fall back to all-day events.
+        $tz       = 'Europe/Belgrade';
+        $dueRaw   = (string) $entity['due_date'];
+        $hasClock = strlen($dueRaw) > 10 && substr($dueRaw, 11, 8) !== '00:00:00';
+
+        if ($hasClock) {
+            try {
+                $start = new DateTime($dueRaw, new DateTimeZone($tz));
+                $end   = (clone $start)->modify('+1 hour');
+                $startSpec = ['dateTime' => $start->format('Y-m-d\TH:i:s'), 'timeZone' => $tz];
+                $endSpec   = ['dateTime' => $end->format('Y-m-d\TH:i:s'),   'timeZone' => $tz];
+            } catch (Throwable $e) {
+                // Malformed string — degrade to all-day so the sync doesn't
+                // crash on one bad row.
+                $hasClock = false;
+            }
+        }
+        if (!$hasClock) {
+            $startDate = substr($dueRaw, 0, 10);
+            $startSpec = ['date' => $startDate];
+            $endSpec   = ['date' => (new DateTime($startDate))->modify('+1 day')->format('Y-m-d')];
+        }
 
         $title = $entity['title'];
         if ($entity['entity_type'] === 'item') {
@@ -655,8 +677,8 @@ class GoogleCalendar
         return [
             'summary'     => $title,
             'description' => $description,
-            'start'       => ['date' => $startDate],
-            'end'         => ['date' => $end],
+            'start'       => $startSpec,
+            'end'         => $endSpec,
             'status'      => $entity['completed'] ? 'cancelled' : 'confirmed',
             'source'      => ['title' => 'BravoCollab', 'url' => $cardUrl],
         ];
@@ -666,7 +688,10 @@ class GoogleCalendar
     {
         return sha1(json_encode([
             $entity['title'], $entity['description'] ?? '',
-            substr($entity['due_date'], 0, 10),
+            // Full due_date string (incl. time) — moving from 17:00 to 18:00
+            // on the same day must invalidate the cached hash so we PATCH
+            // the Google event with the new time.
+            $entity['due_date'],
             $entity['completed'] ? 1 : 0,
             $entity['board_title'],
             $entity['card_title'] ?? null,
