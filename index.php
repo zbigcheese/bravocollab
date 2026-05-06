@@ -82,6 +82,7 @@ $pageMap = [
     'admin_users'         => 'admin/users.php',
     'settings_preferences' => 'settings/preferences.php',
     'settings_calendar'   => 'settings/calendar.php',
+    'whats_next'          => 'whats_next/index.php',
     'google_connect'    => 'google/connect.php',
     'google_callback'   => 'google/callback.php',
 ];

@@ -232,6 +232,16 @@ class Controller
             'type'    => $type,
             'data'    => json_encode($data),
         ]);
+
+        // Web Push trigger — best-effort, isolated. The service worker
+        // fetches the freshest unread notification on receive, so we don't
+        // need to send an encrypted payload.
+        try {
+            require_once __DIR__ . '/WebPush.php';
+            WebPush::sendToUser($userId);
+        } catch (Throwable $e) {
+            error_log('WebPush createNotification trigger failed: ' . $e->getMessage());
+        }
     }
 
     protected function logActivity(int $boardId, ?int $cardId, string $action, ?array $detail = null): void

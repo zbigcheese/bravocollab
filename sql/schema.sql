@@ -310,6 +310,24 @@ CREATE TABLE IF NOT EXISTS `cron_runs` (
     INDEX `idx_started_at` (`started_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Web Push subscriptions — one row per (user, browser endpoint). The same
+-- user can have multiple devices/browsers subscribed; we send to all rows.
+-- A 410 Gone or 404 from the push service means the subscription is dead
+-- and gets deleted automatically on the next send attempt.
+CREATE TABLE IF NOT EXISTS `push_subscriptions` (
+    `id`           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`      INT UNSIGNED NOT NULL,
+    `endpoint`     VARCHAR(500) NOT NULL,
+    `p256dh`       VARCHAR(255) NOT NULL,
+    `auth`         VARCHAR(255) NOT NULL,
+    `user_agent`   VARCHAR(500) DEFAULT NULL,
+    `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `last_used_at` DATETIME DEFAULT NULL,
+    UNIQUE KEY `uk_user_endpoint` (`user_id`, `endpoint`(190)),
+    INDEX `idx_user` (`user_id`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Per-user opt-in/out preferences for notifications, the daily recap, and
 -- coordinator-relevant events. Absence of a row is treated as "all defaults"
 -- (notify_coordinator_cards = 0, both email toggles = 1) so existing users

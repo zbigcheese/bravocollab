@@ -5,11 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php echo CSRF::metaTag(); ?>
     <meta name="user-id" content="<?php echo (int) (Auth::userId() ?? 0); ?>">
+    <meta name="theme-color" content="#F16820">
     <link rel="icon" type="image/png" href="public/img/favicon.png">
+    <link rel="manifest" href="/manifest.json">
     <title>BravoCollab</title>
     <link rel="stylesheet" href="public/css/app.css">
     <link rel="stylesheet" href="public/css/board.css">
     <link rel="stylesheet" href="public/css/modal.css">
+    <script>
+    // Register the service worker as early as possible. Failure here is
+    // non-fatal (push is opt-in and the rest of the app is web-only).
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+        });
+    }
+    </script>
 </head>
 <?php
 $navUser   = Auth::currentUser() ?: [];

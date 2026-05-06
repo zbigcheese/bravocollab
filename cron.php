@@ -24,11 +24,12 @@ require_once __DIR__ . '/core/Mailer.php';
 
 $db = Database::get();
 
-// Self-heal: ensure the user_preferences table exists. The notification /
-// digest / recap queries below all reference it, so the cron must be safe
-// to run on a deployment that hasn't applied the schema migration yet.
+// Self-heal: ensure the user_preferences and push_subscriptions tables exist.
+// Cron must be safe on deployments that haven't applied the schema migration.
 require_once __DIR__ . '/core/UserPreferences.php';
+require_once __DIR__ . '/core/WebPush.php';
 UserPreferences::ensureSchema();
+WebPush::ensureSchema();
 
 // Self-heal: ensure the whats_next_sent table exists for the daily 8am CET
 // digest. Idempotent; lets fresh `git pull` deployments run without a manual
@@ -242,6 +243,28 @@ if ($cetHour === 8) {
             $markSent->execute(['uid' => $uid, 'sd' => $cetDate]);
             $wnSent++;
         }
+
+        // Push the same recap as a notification — service worker will pull
+        // the latest unread notification but we drop a special whats_next
+        // notification first so the title says "What's next today" rather
+        // than whatever else is unread.
+        $cardsTotal = array_sum(array_map(fn($s) => count($s['cards']), $sections));
+        $itemsTotal = array_sum(array_map(fn($s) => count($s['items']), $sections));
+        $db->prepare(
+            'INSERT INTO notifications (user_id, type, data) VALUES (:uid, :t, :d)'
+        )->execute([
+            'uid' => $uid,
+            't'   => 'whats_next',
+            'd'   => json_encode([
+                'cards_total' => $cardsTotal,
+                'items_total' => $itemsTotal,
+                'date'        => $cetDate,
+                // Click target: the dedicated daily page.
+                'board_id'    => 0,
+                'card_id'     => 0,
+            ]),
+        ]);
+        try { WebPush::sendToUser($uid); } catch (Throwable $e) { /* best-effort */ }
     }
 }
 echo "Sent {$wnSent} 'what's next' digest emails.\n";

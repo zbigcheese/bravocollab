@@ -14,6 +14,7 @@ class Router
         'notifications'=> 'NotificationController',
         'users'        => 'UserController',
         'google_calendar' => 'GoogleCalendarController',
+        'push'         => 'PushController',
     ];
 
     public static function dispatch(): void

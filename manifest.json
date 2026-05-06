@@ -1,0 +1,16 @@
+{
+    "name": "BravoCollab",
+    "short_name": "BravoCollab",
+    "description": "Task coordination for the Bravo! movement",
+    "start_url": "/index.php?page=dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#F16820",
+    "theme_color": "#F16820",
+    "lang": "sr",
+    "icons": [
+        { "src": "/public/img/logo_white.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "/public/img/logo_white.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    ]
+}

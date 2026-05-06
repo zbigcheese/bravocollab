@@ -60,6 +60,25 @@ $prefs = UserPreferences::get(Auth::userId());
                 <span class="pref-slider"></span>
             </label>
         </div>
+
+        <h2 class="settings-section-heading">Browser push notifications</h2>
+
+        <div class="pref-row">
+            <div class="pref-row-text">
+                <div class="pref-row-title">Enable push notifications on this device</div>
+                <div class="pref-row-help" id="pushHelp">
+                    Get a system notification on this browser whenever you'd
+                    normally get an in-app notification, plus a daily summary
+                    push at 8:00 CET. On iPhone you must "Add to Home Screen"
+                    first and open the app from there.
+                </div>
+                <div id="pushStatus" class="pref-row-help" style="margin-top:6px;color:var(--color-text-light);"></div>
+            </div>
+            <label class="pref-switch">
+                <input type="checkbox" id="pushToggle">
+                <span class="pref-slider"></span>
+            </label>
+        </div>
     </div>
 </div>
 
@@ -108,7 +127,7 @@ $prefs = UserPreferences::get(Auth::userId());
     const flash = document.getElementById('prefSavedFlash');
     let flashTimer = null;
 
-    document.querySelectorAll('.pref-switch input[type="checkbox"]').forEach(cb => {
+    document.querySelectorAll('.pref-switch input[data-pref]').forEach(cb => {
         cb.addEventListener('change', async () => {
             const key = cb.dataset.pref;
             const desired = cb.checked;
@@ -126,5 +145,106 @@ $prefs = UserPreferences::get(Auth::userId());
             }
         });
     });
+
+    // ---- Push notifications toggle ----
+    const pushCb     = document.getElementById('pushToggle');
+    const pushStatus = document.getElementById('pushStatus');
+    if (!pushCb) return;
+
+    const setStatus = (text) => { pushStatus.textContent = text; };
+    const supported = ('serviceWorker' in navigator) && ('PushManager' in window);
+
+    if (!supported) {
+        pushCb.disabled = true;
+        setStatus('This browser does not support web push notifications.');
+        return;
+    }
+
+    function urlBase64ToUint8(str) {
+        const padding = '='.repeat((4 - str.length % 4) % 4);
+        const b64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const raw = atob(b64);
+        const out = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+        return out;
+    }
+
+    let pushState = { configured: false, public_key: '', subscribed: false };
+
+    async function refreshState() {
+        try {
+            const res = await App.api('push.status', {}, 'GET');
+            pushState.configured = !!res.configured;
+            pushState.public_key = res.public_key || '';
+        } catch (e) { /* ignore */ }
+
+        if (!pushState.configured) {
+            pushCb.disabled = true;
+            setStatus('Push isn\'t configured on this server. (Admin: run tools/generate_vapid.php and add the keys to config.php.)');
+            return;
+        }
+
+        const reg = await navigator.serviceWorker.ready.catch(() => null);
+        const sub = reg ? await reg.pushManager.getSubscription() : null;
+        pushState.subscribed = !!sub;
+        pushCb.checked = pushState.subscribed;
+        pushCb.disabled = false;
+
+        if (pushState.subscribed) {
+            setStatus('Active on this device.');
+        } else if (Notification.permission === 'denied') {
+            setStatus('Notifications are blocked in this browser. Re-enable them in browser settings, then toggle this on.');
+            pushCb.disabled = true;
+        } else {
+            setStatus('Off on this device.');
+        }
+    }
+
+    async function enablePush() {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            pushCb.checked = false;
+            setStatus('Permission denied — push not enabled.');
+            return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8(pushState.public_key),
+            });
+        }
+        const subJson = sub.toJSON();
+        await App.api('push.subscribe', subJson);
+        setStatus('Active on this device.');
+    }
+
+    async function disablePush() {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+            const endpoint = sub.endpoint;
+            try { await sub.unsubscribe(); } catch (e) { /* ignore */ }
+            await App.api('push.unsubscribe', { endpoint });
+        }
+        setStatus('Off on this device.');
+    }
+
+    pushCb.addEventListener('change', async () => {
+        const desired = pushCb.checked;
+        pushCb.disabled = true;
+        try {
+            if (desired) await enablePush();
+            else         await disablePush();
+        } catch (e) {
+            pushCb.checked = !desired;
+            App.showToast(e.message || 'Push toggle failed', 'error');
+        } finally {
+            pushCb.disabled = false;
+        }
+    });
+
+    refreshState();
 })();
 </script>

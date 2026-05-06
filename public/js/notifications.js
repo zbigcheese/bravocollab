@@ -83,7 +83,7 @@ const Notifications = {
                 const icon = this.getIcon(n.type);
 
                 return `
-                    <div class="notification-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}" data-board-id="${data.board_id || ''}" data-card-id="${data.card_id || ''}">
+                    <div class="notification-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}" data-notif-type="${n.type}" data-board-id="${data.board_id || ''}" data-card-id="${data.card_id || ''}">
                         <div class="notif-icon">${icon}</div>
                         <div class="notif-content">
                             <div class="notif-text">${text}</div>
@@ -101,6 +101,14 @@ const Notifications = {
                     const cardId = el.dataset.cardId;
 
                     await App.api('notifications.mark_read', { id: parseInt(notifId) });
+
+                    // whats_next routes to the dedicated daily page; the
+                    // notification carries no board/card.
+                    const notifType = el.dataset.notifType;
+                    if (notifType === 'whats_next') {
+                        window.location.href = 'index.php?page=whats_next';
+                        return;
+                    }
 
                     if (boardId) {
                         let url = `index.php?page=board&id=${boardId}`;
@@ -143,6 +151,11 @@ const Notifications = {
                 return `<strong>${actor}</strong> mentioned you in <strong>${card}</strong>`;
             case 'comment_reply':
                 return `<strong>${actor}</strong> replied to your comment on <strong>${card}</strong>`;
+            case 'whats_next': {
+                const c = parseInt(data.cards_total || 0);
+                const i = parseInt(data.items_total || 0);
+                return `What's next today — ${c} card${c===1?'':'s'} and ${i} task${i===1?'':'s'}`;
+            }
             case 'due_soon':
                 return `<strong>${card}</strong> is due soon`;
             case 'due_overdue':
