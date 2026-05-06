@@ -157,6 +157,13 @@
 }
 .dashboard-cal-pane[hidden] { display: none; }
 
+/* Toolbar text inside the dashboard pane is dark — the shared .view-title
+   defaults to white because on the board view it sits over the coloured
+   board background. Here it sits over a white card. */
+.dashboard-cal-pane .view-title {
+    color: #172b4d;
+}
+
 @media (max-width: 768px) {
     .dashboard-cal-section { padding: 12px; margin-top: 20px; }
     .dashboard-cal-header { gap: 6px; }
