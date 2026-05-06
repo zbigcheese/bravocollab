@@ -113,6 +113,7 @@ const CardModal = {
                                 <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Set Coordinator</button>
                                 <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
                             `}
+                            <button class="btn btn-secondary btn-sm" id="sidebarCloneCard">Clone</button>
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
@@ -666,6 +667,7 @@ const CardModal = {
         document.getElementById('sidebarAttachment')?.addEventListener('click', () => this.triggerAttachmentUpload());
         document.getElementById('sidebarWatch')?.addEventListener('click', () => this.toggleWatch());
         document.getElementById('sidebarMoveToBoard')?.addEventListener('click', () => this.showMoveToBoardDialog());
+        document.getElementById('sidebarCloneCard')?.addEventListener('click', () => this.cloneCard());
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
         document.getElementById('sidebarRestore')?.addEventListener('click', () => this.restoreCard());
     },
@@ -1696,6 +1698,35 @@ const CardModal = {
     },
 
     // ---- Archive ----
+    async cloneCard() {
+        if (!this.currentCard) return;
+        const sourceId = parseInt(this.currentCard.id);
+        this.suppressSSE();
+        try {
+            const res = await App.api('cards.clone_card', { id: sourceId });
+            if (!res || !res.success) {
+                App.showToast('Failed to clone card', 'error');
+                return;
+            }
+            App.showToast('Card cloned', 'success');
+            this.closeModal();
+
+            // Refresh board so the new card appears in the right list, then
+            // pop the new card open for the user to keep editing.
+            const newCardId = parseInt(res.card_id || (res.card && res.card.id));
+            const reopen = () => {
+                if (newCardId) CardModal.open(newCardId);
+            };
+            if (Board?.refreshBoardData) {
+                Board.refreshBoardData().then(reopen).catch(reopen);
+            } else {
+                reopen();
+            }
+        } catch (e) {
+            App.showToast(e.message || 'Failed to clone card', 'error');
+        }
+    },
+
     async showMoveToBoardDialog() {
         const currentBoardId = parseInt(this.currentCard.board_id || Board.boardId);
         const cardTitle = this.currentCard.title;

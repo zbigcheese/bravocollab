@@ -224,6 +224,179 @@ class CardController extends Controller
         $this->pushGoogleSync('card', $cardId);
     }
 
+    /**
+     * Duplicate a card into the same list. Carries over: title, description,
+     * due_date, start_date, coordinator, assignees, labels, attachments
+     * (files physically copied with new stored_names), checklists (titles),
+     * checklist items (content + assigned_to). Resets: is_archived=0,
+     * due_complete=0, every checklist item's is_checked / due_date / checked_*,
+     * comments (none), watchers (only the cloning user). The new card is
+     * inserted right after the source in the list ordering.
+     */
+    public function cloneCard(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $cardId = (int) ($data['id'] ?? 0);
+        if (!$cardId) {
+            $this->json(['error' => 'Card ID required'], 400);
+            return;
+        }
+
+        $boardId = $this->getBoardIdForCard($cardId);
+        if (!$boardId) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+        $this->requireBoardAccess($boardId);
+
+        $src = $this->cardModel->find($cardId);
+        if (!$src) {
+            $this->json(['error' => 'Card not found'], 404);
+            return;
+        }
+
+        $db     = Database::get();
+        $config = require __DIR__ . '/../config/config.php';
+        $uploadDir = $config['upload_dir'];
+
+        // Position the clone immediately after the source. If there's no
+        // room between source and the next card, append to the list end.
+        $nextStmt = $db->prepare(
+            'SELECT position FROM cards WHERE list_id = :lid AND position > :pos ORDER BY position ASC LIMIT 1'
+        );
+        $nextStmt->execute(['lid' => $src['list_id'], 'pos' => $src['position']]);
+        $nextRow = $nextStmt->fetch();
+        if ($nextRow) {
+            $diff = (int) $nextRow['position'] - (int) $src['position'];
+            $newPosition = $diff >= 2
+                ? (int) $src['position'] + intdiv($diff, 2)
+                : $this->cardModel->getNextPosition('list_id', (int) $src['list_id']);
+        } else {
+            $newPosition = (int) $src['position'] + POSITION_GAP;
+        }
+
+        $newCardId = $this->cardModel->insert([
+            'list_id'        => $src['list_id'],
+            'title'          => $src['title'],
+            'description'    => $src['description'],
+            'position'       => $newPosition,
+            'due_date'       => $src['due_date'],
+            'start_date'     => $src['start_date'] ?? null,
+            'due_complete'   => 0,
+            'coordinator_id' => $src['coordinator_id'],
+            'is_archived'    => 0,
+            'created_by'     => Auth::userId(),
+        ]);
+
+        // The cloning user auto-watches (mirrors the auto-watch rule for
+        // freshly-created cards). Watchers from the source are NOT carried over.
+        $db->prepare(
+            'INSERT IGNORE INTO card_watchers (card_id, user_id) VALUES (:cid, :uid)'
+        )->execute(['cid' => $newCardId, 'uid' => Auth::userId()]);
+
+        // Labels — straight copy via INSERT…SELECT.
+        $db->prepare(
+            'INSERT INTO card_labels (card_id, label_id)
+             SELECT :new, label_id FROM card_labels WHERE card_id = :old'
+        )->execute(['new' => $newCardId, 'old' => $cardId]);
+
+        // Assignments — straight copy.
+        $db->prepare(
+            'INSERT INTO card_assignments (card_id, user_id)
+             SELECT :new, user_id FROM card_assignments WHERE card_id = :old'
+        )->execute(['new' => $newCardId, 'old' => $cardId]);
+
+        // Attachments — copy each file on disk with a fresh stored_name so
+        // deleting one card's attachment can't orphan the other's reference.
+        // Skip silently if the source file is missing (was probably already
+        // pruned out-of-band).
+        $atts = $db->prepare('SELECT * FROM attachments WHERE card_id = :cid');
+        $atts->execute(['cid' => $cardId]);
+        $insAtt = $db->prepare(
+            'INSERT INTO attachments
+                (card_id, user_id, original_name, stored_name, file_size, mime_type, is_image, thumbnail_path)
+             VALUES (:cid, :uid, :on, :sn, :fs, :mt, :ii, :tp)'
+        );
+        foreach ($atts->fetchAll() as $a) {
+            $oldPath = $uploadDir . '/attachments/' . $a['stored_name'];
+            if (!file_exists($oldPath)) continue;
+
+            $ext = strtolower(pathinfo($a['stored_name'], PATHINFO_EXTENSION)) ?: 'bin';
+            $newStored = uniqid('', true) . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            $newPath = $uploadDir . '/attachments/' . $newStored;
+            if (!@copy($oldPath, $newPath)) continue;
+
+            $newThumb = null;
+            if (!empty($a['thumbnail_path'])) {
+                $oldThumbPath = $uploadDir . '/thumbnails/' . $a['thumbnail_path'];
+                if (file_exists($oldThumbPath)) {
+                    $newThumb = 'thumb_' . $newStored;
+                    if (!@copy($oldThumbPath, $uploadDir . '/thumbnails/' . $newThumb)) {
+                        $newThumb = null;
+                    }
+                }
+            }
+
+            $insAtt->execute([
+                'cid' => $newCardId, 'uid' => Auth::userId(),
+                'on'  => $a['original_name'], 'sn' => $newStored,
+                'fs'  => $a['file_size'], 'mt' => $a['mime_type'],
+                'ii'  => $a['is_image'], 'tp' => $newThumb,
+            ]);
+        }
+
+        // Checklists + items. Items are reset to unchecked with NULL due_date
+        // (per the spec — "fresh start" for the clone) but assigned_to is
+        // preserved.
+        $cls = $db->prepare('SELECT id, title, position FROM checklists WHERE card_id = :cid ORDER BY position ASC');
+        $cls->execute(['cid' => $cardId]);
+        $insCl = $db->prepare(
+            'INSERT INTO checklists (card_id, title, position) VALUES (:cid, :title, :pos)'
+        );
+        $insItem = $db->prepare(
+            'INSERT INTO checklist_items (checklist_id, content, is_checked, position, assigned_to, due_date)
+             VALUES (:clid, :content, 0, :pos, :assigned, NULL)'
+        );
+        foreach ($cls->fetchAll() as $cl) {
+            $insCl->execute(['cid' => $newCardId, 'title' => $cl['title'], 'pos' => $cl['position']]);
+            $newClId = (int) $db->lastInsertId();
+
+            $itemsStmt = $db->prepare(
+                'SELECT content, position, assigned_to FROM checklist_items
+                 WHERE checklist_id = :id ORDER BY position ASC'
+            );
+            $itemsStmt->execute(['id' => $cl['id']]);
+            foreach ($itemsStmt->fetchAll() as $it) {
+                $insItem->execute([
+                    'clid'     => $newClId,
+                    'content'  => $it['content'],
+                    'pos'      => $it['position'],
+                    'assigned' => $it['assigned_to'],
+                ]);
+            }
+        }
+
+        $newCard = $this->cardModel->getSummary($newCardId);
+        if ($newCard) $newCard['is_watching'] = 1;
+
+        $this->publishSSE($boardId, SSE_CARD_CREATED, ['card' => $newCard]);
+        $this->logActivity($boardId, $newCardId, 'card_cloned', [
+            'source_id' => $cardId,
+            'title'     => $src['title'],
+        ]);
+
+        $this->json([
+            'success' => true,
+            'card_id' => $newCardId,
+            'card'    => $newCard,
+        ]);
+        $this->pushGoogleSync('card', $newCardId);
+    }
+
     public function moveToBoard(): void
     {
         $this->requireAuth();
