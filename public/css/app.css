@@ -91,6 +91,50 @@ a:hover {
     gap: 16px;
 }
 
+/* ---- Install app button (PWA install prompt trigger) ---- */
+/* Hidden by default; pwa.js reveals it only on mobile browsers (not the
+   PWA itself, not desktop). Triggers the beforeinstallprompt flow on
+   Chrome/Edge or shows iOS Add-to-Home-Screen instructions. */
+.install-app-btn {
+    background: transparent;
+    border: 0;
+    padding: 6px;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, color 0.12s;
+}
+.install-app-btn[hidden] { display: none; }
+.install-app-btn svg { width: 20px; height: 20px; display: block; }
+.install-app-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+
+/* iOS Add-to-Home-Screen instruction sheet — bottom-anchored card. */
+.ios-install-sheet {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 12px;
+    z-index: 400;
+    background: #172b4d;
+    color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    padding: 16px 18px;
+    line-height: 1.5;
+    font-size: 14px;
+}
+.ios-install-sheet strong { display: block; font-size: 15px; margin-bottom: 6px; }
+.ios-install-sheet ol { margin: 8px 0 0 18px; padding: 0; }
+.ios-install-sheet li { margin: 4px 0; }
+.ios-install-sheet button {
+    margin-top: 12px;
+    background: #F16820; color: #fff;
+    border: 0; border-radius: 6px;
+    padding: 8px 14px; font-weight: 700; cursor: pointer; font-size: 13px;
+}
+.ios-install-sheet button:hover { filter: brightness(1.05); }
+
 /* ---- Calendar sync menu in the navbar ---- */
 .calendar-menu {
     position: relative;

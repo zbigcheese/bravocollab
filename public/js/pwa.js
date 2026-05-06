@@ -142,6 +142,85 @@ const PWA = {
     },
 };
 
+// ---- Install button (mobile-browser only) ----
+// Chrome/Edge fire `beforeinstallprompt` when the PWA is installable; we
+// capture the event, reveal the navbar button, and call .prompt() on click.
+// Safari on iOS doesn't expose this — we still show the button (because
+// detection is reliable) and open an instruction sheet on tap.
+PWA._deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    PWA._deferredInstallPrompt = e;
+    PWA._maybeShowInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+    PWA._deferredInstallPrompt = null;
+    const btn = document.getElementById('installAppBtn');
+    if (btn) btn.hidden = true;
+});
+
+PWA._isMobileViewport = function () {
+    return window.matchMedia('(max-width: 768px)').matches;
+};
+
+PWA._isIOS = function () {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream;
+};
+
+PWA._maybeShowInstallButton = function () {
+    const btn = document.getElementById('installAppBtn');
+    if (!btn) return;
+    // Already running as PWA → no need.
+    if (this.isStandalone()) { btn.hidden = true; return; }
+    // Desktop → not the place for it.
+    if (!this._isMobileViewport()) { btn.hidden = true; return; }
+    // Mobile in browser: show if Chrome captured the prompt OR we're on iOS.
+    if (this._deferredInstallPrompt || this._isIOS()) {
+        btn.hidden = false;
+    }
+};
+
+PWA._showIosInstallInstructions = function () {
+    if (document.getElementById('iosInstallSheet')) return;
+    const sheet = document.createElement('div');
+    sheet.id = 'iosInstallSheet';
+    sheet.className = 'ios-install-sheet';
+    sheet.innerHTML = `
+        <strong>Install BravoCollab on your iPhone</strong>
+        <ol>
+            <li>Tap the <em>Share</em> button in Safari (the square with an arrow).</li>
+            <li>Scroll down and tap <em>Add to Home Screen</em>.</li>
+            <li>Tap <em>Add</em>. Open the app from the new home-screen icon.</li>
+        </ol>
+        <button type="button" id="iosInstallClose">Got it</button>
+    `;
+    document.body.appendChild(sheet);
+    document.getElementById('iosInstallClose').addEventListener('click', () => sheet.remove());
+};
+
+PWA._handleInstallClick = async function () {
+    if (this._deferredInstallPrompt) {
+        // Chrome / Edge / Android browsers — fire the saved event.
+        try {
+            this._deferredInstallPrompt.prompt();
+            const result = await this._deferredInstallPrompt.userChoice;
+            if (result && result.outcome === 'accepted') {
+                const btn = document.getElementById('installAppBtn');
+                if (btn) btn.hidden = true;
+            }
+        } catch (e) { /* user dismissed */ }
+        this._deferredInstallPrompt = null;
+    } else if (this._isIOS()) {
+        this._showIosInstallInstructions();
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     PWA.maybePromptOnFirstOpen();
+    PWA._maybeShowInstallButton();
+    document.getElementById('installAppBtn')?.addEventListener('click', () => PWA._handleInstallClick());
+    // If the viewport is resized (rotation, devtools), re-evaluate visibility.
+    window.addEventListener('resize', () => PWA._maybeShowInstallButton());
 });
