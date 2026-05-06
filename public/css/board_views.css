@@ -109,9 +109,15 @@
     border-radius: 6px;
     font-size: 13px;
     background: #fff;
-    color: var(--color-text);
+    color: #172b4d;
     font-family: inherit;
     cursor: pointer;
+}
+/* Explicit black text on the dropdown options too — some browsers default
+   to white from the surrounding theme and end up rendering white-on-white. */
+.dashboard-cal-range option {
+    color: #172b4d;
+    background: #fff;
 }
 
 /* Inline view switcher (Calendar / Timeline) for the dashboard. Distinct
