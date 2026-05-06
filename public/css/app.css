@@ -99,16 +99,18 @@ a:hover {
     background: transparent;
     border: 0;
     padding: 6px;
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.95);
     cursor: pointer;
     border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;        /* don't let the navbar squeeze it into a sliver */
+    line-height: 0;        /* keep the SVG vertically tight */
     transition: background 0.12s, color 0.12s;
 }
 .install-app-btn[hidden] { display: none; }
-.install-app-btn svg { width: 20px; height: 20px; display: block; }
+.install-app-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
 .install-app-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 
 /* iOS Add-to-Home-Screen instruction sheet — bottom-anchored card. */
