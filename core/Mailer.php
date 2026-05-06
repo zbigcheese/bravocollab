@@ -224,7 +224,10 @@ class Mailer
                 $cards, fn($c) => substr($c['due_date'], 0, 10) === $dateStr
             ));
             $dayItems = array_values(array_filter(
-                $items, fn($it) => $it['due_date'] === $dateStr
+                $items,
+                // Items now store DATETIME; group by the date part only so
+                // an item due at 14:30 still buckets under its date heading.
+                fn($it) => substr((string) $it['due_date'], 0, 10) === $dateStr
             ));
             if (empty($dayCards) && empty($dayItems)) continue;
 

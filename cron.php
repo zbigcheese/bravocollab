@@ -31,6 +31,14 @@ require_once __DIR__ . '/core/WebPush.php';
 UserPreferences::ensureSchema();
 WebPush::ensureSchema();
 
+// Self-heal: widen checklist_items.due_date from DATE to DATETIME so items
+// can carry an optional time. Idempotent — modifying to the same type is a
+// no-op MySQL-wide; existing DATE values get '00:00:00' appended (which our
+// "non-midnight = timed" convention treats as date-only, so semantics survive).
+try {
+    $db->exec("ALTER TABLE `checklist_items` MODIFY COLUMN `due_date` DATETIME DEFAULT NULL");
+} catch (Throwable $e) { /* already correct or insufficient priv — non-fatal */ }
+
 // Self-heal: ensure the whats_next_sent table exists for the daily 8am CET
 // digest. Idempotent; lets fresh `git pull` deployments run without a manual
 // schema migration step.
@@ -238,7 +246,8 @@ if ($cetHour === 8) {
                 }
             }
             foreach ($sec['items'] as $it) {
-                if (in_array($it['due_date'], $nearTermDates, true)) {
+                // Items can carry a time component now — compare date part only.
+                if (in_array(substr((string) $it['due_date'], 0, 10), $nearTermDates, true)) {
                     $hasReason = true; break 2;
                 }
             }

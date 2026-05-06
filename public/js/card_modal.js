@@ -272,8 +272,14 @@ const CardModal = {
             }
             if (item.due_date) {
                 const due = App.formatDueDate(item.due_date);
+                // Append HH:MM if the stored value carries a non-midnight time.
+                let txt = due.text;
+                if (item.due_date.length > 10) {
+                    const t = item.due_date.substring(11, 16);
+                    if (t && t !== '00:00') txt += ` ${t}`;
+                }
                 const cls = item.is_checked ? 'complete' : due.class;
-                meta += `<span class="cl-item-due ${cls}">${due.text}</span>`;
+                meta += `<span class="cl-item-due ${cls}">${App.escapeHtml(txt)}</span>`;
             }
             return `
                 <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
@@ -1192,6 +1198,16 @@ const CardModal = {
         }
         if (!itemData) return;
 
+        // Stored value can be 'YYYY-MM-DD' (legacy DATE rows) or
+        // 'YYYY-MM-DD HH:MM:SS' (new DATETIME rows). Split into the two
+        // inputs; a midnight time stays empty so we don't surprise users
+        // who never picked one.
+        const stored = itemData.due_date || '';
+        const datePart = stored.substring(0, 10);
+        const timePart = stored.length > 10 && stored.substring(11, 16) !== '00:00'
+            ? stored.substring(11, 16)
+            : '';
+
         const memberOpts = this.boardMembers.map(m =>
             `<option value="${m.id}" ${parseInt(itemData.assigned_to) === m.id ? 'selected' : ''}>${App.escapeHtml(m.display_name)}</option>`
         ).join('');
@@ -1206,7 +1222,11 @@ const CardModal = {
             </div>
             <div class="form-group">
                 <label>Due Date</label>
-                <input type="date" id="clItemDueDate" value="${itemData.due_date || ''}" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="date" id="clItemDueDate" value="${datePart}" style="flex:1;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
+                    <input type="time" id="clItemDueTime" value="${timePart}" style="width:120px;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
+                </div>
+                <div style="font-size:12px;color:var(--color-text-light);margin-top:4px;">Time is optional — leave empty for an all-day item.</div>
             </div>
         `, `
             <button class="btn btn-secondary btn-sm" id="clItemClearDue">Clear Due Date</button>
@@ -1215,7 +1235,16 @@ const CardModal = {
 
         document.getElementById('clItemSave').addEventListener('click', async () => {
             const assignedTo = document.getElementById('clItemAssignee').value || null;
-            const dueDate = document.getElementById('clItemDueDate').value || null;
+            const dateVal = document.getElementById('clItemDueDate').value;
+            const timeVal = document.getElementById('clItemDueTime').value;
+            // Combine date + time into a single string for the DATETIME column.
+            // No date → null. Date-only → 'YYYY-MM-DD' (DB stores as midnight).
+            // Date+time → 'YYYY-MM-DD HH:MM:00'.
+            let dueDate = null;
+            if (dateVal) {
+                dueDate = timeVal ? `${dateVal} ${timeVal}:00` : dateVal;
+            }
+
             this.suppressSSE();
             try {
                 await App.api('checklists.update_item', { id: itemId, assigned_to: assignedTo, due_date: dueDate });
@@ -1232,6 +1261,7 @@ const CardModal = {
 
         document.getElementById('clItemClearDue').addEventListener('click', () => {
             document.getElementById('clItemDueDate').value = '';
+            document.getElementById('clItemDueTime').value = '';
         });
     },
 

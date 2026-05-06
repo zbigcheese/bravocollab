@@ -252,7 +252,7 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
     `is_checked`   TINYINT(1) NOT NULL DEFAULT 0,
     `position`     INT UNSIGNED NOT NULL DEFAULT 0,
     `assigned_to`  INT UNSIGNED DEFAULT NULL,
-    `due_date`     DATE DEFAULT NULL,
+    `due_date`     DATETIME DEFAULT NULL,
     `checked_by`   INT UNSIGNED DEFAULT NULL,
     `checked_at`   DATETIME DEFAULT NULL,
     `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
