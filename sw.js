@@ -8,8 +8,8 @@
  */
 
 const SW_VERSION = 'bc-sw-v1';
-const APP_ICON   = '/public/img/icon-192.png';
-const APP_BADGE  = '/public/img/icon-192.png';
+const APP_ICON   = '/public/img/favicon.png';
+const APP_BADGE  = '/public/img/favicon.png';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();

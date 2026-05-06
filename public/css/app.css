@@ -541,6 +541,38 @@ a:hover {
     background: rgba(255,255,255,0.1);
 }
 
+/* PWA first-open prompt banner — fixed at the bottom inside the standalone
+   app, dismissible, never appears in regular browser tabs. */
+.pwa-push-prompt {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 12px;
+    z-index: 300;
+    background: #172b4d;
+    color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.pwa-push-prompt-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.4; }
+.pwa-push-prompt-text strong { font-size: 15px; }
+.pwa-push-prompt-text span   { font-size: 13px; color: rgba(255,255,255,0.8); }
+.pwa-push-prompt-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.pwa-push-prompt-no, .pwa-push-prompt-yes {
+    padding: 8px 14px; border-radius: 6px; border: 0; cursor: pointer;
+    font-weight: 700; font-size: 13px;
+}
+.pwa-push-prompt-no  { background: transparent; color: rgba(255,255,255,0.85); }
+.pwa-push-prompt-no:hover { background: rgba(255,255,255,0.1); }
+.pwa-push-prompt-yes { background: #F16820; color: #fff; }
+.pwa-push-prompt-yes:hover { filter: brightness(1.05); }
+.pwa-push-prompt-yes:disabled { opacity: 0.7; cursor: wait; }
+@media (min-width: 600px) {
+    .pwa-push-prompt { left: auto; right: 16px; max-width: 420px; }
+}
+
 .notification-bell svg {
     color: #fff;
 }

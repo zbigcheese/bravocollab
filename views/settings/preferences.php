@@ -61,11 +61,11 @@ $prefs = UserPreferences::get(Auth::userId());
             </label>
         </div>
 
-        <h2 class="settings-section-heading">Browser push notifications</h2>
+        <h2 class="settings-section-heading" id="pushSectionHeading">Browser push notifications</h2>
 
         <div class="pref-row">
             <div class="pref-row-text">
-                <div class="pref-row-title">Enable push notifications on this device</div>
+                <div class="pref-row-title" id="pushTitle">Enable push notifications on this device</div>
                 <div class="pref-row-help" id="pushHelp">
                     Get a system notification on this browser whenever you'd
                     normally get an in-app notification, plus a daily summary
@@ -76,6 +76,25 @@ $prefs = UserPreferences::get(Auth::userId());
             </div>
             <label class="pref-switch">
                 <input type="checkbox" id="pushToggle">
+                <span class="pref-slider"></span>
+            </label>
+        </div>
+
+        <!-- Mobile push checkbox — only rendered visible when running as a
+             PWA (display-mode standalone). It binds to the same per-device
+             subscription as the toggle above; both are kept in sync, but
+             this row makes the option discoverable when someone's already
+             inside the installed app on their phone. -->
+        <div class="pref-row pref-row-pwa-only" id="mobilePushRow" style="display:none;">
+            <div class="pref-row-text">
+                <div class="pref-row-title">Mobile push notifications</div>
+                <div class="pref-row-help">
+                    You're using BravoCollab as an installed app. Toggle this
+                    on to receive push notifications on this phone.
+                </div>
+            </div>
+            <label class="pref-switch">
+                <input type="checkbox" id="mobilePushToggle">
                 <span class="pref-slider"></span>
             </label>
         </div>
@@ -123,7 +142,10 @@ $prefs = UserPreferences::get(Auth::userId());
 </style>
 
 <script>
-(function () {
+// Wrapped so the footer-loaded PWA module is defined by the time refreshState
+// runs (script tags in <body> run before DOMContentLoaded; the deferred
+// external scripts in footer.php load before the event fires).
+document.addEventListener('DOMContentLoaded', function () {
     const flash = document.getElementById('prefSavedFlash');
     let flashTimer = null;
 
@@ -147,104 +169,92 @@ $prefs = UserPreferences::get(Auth::userId());
     });
 
     // ---- Push notifications toggle ----
-    const pushCb     = document.getElementById('pushToggle');
-    const pushStatus = document.getElementById('pushStatus');
+    // Two toggles are wired against the same per-device subscription:
+    // the always-shown "browser" one and the PWA-only "mobile" one. We
+    // keep them in sync because they control the same underlying state.
+    const pushCb         = document.getElementById('pushToggle');
+    const mobileRow      = document.getElementById('mobilePushRow');
+    const mobileCb       = document.getElementById('mobilePushToggle');
+    const pushStatus     = document.getElementById('pushStatus');
+    const pushHeading    = document.getElementById('pushSectionHeading');
+    const pushTitle      = document.getElementById('pushTitle');
     if (!pushCb) return;
 
     const setStatus = (text) => { pushStatus.textContent = text; };
-    const supported = ('serviceWorker' in navigator) && ('PushManager' in window);
 
-    if (!supported) {
+    // When running as a PWA, surface the mobile-specific row + adapt the
+    // section copy to make it obvious which device this controls.
+    if (PWA.isStandalone()) {
+        mobileRow.style.display = '';
+        pushHeading.textContent = 'Push notifications';
+        pushTitle.textContent   = 'Enable push notifications on this device';
+    }
+
+    if (!PWA.isPushSupported()) {
         pushCb.disabled = true;
+        if (mobileCb) mobileCb.disabled = true;
         setStatus('This browser does not support web push notifications.');
         return;
     }
 
-    function urlBase64ToUint8(str) {
-        const padding = '='.repeat((4 - str.length % 4) % 4);
-        const b64 = (str + padding).replace(/-/g, '+').replace(/_/g, '/');
-        const raw = atob(b64);
-        const out = new Uint8Array(raw.length);
-        for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-        return out;
-    }
-
-    let pushState = { configured: false, public_key: '', subscribed: false };
-
     async function refreshState() {
-        try {
-            const res = await App.api('push.status', {}, 'GET');
-            pushState.configured = !!res.configured;
-            pushState.public_key = res.public_key || '';
-        } catch (e) { /* ignore */ }
-
-        if (!pushState.configured) {
+        const status = await PWA.getStatus(true);
+        if (!status.configured) {
             pushCb.disabled = true;
+            if (mobileCb) mobileCb.disabled = true;
             setStatus('Push isn\'t configured on this server. (Admin: run tools/generate_vapid.php and add the keys to config.php.)');
             return;
         }
 
-        const reg = await navigator.serviceWorker.ready.catch(() => null);
-        const sub = reg ? await reg.pushManager.getSubscription() : null;
-        pushState.subscribed = !!sub;
-        pushCb.checked = pushState.subscribed;
-        pushCb.disabled = false;
+        const sub = await PWA.getCurrentSubscription();
+        const subscribed = !!sub;
+        pushCb.checked = subscribed;
+        if (mobileCb) mobileCb.checked = subscribed;
 
-        if (pushState.subscribed) {
-            setStatus('Active on this device.');
-        } else if (Notification.permission === 'denied') {
-            setStatus('Notifications are blocked in this browser. Re-enable them in browser settings, then toggle this on.');
+        if (Notification.permission === 'denied') {
             pushCb.disabled = true;
-        } else {
-            setStatus('Off on this device.');
-        }
-    }
-
-    async function enablePush() {
-        const perm = await Notification.requestPermission();
-        if (perm !== 'granted') {
-            pushCb.checked = false;
-            setStatus('Permission denied — push not enabled.');
+            if (mobileCb) mobileCb.disabled = true;
+            setStatus('Notifications are blocked in this browser. Re-enable them in browser settings, then toggle this on.');
             return;
         }
-        const reg = await navigator.serviceWorker.ready;
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-            sub = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8(pushState.public_key),
-            });
-        }
-        const subJson = sub.toJSON();
-        await App.api('push.subscribe', subJson);
-        setStatus('Active on this device.');
+
+        pushCb.disabled = false;
+        if (mobileCb) mobileCb.disabled = false;
+        setStatus(subscribed ? 'Active on this device.' : 'Off on this device.');
     }
 
-    async function disablePush() {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-            const endpoint = sub.endpoint;
-            try { await sub.unsubscribe(); } catch (e) { /* ignore */ }
-            await App.api('push.unsubscribe', { endpoint });
-        }
-        setStatus('Off on this device.');
-    }
-
-    pushCb.addEventListener('change', async () => {
-        const desired = pushCb.checked;
-        pushCb.disabled = true;
+    async function applyToggle(desired, sourceCb) {
+        // Mirror the source state to the other toggle so they stay in sync.
+        const otherCb = sourceCb === pushCb ? mobileCb : pushCb;
+        sourceCb.disabled = true;
+        if (otherCb) { otherCb.disabled = true; otherCb.checked = desired; }
         try {
-            if (desired) await enablePush();
-            else         await disablePush();
+            if (desired) {
+                const ok = await PWA.enablePush();
+                if (!ok) {
+                    sourceCb.checked = false;
+                    if (otherCb) otherCb.checked = false;
+                    setStatus('Permission denied — push not enabled.');
+                    return;
+                }
+                setStatus('Active on this device.');
+            } else {
+                await PWA.disablePush();
+                setStatus('Off on this device.');
+            }
         } catch (e) {
-            pushCb.checked = !desired;
+            sourceCb.checked  = !desired;
+            if (otherCb) otherCb.checked = !desired;
             App.showToast(e.message || 'Push toggle failed', 'error');
         } finally {
-            pushCb.disabled = false;
+            sourceCb.disabled = false;
+            if (otherCb) otherCb.disabled = false;
         }
-    });
+    }
+
+    pushCb.addEventListener('change', () => applyToggle(pushCb.checked, pushCb));
+    mobileCb?.addEventListener('change', () => applyToggle(mobileCb.checked, mobileCb));
 
     refreshState();
-})();
+});
 </script>
