@@ -80,6 +80,23 @@ const App = {
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     },
 
+    // Full absolute date + time, e.g. "Apr 28, 2026, 14:32". Used where the
+    // exact moment matters (e.g. card creation timestamp) rather than the
+    // relative "5m ago" form.
+    formatDateTime(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString(undefined, {
+            year:   'numeric',
+            month:  'short',
+            day:    'numeric',
+            hour:   '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
+    },
+
     formatDueDate(dateStr) {
         if (!dateStr) return '';
         const d = new Date(dateStr);

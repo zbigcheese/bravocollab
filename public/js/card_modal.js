@@ -19,6 +19,16 @@ const CardModal = {
         return Boolean(typeof Board !== 'undefined' && Board.isPersonal);
     },
 
+    // True when the current user created this card. Title and description
+    // edits are restricted to the creator (server-enforced; this is the
+    // matching UI gate to hide controls that would only 403).
+    isOwnCard() {
+        if (!this.currentCard) return false;
+        const creator = this.currentCard.created_by;
+        if (creator == null) return false;
+        return parseInt(creator) === App.userId;
+    },
+
     isSuppressed() {
         return Date.now() < this._suppressUntil;
     },
@@ -74,7 +84,7 @@ const CardModal = {
                 <div class="modal-header">
                     ${archivedLabel}
                     <input type="checkbox" class="card-detail-complete-check" id="cardCompleteCheck"${c.due_complete == 1 ? ' checked' : ''} title="Mark as complete" aria-label="Mark as complete">
-                    <textarea class="card-detail-title" id="cardTitle" rows="1">${App.escapeHtml(c.title)}</textarea>
+                    <textarea class="card-detail-title" id="cardTitle" rows="1"${this.isOwnCard() ? '' : ' readonly title="Only the card creator can edit the title"'}>${App.escapeHtml(c.title)}</textarea>
                     <button class="modal-close" id="closeCardModal">&times;</button>
                 </div>
                 <div class="card-detail-sidebar-backdrop" id="cardDetailSidebarBackdrop"></div>
@@ -108,7 +118,7 @@ const CardModal = {
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
                             <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-light);">
                                 Created by <strong style="color:var(--color-text);">${App.escapeHtml(c.creator_name)}</strong><br>
-                                ${App.formatDate(c.created_at)}
+                                ${App.formatDateTime(c.created_at)}
                             </div>
                         </div>
                     </div>
@@ -204,6 +214,23 @@ const CardModal = {
     renderDescriptionSection() {
         const c = this.currentCard;
         const hasDesc = c.description && c.description.trim();
+        const editable = this.isOwnCard();
+
+        // Read-only path for non-creators: show the description if it exists,
+        // otherwise hide the section entirely (no point inviting an edit
+        // they can't perform).
+        if (!editable) {
+            if (!hasDesc) return '';
+            return `
+                <div class="card-section">
+                    <div class="card-section-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+                        <h3>Description</h3>
+                    </div>
+                    <div class="card-description-display card-description-readonly">${App.escapeHtml(c.description)}</div>
+                </div>
+            `;
+        }
 
         return `
             <div class="card-section">
@@ -267,7 +294,7 @@ const CardModal = {
             <div class="card-section checklist-section" data-checklist-id="${cl.id}">
                 <div class="card-section-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    <h3>${App.escapeHtml(cl.title)}</h3>
+                    <input class="checklist-title-edit" type="text" data-checklist-id="${cl.id}" value="${App.escapeHtml(cl.title)}" maxlength="255" aria-label="Checklist title">
                     <button class="btn btn-sm btn-secondary delete-checklist" data-checklist-id="${cl.id}" style="margin-left:auto;">Delete</button>
                 </div>
                 <div class="checklist-progress-bar"><div class="checklist-progress-fill" style="width:${pct}%"></div></div>
@@ -444,9 +471,12 @@ const CardModal = {
             }
         });
 
-        // Title edit
+        // Title edit — creator-only. Server enforces the same rule, but
+        // we short-circuit here so the readonly textarea can't accidentally
+        // 403 if the user manages to dispatch a change event.
         const titleEl = document.getElementById('cardTitle');
         titleEl.addEventListener('blur', async () => {
+            if (!this.isOwnCard()) return;
             const newTitle = titleEl.value.trim();
             if (newTitle && newTitle !== c.title) {
                 this.suppressSSE();
@@ -588,7 +618,44 @@ const CardModal = {
                 e.preventDefault();
                 this.addChecklistItem(parseInt(e.target.dataset.checklistId));
             }
+            // Enter on the inline checklist-title editor commits the change
+            // (mirrors the card-title behaviour).
+            if (e.target.matches('.checklist-title-edit') && e.key === 'Enter') {
+                e.preventDefault();
+                e.target.blur();
+            }
+            if (e.target.matches('.checklist-title-edit') && e.key === 'Escape') {
+                // Revert to the stored title and lose focus without saving.
+                const id = parseInt(e.target.dataset.checklistId);
+                const cl = this.currentCard.checklists?.find(x => x.id === id);
+                if (cl) e.target.value = cl.title;
+                e.target.blur();
+            }
         });
+
+        // Save inline checklist title edits on blur. Capture phase because
+        // blur doesn't bubble.
+        overlay.addEventListener('blur', async (e) => {
+            if (!e.target.matches('.checklist-title-edit')) return;
+            const id = parseInt(e.target.dataset.checklistId);
+            const cl = this.currentCard.checklists?.find(x => x.id === id);
+            if (!cl) return;
+            const newTitle = e.target.value.trim();
+            if (!newTitle) {
+                // Empty title isn't allowed by the API; restore the previous one.
+                e.target.value = cl.title;
+                return;
+            }
+            if (newTitle === cl.title) return;
+            this.suppressSSE();
+            try {
+                await App.api('checklists.update', { id, title: newTitle });
+                cl.title = newTitle;
+            } catch (err) {
+                e.target.value = cl.title;
+                App.showToast(err.message || 'Failed to rename checklist', 'error');
+            }
+        }, true);
 
         // Sidebar buttons
         document.getElementById('sidebarCoordinator')?.addEventListener('click', () => this.showCoordinatorPicker());

@@ -43,12 +43,20 @@ class CardController extends Controller
             'created_by' => Auth::userId(),
         ]);
 
+        // Auto-watch: the creator gets watched-by-default so they receive
+        // the same comment / due notifications other watchers get without
+        // having to flip the eye icon on their own card.
+        Database::get()->prepare(
+            'INSERT IGNORE INTO card_watchers (card_id, user_id) VALUES (:cid, :uid)'
+        )->execute(['cid' => $cardId, 'uid' => Auth::userId()]);
+
         $card = $this->cardModel->find($cardId);
         $card['assignees'] = [];
         $card['labels'] = [];
         $card['comment_count'] = 0;
         $card['attachment_count'] = 0;
         $card['checklist_progress'] = '0/0';
+        $card['is_watching'] = 1;
 
         $this->publishSSE($boardId, SSE_CARD_CREATED, ['card' => $card]);
         $this->logActivity($boardId, $cardId, 'card_created', ['title' => $title]);
@@ -128,6 +136,22 @@ class CardController extends Controller
             return;
         }
         $this->requireBoardAccess($boardId);
+
+        // Title and description are creator-only edits. Other fields
+        // (due_date, due_complete, start_date) stay open to anyone with
+        // board access — they're operational, not authorial.
+        $editsTitleOrDesc = isset($data['title']) || array_key_exists('description', $data);
+        if ($editsTitleOrDesc) {
+            $existing = $this->cardModel->find($cardId);
+            if (!$existing) {
+                $this->json(['error' => 'Card not found'], 404);
+                return;
+            }
+            if ((int) $existing['created_by'] !== Auth::userId()) {
+                $this->json(['error' => 'Only the card creator can edit the title or description'], 403);
+                return;
+            }
+        }
 
         $updates = [];
         if (isset($data['title'])) {

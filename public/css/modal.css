@@ -122,6 +122,28 @@
     margin: 0;
 }
 
+/* Inline-editable checklist title — looks like the section heading until
+   focused, then reveals an input outline like the card-detail-title. */
+.checklist-title-edit {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font-family);
+    color: var(--color-text);
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    margin: -2px 0;     /* keep the header height stable vs. the non-editable case */
+}
+.checklist-title-edit:hover { border-color: var(--color-border); }
+.checklist-title-edit:focus {
+    border-color: var(--color-primary);
+    background: var(--color-white);
+    outline: none;
+}
+
 .card-section-header .btn-sm {
     margin-left: auto;
 }
@@ -168,6 +190,31 @@
     border-color: var(--color-primary);
     background: var(--color-white);
     outline: none;
+}
+
+/* Read-only title for non-creators — no edit affordance, no hover/focus
+   ring, no text caret. Server-enforced; this is the cosmetic match. */
+.card-detail-title[readonly] {
+    cursor: default;
+}
+.card-detail-title[readonly]:focus {
+    border-color: transparent;
+    background: transparent;
+    outline: none;
+}
+
+/* Read-only description shown to non-creators — same visuals as the
+   editable display block but no hover/click/cursor cues. */
+.card-description-readonly {
+    padding: 8px 12px;
+    min-height: 40px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    cursor: default;
 }
 
 /* Description */
