@@ -161,6 +161,8 @@ class ChecklistController extends Controller
         $boardId = $this->getBoardIdForCard($item['card_id']);
         $this->requireBoardAccess($boardId);
 
+        $wasChecked = (int) ($item['is_checked'] ?? 0) === 1;
+
         $db->prepare('UPDATE checklist_items SET is_checked = :checked, checked_by = :by, checked_at = :at WHERE id = :id')
            ->execute([
                'checked' => $isChecked ? 1 : 0,
@@ -168,6 +170,17 @@ class ChecklistController extends Controller
                'at'      => $isChecked ? date('Y-m-d H:i:s') : null,
                'id'      => $itemId,
            ]);
+
+        // Notify subscribers only on the unchecked → checked transition
+        // (un-checking is silent — it's usually a correction, not an event).
+        if ($isChecked && !$wasChecked) {
+            $this->notifyCardEvent(
+                (int) $item['card_id'],
+                $boardId,
+                NOTIF_ITEM_COMPLETED,
+                ['item_content' => $item['content'] ?? '']
+            );
+        }
 
         $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => $item['card_id']]);
 

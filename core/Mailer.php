@@ -372,6 +372,14 @@ class Mailer
             case 'comment_added':   $line = "<strong>{$actor}</strong> commented on <strong>{$card}</strong>"; break;
             case 'comment_mention': $line = "<strong>{$actor}</strong> mentioned you in <strong>{$card}</strong>"; break;
             case 'comment_reply':   $line = "<strong>{$actor}</strong> replied to your comment on <strong>{$card}</strong>"; break;
+            case 'card_completed':  $line = "<strong>{$actor}</strong> marked <strong>{$card}</strong> as done"; break;
+            case 'item_completed': {
+                $itemContent = htmlspecialchars((string) ($data['item_content'] ?? ''), ENT_QUOTES);
+                $line = "<strong>{$actor}</strong> checked off "
+                      . ($itemContent !== '' ? "<em>{$itemContent}</em> on " : '')
+                      . "<strong>{$card}</strong>";
+                break;
+            }
             case 'due_soon':        $line = "<strong>{$card}</strong> is due soon"; break;
             case 'due_overdue':     $line = "<strong>{$card}</strong> is overdue"; break;
             case 'board_invited':   $line = "<strong>{$actor}</strong> added you to <strong>{$board}</strong>"; break;
@@ -407,6 +415,8 @@ class Mailer
             case 'comment_added':   return "{$actor} commented on {$card} — {$appName}";
             case 'comment_mention': return "{$actor} mentioned you in {$card} — {$appName}";
             case 'comment_reply':   return "{$actor} replied to your comment on {$card} — {$appName}";
+            case 'card_completed':  return "{$actor} marked {$card} as done — {$appName}";
+            case 'item_completed':  return "{$actor} checked off a task on {$card} — {$appName}";
             case 'due_soon':        return "{$card} is due soon — {$appName}";
             case 'due_overdue':     return "{$card} is overdue — {$appName}";
             case 'board_invited':   return "You were added to {$board} — {$appName}";

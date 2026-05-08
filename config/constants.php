@@ -14,6 +14,8 @@ define('NOTIF_CARD_UNASSIGNED', 'card_unassigned');
 define('NOTIF_COMMENT_ADDED', 'comment_added');
 define('NOTIF_COMMENT_MENTION', 'comment_mention');
 define('NOTIF_COMMENT_REPLY',   'comment_reply');
+define('NOTIF_CARD_COMPLETED',  'card_completed');
+define('NOTIF_ITEM_COMPLETED',  'item_completed');
 define('NOTIF_DUE_SOON', 'due_soon');
 define('NOTIF_DUE_OVERDUE', 'due_overdue');
 define('NOTIF_BOARD_INVITED', 'board_invited');

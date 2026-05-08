@@ -172,7 +172,26 @@ class CardController extends Controller
             return;
         }
 
+        // Snapshot due_complete before applying updates so we know if this
+        // request transitions the card from incomplete → complete (only the
+        // forward transition fires a notification; un-completing doesn't).
+        $prevDueComplete = null;
+        if (isset($updates['due_complete'])) {
+            $stmt = Database::get()->prepare('SELECT due_complete FROM cards WHERE id = :id');
+            $stmt->execute(['id' => $cardId]);
+            $row = $stmt->fetch();
+            $prevDueComplete = $row ? (int) $row['due_complete'] : null;
+        }
+
         $this->cardModel->update($cardId, $updates);
+
+        // Notify subscribers when this update completes the card.
+        if (isset($updates['due_complete'])
+            && (int) $updates['due_complete'] === 1
+            && $prevDueComplete === 0
+        ) {
+            $this->notifyCardEvent($cardId, $boardId, NOTIF_CARD_COMPLETED);
+        }
 
         $card = $this->cardModel->find($cardId);
         $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $card]);

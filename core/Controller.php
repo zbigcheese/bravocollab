@@ -259,6 +259,59 @@ class Controller
         ]);
     }
 
+    /**
+     * Set of user IDs subscribed to events for this card — assignees,
+     * watchers, plus the coordinator IF they've opted into coordinator
+     * notifications. Mirrors the recipient set used for comment notifies.
+     * Caller is still responsible for filtering out the actor (createNotification
+     * does that automatically).
+     */
+    protected function cardSubscriberIds(int $cardId): array
+    {
+        $stmt = Database::get()->prepare(
+            'SELECT user_id FROM card_assignments WHERE card_id = :cid_a
+             UNION
+             SELECT user_id FROM card_watchers WHERE card_id = :cid_w
+             UNION
+             SELECT c.coordinator_id AS user_id
+             FROM cards c
+             LEFT JOIN user_preferences up ON up.user_id = c.coordinator_id
+             WHERE c.id = :cid_c
+               AND c.coordinator_id IS NOT NULL
+               AND COALESCE(up.notify_coordinator_cards, 0) = 1'
+        );
+        $stmt->execute(['cid_a' => $cardId, 'cid_w' => $cardId, 'cid_c' => $cardId]);
+        $ids = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $ids[(int) $row['user_id']] = true;
+        }
+        return array_keys($ids);
+    }
+
+    /**
+     * Helper: notify everyone subscribed to a card about a generic event
+     * (completion, item-completed, etc.). Looks up the card title once and
+     * deduplicates the recipient set via cardSubscriberIds.
+     */
+    protected function notifyCardEvent(int $cardId, int $boardId, string $type, array $extraData = []): void
+    {
+        $stmt = Database::get()->prepare('SELECT title FROM cards WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $cardId]);
+        $row = $stmt->fetch();
+        $cardTitle = $row['title'] ?? '';
+
+        $payload = array_merge([
+            'board_id'   => $boardId,
+            'card_id'    => $cardId,
+            'card_title' => $cardTitle,
+            'actor_name' => Auth::userName(),
+        ], $extraData);
+
+        foreach ($this->cardSubscriberIds($cardId) as $uid) {
+            $this->createNotification($uid, $type, $payload);
+        }
+    }
+
     protected function getBoardIdForCard(int $cardId): ?int
     {
         $db = Database::get();

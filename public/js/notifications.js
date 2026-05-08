@@ -151,6 +151,14 @@ const Notifications = {
                 return `<strong>${actor}</strong> mentioned you in <strong>${card}</strong>`;
             case 'comment_reply':
                 return `<strong>${actor}</strong> replied to your comment on <strong>${card}</strong>`;
+            case 'card_completed':
+                return `<strong>${actor}</strong> marked <strong>${card}</strong> as done`;
+            case 'item_completed': {
+                const item = App.escapeHtml(data.item_content || '');
+                return item
+                    ? `<strong>${actor}</strong> checked off <em>${item}</em> on <strong>${card}</strong>`
+                    : `<strong>${actor}</strong> checked off a task on <strong>${card}</strong>`;
+            }
             case 'whats_next': {
                 const c = parseInt(data.cards_total || 0);
                 const i = parseInt(data.items_total || 0);
@@ -179,6 +187,11 @@ const Notifications = {
             case 'due_soon':
             case 'due_overdue':
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EB5A46" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            case 'card_completed':
+            case 'item_completed':
+                // Filled checkmark in a circle so completion notifications
+                // visually pop next to the comment / due-date icons.
+                return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#61BD4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="8 12.5 11 15.5 16 9.5"/></svg>';
             default:
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0079BF" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>';
         }
