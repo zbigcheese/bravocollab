@@ -1,8 +1,8 @@
     </main>
     <div id="toast-container"></div>
-    <script src="public/js/app.js"></script>
-    <script src="public/js/notifications.js"></script>
-    <script src="public/js/pwa.js"></script>
+    <script src="<?php echo asset_url('public/js/app.js'); ?>"></script>
+    <script src="<?php echo asset_url('public/js/notifications.js'); ?>"></script>
+    <script src="<?php echo asset_url('public/js/pwa.js'); ?>"></script>
     <script>
         (function () {
             const trigger  = document.getElementById('userMenuTrigger');

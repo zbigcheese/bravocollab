@@ -16,7 +16,7 @@ $_isPersonalOwner = $_pageBoard
 $_isPersonal = $_pageBoard && (int) ($_pageBoard['is_personal'] ?? 0) === 1;
 $_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
 ?>
-<link rel="stylesheet" href="public/css/board_views.css">
+<link rel="stylesheet" href="<?php echo asset_url('public/css/board_views.css'); ?>">
 <div class="board-wrapper" id="boardWrapper"
      data-board-id="<?php echo $boardId; ?>"
      data-is-admin="<?php echo $_canAdmin ? '1' : '0'; ?>"
@@ -85,8 +85,8 @@ $_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
     </div>
 </div>
 
-<script src="public/vendor/sortable.min.js"></script>
-<script src="public/js/board.js"></script>
-<script src="public/js/card_modal.js"></script>
-<script src="public/js/board_views.js"></script>
-<script src="public/js/sse_client.js"></script>
+<script src="<?php echo asset_url('public/vendor/sortable.min.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/board.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/card_modal.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/board_views.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/sse_client.js'); ?>"></script>

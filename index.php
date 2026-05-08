@@ -12,6 +12,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/core/Auth.php';
 require_once __DIR__ . '/core/CSRF.php';
 require_once __DIR__ . '/core/Validator.php';
+require_once __DIR__ . '/core/Helpers.php';
 
 Auth::init();
 

@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="public/css/board_views.css">
+<link rel="stylesheet" href="<?php echo asset_url('public/css/board_views.css'); ?>">
 <div class="dashboard" id="dashboard">
     <div class="dashboard-header">
         <h1>My Boards</h1>
@@ -48,7 +48,7 @@
         <div id="dashboardTimelinePane" class="dashboard-cal-pane" hidden></div>
     </section>
 </div>
-<script src="public/js/dashboard_views.js"></script>
+<script src="<?php echo asset_url('public/js/dashboard_views.js'); ?>"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
