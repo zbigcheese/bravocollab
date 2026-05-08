@@ -154,6 +154,13 @@
     /* Reuses the calendar/timeline classes from below; this just gives
        the pane sensible spacing inside the dashboard card. */
     padding: 4px 0 8px;
+    /* Timeline content has min-width:720px and the mobile calendar uses
+       a horizontal flex strip — both need a scroll container ON THE PANE
+       so they don't push the whole page sideways. The board view gets
+       this for free via .board-view-pane; the dashboard pane needs it
+       declared explicitly. */
+    overflow-x: auto;
+    max-width: 100%;
 }
 .dashboard-cal-pane[hidden] { display: none; }
 
@@ -162,6 +169,22 @@
    board background. Here it sits over a white card. */
 .dashboard-cal-pane .view-title {
     color: #172b4d;
+}
+
+/* SVG arrow buttons inside the dashboard view-toolbar — keep them tight
+   so the chevron sits centred in the button without expanding it. */
+.dashboard-cal-pane .nav-arrow-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    line-height: 0;
+}
+.dashboard-cal-pane .nav-arrow-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+    flex-shrink: 0;
 }
 
 @media (max-width: 768px) {

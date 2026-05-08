@@ -247,9 +247,9 @@ const DashboardViews = {
 
         pane.innerHTML = `
             <div class="view-toolbar">
-                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous month">&lsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="prev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
                 <div class="view-title">${monthName}</div>
-                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next month">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="next" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></button>
                 <button class="btn btn-sm btn-secondary" data-nav="today">Today</button>
             </div>
             <div class="calendar-grid">
@@ -319,9 +319,9 @@ const DashboardViews = {
 
         pane.innerHTML = `
             <div class="view-toolbar">
-                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous week">&lsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="prev" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
                 <div class="view-title">${title}</div>
-                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next week">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="next" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></button>
                 <button class="btn btn-sm btn-secondary" data-nav="today">This week</button>
             </div>
             <div class="calendar-grid calendar-week">${cellsHtml}</div>
@@ -403,9 +403,9 @@ const DashboardViews = {
 
         pane.innerHTML = `
             <div class="view-toolbar">
-                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous month">&lsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="prev" aria-label="Previous month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
                 <div class="view-title">${monthName}</div>
-                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next month">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="next" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></button>
                 <button class="btn btn-sm btn-secondary" data-nav="today">Today</button>
             </div>
             <div class="tl-wrap" style="--tl-days:${daysInMonth};">
@@ -468,9 +468,9 @@ const DashboardViews = {
 
         pane.innerHTML = `
             <div class="view-toolbar">
-                <button class="btn btn-sm btn-secondary" data-nav="prev" aria-label="Previous week">&lsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="prev" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
                 <div class="view-title">${title}</div>
-                <button class="btn btn-sm btn-secondary" data-nav="next" aria-label="Next week">&rsaquo;</button>
+                <button class="btn btn-sm btn-secondary nav-arrow-btn" data-nav="next" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></button>
                 <button class="btn btn-sm btn-secondary" data-nav="today">This week</button>
             </div>
             <div class="tl-wrap" style="--tl-days:${daysInWeek};">
