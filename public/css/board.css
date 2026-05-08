@@ -101,6 +101,12 @@
     font-weight: 700;
     position: relative;
     z-index: 1;
+    /* Long unbroken strings (URLs, run-on words) must wrap into the
+       card height rather than push the grid column wider — otherwise
+       the whole dashboard scrolls horizontally. */
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
 }
 
 .board-tile-meta {
@@ -114,6 +120,12 @@
 .board-tile-wrap {
     display: flex;
     flex-direction: column;
+    /* Grid items default to min-width:auto = "don't shrink below content".
+       Long board titles or update rows would then push the grid column
+       (and the dashboard) wider than the viewport. Forcing 0 lets the
+       column collapse to its `minmax(240px, 1fr)` share and content
+       wraps inside instead. */
+    min-width: 0;
 }
 
 /* Personal board carries no updates list, so its tile alone has to fill the
@@ -172,6 +184,9 @@
 .board-update-line {
     color: var(--color-text);
     line-height: 1.35;
+    /* Long actor / verb strings shouldn't push the dashboard wider. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .board-update-card {
