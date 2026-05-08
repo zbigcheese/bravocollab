@@ -39,6 +39,17 @@ try {
     $db->exec("ALTER TABLE `checklist_items` MODIFY COLUMN `due_date` DATETIME DEFAULT NULL");
 } catch (Throwable $e) { /* already correct or insufficient priv — non-fatal */ }
 
+// Self-heal: attachments may now belong to a specific comment in addition to
+// a card. Add comment_id + matching index + FK on existing installs. Each
+// statement is wrapped because re-running them on an already-migrated DB
+// raises duplicate-column / duplicate-key errors that we want to ignore.
+try { $db->exec("ALTER TABLE `attachments` ADD COLUMN `comment_id` INT UNSIGNED DEFAULT NULL AFTER `card_id`"); }
+catch (Throwable $e) { /* already added */ }
+try { $db->exec("ALTER TABLE `attachments` ADD INDEX `idx_comment` (`comment_id`)"); }
+catch (Throwable $e) { /* already added */ }
+try { $db->exec("ALTER TABLE `attachments` ADD CONSTRAINT `fk_attachment_comment` FOREIGN KEY (`comment_id`) REFERENCES `comments`(`id`) ON DELETE CASCADE"); }
+catch (Throwable $e) { /* already added */ }
+
 // Self-heal: ensure the whats_next_sent table exists for the daily 8am CET
 // digest. Idempotent; lets fresh `git pull` deployments run without a manual
 // schema migration step.

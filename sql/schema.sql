@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS `comments` (
 CREATE TABLE IF NOT EXISTS `attachments` (
     `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `card_id`        INT UNSIGNED NOT NULL,
+    `comment_id`     INT UNSIGNED DEFAULT NULL,
     `user_id`        INT UNSIGNED NOT NULL,
     `original_name`  VARCHAR(255) NOT NULL,
     `stored_name`    VARCHAR(255) NOT NULL,
@@ -226,9 +227,11 @@ CREATE TABLE IF NOT EXISTS `attachments` (
     `is_image`       TINYINT(1) NOT NULL DEFAULT 0,
     `thumbnail_path` VARCHAR(255) DEFAULT NULL,
     `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`card_id`) REFERENCES `cards`(`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-    INDEX `idx_card` (`card_id`)
+    FOREIGN KEY (`card_id`)    REFERENCES `cards`(`id`)    ON DELETE CASCADE,
+    FOREIGN KEY (`comment_id`) REFERENCES `comments`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)    REFERENCES `users`(`id`)    ON DELETE CASCADE,
+    INDEX `idx_card`    (`card_id`),
+    INDEX `idx_comment` (`comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

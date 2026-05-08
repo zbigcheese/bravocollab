@@ -371,7 +371,19 @@ const CardModal = {
         return html;
     },
 
-    renderSingleComment(cm, isReply = false) {
+    renderSingleComment(cm, depthOrIsReply = 0) {
+        // Backwards-compat: original callers passed isReply (true|false).
+        // Coerce both shapes into a depth integer (0 = root, 1 = reply,
+        // 2 = reply-to-reply).
+        const depth = typeof depthOrIsReply === 'boolean'
+            ? (depthOrIsReply ? 1 : 0)
+            : Math.max(0, parseInt(depthOrIsReply) || 0);
+        const isReply = depth > 0;
+        // Reply button hidden at depth 2 — server caps nesting there and
+        // silently flattens further attempts, so a Reply affordance would
+        // mislead.
+        const canReply = depth < 2;
+
         // Edit and Delete are strictly own-comments — admins included. Server
         // enforces this. The client-side check is purely a UX hint that hides
         // buttons we know won't work — so if EITHER side of the comparison is
@@ -386,8 +398,13 @@ const CardModal = {
         const editBtn    = isOwn ? `<button class="edit-comment" data-comment-id="${cm.id}">Edit</button>` : '';
         const deleteBtn  = isOwn ? `<button class="delete-comment" data-comment-id="${cm.id}">Delete</button>` : '';
 
+        const atts = Array.isArray(cm.attachments) ? cm.attachments : [];
+        const attsHtml = atts.length
+            ? `<div class="comment-attachments">${atts.map(a => this.renderCommentAttachment(a, isOwn)).join('')}</div>`
+            : '';
+
         return `
-            <div class="comment-item ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
+            <div class="comment-item depth-${depth} ${isReply ? 'comment-reply' : ''}" data-comment-id="${cm.id}">
                 ${App.avatarHtml(cm.author_name, isReply ? 'sm' : '')}
                 <div class="comment-body">
                     <div class="comment-header">
@@ -395,8 +412,9 @@ const CardModal = {
                         <span class="comment-time">${App.formatDate(cm.created_at)}${cm.is_edited ? ' (edited)' : ''}</span>
                     </div>
                     <div class="comment-text">${this.formatCommentBody(cm.body)}</div>
+                    ${attsHtml}
                     <div class="comment-actions">
-                        ${!isReply ? `<button class="reply-comment" data-comment-id="${cm.id}" data-author="${App.escapeHtml(cm.author_name)}">Reply</button>` : ''}
+                        ${canReply ? `<button class="reply-comment" data-comment-id="${cm.id}" data-author="${App.escapeHtml(cm.author_name)}">Reply</button>` : ''}
                         ${editBtn}
                         ${deleteBtn}
                     </div>
@@ -405,24 +423,66 @@ const CardModal = {
         `;
     },
 
+    // Compact attachment renderer for inline-in-comment display. Image
+    // thumbnails open the lightbox (which scans both card-level and
+    // comment-level images). Non-images get the same icon-tile treatment as
+    // card attachments but in a tighter layout.
+    renderCommentAttachment(a, isOwn) {
+        const delBtn = isOwn
+            ? `<button class="comment-attach-delete delete-attachment" data-attachment-id="${a.id}" title="Remove" aria-label="Remove">&times;</button>`
+            : '';
+        if (a.is_image) {
+            return `
+                <div class="comment-attachment is-image" data-attachment-id="${a.id}">
+                    <img class="comment-attach-thumb lightbox-trigger"
+                         src="api.php?action=attachments.download&id=${a.id}&thumb=1"
+                         data-attachment-id="${a.id}" alt="${App.escapeHtml(a.original_name)}">
+                    ${delBtn}
+                </div>
+            `;
+        }
+        return `
+            <div class="comment-attachment is-file" data-attachment-id="${a.id}">
+                <a class="comment-attach-link" href="api.php?action=attachments.download&id=${a.id}" download>
+                    <span class="comment-attach-icon">${this.getFileExt(a.original_name)}</span>
+                    <span class="comment-attach-name">${App.escapeHtml(a.original_name)}</span>
+                    <span class="comment-attach-size">${this.formatFileSize(a.file_size)}</span>
+                </a>
+                ${delBtn}
+            </div>
+        `;
+    },
+
     renderCommentsSection() {
         const c = this.currentCard;
         const allComments = c.comments || [];
 
-        // Thread: root comments (no parent) with their replies nested below
-        const roots = allComments.filter(cm => !cm.parent_id);
-        const replies = allComments.filter(cm => cm.parent_id);
+        // Index every comment by its parent_id so the renderer can recurse.
+        // Server caps depth at 2, so this can't unbound itself.
         const replyMap = {};
-        replies.forEach(r => {
-            const pid = parseInt(r.parent_id);
-            if (!replyMap[pid]) replyMap[pid] = [];
-            replyMap[pid].push(r);
+        allComments.forEach(cm => {
+            if (cm.parent_id) {
+                const pid = parseInt(cm.parent_id);
+                if (!replyMap[pid]) replyMap[pid] = [];
+                replyMap[pid].push(cm);
+            }
         });
 
-        const commentsHtml = roots.map(cm => {
-            const threadReplies = (replyMap[cm.id] || []).map(r => this.renderSingleComment(r, true)).join('');
-            return this.renderSingleComment(cm, false) + (threadReplies ? `<div class="comment-replies">${threadReplies}</div>` : '');
-        }).join('');
+        const renderThread = (cm, depth) => {
+            let html = this.renderSingleComment(cm, depth);
+            const children = replyMap[cm.id] || [];
+            if (children.length > 0) {
+                html += '<div class="comment-replies">';
+                for (const child of children) {
+                    html += renderThread(child, Math.min(depth + 1, 2));
+                }
+                html += '</div>';
+            }
+            return html;
+        };
+
+        const roots = allComments.filter(cm => !cm.parent_id);
+        const commentsHtml = roots.map(cm => renderThread(cm, 0)).join('');
 
         return `
             <div class="card-section" id="commentsSection">
@@ -435,7 +495,12 @@ const CardModal = {
                         <textarea id="newComment" placeholder="${this.isPersonalBoard() ? 'Write a note...' : 'Write a comment... Use @ to mention members'}"></textarea>
                         <div id="mentionDropdown" class="mention-dropdown" style="display:none;"></div>
                     </div>
-                    <button class="btn btn-primary btn-sm" id="submitComment" style="margin-top:6px;">Comment</button>
+                    <div class="staged-attachments" id="newCommentStaged"></div>
+                    <div class="comment-form-actions">
+                        <button class="btn btn-primary btn-sm" id="submitComment">Comment</button>
+                        <button type="button" class="attach-trigger-btn" id="newCommentAttachBtn" title="Attach file" aria-label="Attach file">📎</button>
+                        <button type="button" class="emoji-trigger-btn" id="newCommentEmojiBtn" title="Insert emoji" aria-label="Insert emoji">😊</button>
+                    </div>
                 </div>
                 <div id="commentsList">${commentsHtml || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
             </div>
@@ -572,6 +637,24 @@ const CardModal = {
                 document.getElementById('mentionDropdown')
             );
         }
+
+        // Emoji picker on the main composer.
+        if (typeof EmojiPicker !== 'undefined') {
+            EmojiPicker.attach(
+                document.getElementById('newComment'),
+                document.getElementById('newCommentEmojiBtn')
+            );
+        }
+
+        // File staging for the main composer. Files queue up locally; they
+        // upload after the comment row is created so they get the right
+        // comment_id.
+        this._newCommentStaged = [];
+        this.attachFileStaging(
+            document.getElementById('newCommentAttachBtn'),
+            document.getElementById('newCommentStaged'),
+            this._newCommentStaged
+        );
 
         // Delegated actions
         overlay.addEventListener('click', (e) => {
@@ -801,6 +884,15 @@ const CardModal = {
         const commentEl = document.querySelector(`.comment-item[data-comment-id="${parentCommentId}"]`);
         if (!commentEl) return;
 
+        // Find the parent's depth so we can render the optimistic new
+        // comment with the correct nesting level (1 if parent is root, 2
+        // if parent is itself a reply — server caps further nesting).
+        const parentComment = (this.currentCard.comments || []).find(
+            x => parseInt(x.id) === parseInt(parentCommentId)
+        );
+        const parentDepth = (parentComment && parentComment.parent_id) ? 1 : 0;
+        const newDepth = Math.min(parentDepth + 1, 2);
+
         // Find or create the replies container
         let repliesContainer = commentEl.nextElementSibling;
         if (!repliesContainer || !repliesContainer.classList.contains('comment-replies')) {
@@ -816,9 +908,12 @@ const CardModal = {
                 <textarea class="inline-reply-textarea" placeholder="Reply to ${App.escapeHtml(authorName)}..." rows="2"></textarea>
                 <div class="inline-reply-mention-dropdown mention-dropdown" style="display:none;"></div>
             </div>
-            <div style="display:flex;gap:6px;margin-top:4px;">
+            <div class="staged-attachments inline-reply-staged"></div>
+            <div class="comment-form-actions" style="margin-top:4px;">
                 <button class="btn btn-primary btn-sm inline-reply-submit">Reply</button>
                 <button class="btn btn-secondary btn-sm inline-reply-cancel">Cancel</button>
+                <button type="button" class="attach-trigger-btn inline-reply-attach" title="Attach file" aria-label="Attach file">📎</button>
+                <button type="button" class="emoji-trigger-btn inline-reply-emoji" title="Insert emoji" aria-label="Insert emoji">😊</button>
             </div>
         `;
         // Place reply form at top so newest reply lands above existing ones.
@@ -834,9 +929,23 @@ const CardModal = {
             this.initMentionAutocompleteOn(textarea, dropdown);
         }
 
+        // Emoji picker for the inline reply.
+        if (typeof EmojiPicker !== 'undefined') {
+            EmojiPicker.attach(textarea, form.querySelector('.inline-reply-emoji'));
+        }
+
+        // File staging for the inline reply.
+        const replyStaged = [];
+        this.attachFileStaging(
+            form.querySelector('.inline-reply-attach'),
+            form.querySelector('.inline-reply-staged'),
+            replyStaged
+        );
+
         form.querySelector('.inline-reply-submit').addEventListener('click', async () => {
             const body = textarea.value.trim();
             if (!body) return;
+            const stagedFiles = replyStaged.slice();
             this.suppressSSE();
             try {
                 const res = await App.api('comments.create', {
@@ -853,11 +962,16 @@ const CardModal = {
                         author_name: document.querySelector('.user-name')?.textContent || 'You',
                         created_at: new Date().toISOString(),
                         is_edited: false,
+                        attachments: [],
                     };
                     this.currentCard.comments.push(newComment);
                     form.remove();
-                    repliesContainer.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment, true));
-                    this.refreshBoardCard();
+                    repliesContainer.insertAdjacentHTML('afterbegin', this.renderSingleComment(newComment, newDepth));
+                    if (stagedFiles.length) {
+                        await this.uploadCommentAttachments(stagedFiles, newComment.id, { injectIntoCommentDom: true });
+                    } else {
+                        this.refreshBoardCard();
+                    }
                 }
             } catch (e) {
                 App.showToast(e.message, 'error');
@@ -883,6 +997,10 @@ const CardModal = {
     async addComment() {
         const textarea = document.getElementById('newComment');
         const body = textarea.value.trim();
+        const stagedFiles = (this._newCommentStaged || []).slice();
+        // Allow comment-less attach-only posts? The card-level UI uploads
+        // directly; here we still require a body so the row has visible
+        // content. (Kept consistent with existing comments behaviour.)
         if (!body) return;
 
         const parentId = this._replyToId || null;
@@ -903,6 +1021,7 @@ const CardModal = {
                     author_name: document.querySelector('.user-name')?.textContent || 'You',
                     created_at: new Date().toISOString(),
                     is_edited: false,
+                    attachments: [],
                 };
                 this.currentCard.comments = this.currentCard.comments || [];
                 this.currentCard.comments.push(newComment);
@@ -931,7 +1050,15 @@ const CardModal = {
                     ? 'Write a note...'
                     : 'Write a comment... Use @ to mention members';
                 this._replyToId = null;
-                this.refreshBoardCard();
+
+                // Drain staged files into the freshly-created comment.
+                if (stagedFiles.length) {
+                    this._newCommentStaged.length = 0;
+                    this.renderStagedFiles(document.getElementById('newCommentStaged'), this._newCommentStaged);
+                    await this.uploadCommentAttachments(stagedFiles, newComment.id, { injectIntoCommentDom: true });
+                } else {
+                    this.refreshBoardCard();
+                }
             }
         } catch (e) {
             App.showToast(e.message, 'error');
@@ -957,6 +1084,8 @@ const CardModal = {
             <div class="comment-edit-actions">
                 <button class="btn btn-primary btn-sm save-edit-comment">Save</button>
                 <button class="btn btn-secondary btn-sm cancel-edit-comment">Cancel</button>
+                <button type="button" class="attach-trigger-btn comment-edit-attach" title="Attach file" aria-label="Attach file">📎</button>
+                <button type="button" class="emoji-trigger-btn comment-edit-emoji" title="Insert emoji" aria-label="Insert emoji">😊</button>
             </div>
         `;
 
@@ -972,6 +1101,25 @@ const CardModal = {
         if (!this.isPersonalBoard()) {
             this.initMentionAutocomplete(editArea, dropdown);
         }
+
+        // Emoji picker on the edit textarea.
+        if (typeof EmojiPicker !== 'undefined') {
+            EmojiPicker.attach(editArea, commentEl.querySelector('.comment-edit-emoji'));
+        }
+
+        // Attach button on edit — uploads immediately to the existing comment.
+        const editAttachBtn = commentEl.querySelector('.comment-edit-attach');
+        editAttachBtn?.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.addEventListener('change', async () => {
+                const files = Array.from(input.files);
+                if (!files.length) return;
+                await this.uploadCommentAttachments(files, commentId, { injectIntoCommentDom: true });
+            });
+            input.click();
+        });
 
         const restoreDisplay = (body) => {
             commentEl.classList.remove('is-editing');
@@ -1305,18 +1453,137 @@ const CardModal = {
         this.suppressSSE();
         try {
             await App.api('attachments.delete', { id: attachmentId });
-            this.currentCard.attachments = (this.currentCard.attachments || []).filter(a => a.id !== attachmentId);
-            document.querySelector(`.attachment-item[data-attachment-id="${attachmentId}"]`)?.remove();
+            // Strip from card-level list (if it lived there) and from any
+            // comment that owns it. IDs round-trip as numbers/strings via
+            // SSE; coerce on both sides to keep the filter reliable.
+            const target = parseInt(attachmentId);
+            this.currentCard.attachments = (this.currentCard.attachments || []).filter(a => parseInt(a.id) !== target);
+            (this.currentCard.comments || []).forEach(cm => {
+                if (Array.isArray(cm.attachments)) {
+                    cm.attachments = cm.attachments.filter(a => parseInt(a.id) !== target);
+                }
+            });
+            document.querySelectorAll(`[data-attachment-id="${attachmentId}"]`).forEach(el => {
+                if (el.classList.contains('attachment-item') || el.classList.contains('comment-attachment')) {
+                    el.remove();
+                }
+            });
             this.refreshBoardCard();
         } catch (e) {
             App.showToast(e.message, 'error');
         }
     },
 
+    // Wire a paperclip button + a chip-list container so the user can stage
+    // files locally. Returns the staged-list reference (same one passed in)
+    // for convenience. Files upload after the comment they belong to is
+    // created (or, in edit mode, immediately).
+    attachFileStaging(button, listEl, stagedList) {
+        if (!button || !listEl) return stagedList;
+        button.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.addEventListener('change', () => {
+                for (const f of input.files) {
+                    stagedList.push(f);
+                }
+                this.renderStagedFiles(listEl, stagedList);
+            });
+            input.click();
+        });
+        listEl.addEventListener('click', (e) => {
+            const rm = e.target.closest('.staged-remove');
+            if (!rm) return;
+            const idx = parseInt(rm.dataset.idx);
+            if (!Number.isFinite(idx)) return;
+            stagedList.splice(idx, 1);
+            this.renderStagedFiles(listEl, stagedList);
+        });
+        return stagedList;
+    },
+
+    renderStagedFiles(listEl, stagedList) {
+        if (!listEl) return;
+        if (!stagedList.length) { listEl.innerHTML = ''; return; }
+        listEl.innerHTML = stagedList.map((f, i) => `
+            <span class="staged-file" title="${App.escapeHtml(f.name)}">
+                <span class="staged-file-name">${App.escapeHtml(f.name)}</span>
+                <span class="staged-file-size">${this.formatFileSize(f.size)}</span>
+                <button type="button" class="staged-remove" data-idx="${i}" aria-label="Remove">&times;</button>
+            </span>
+        `).join('');
+    },
+
+    // Upload a list of staged File objects against a (newly-created or
+    // existing) comment. Mutates the in-memory comment object's attachments
+    // array and, optionally, appends rendered nodes into the supplied
+    // container so the new attachment appears without a full re-render.
+    async uploadCommentAttachments(files, commentId, options = {}) {
+        if (!files || !files.length) return [];
+        this.suppressSSE();
+        const uploaded = [];
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('card_id', this.currentCard.id);
+            formData.append('comment_id', commentId);
+            try {
+                const res = await App.upload('attachments.upload', formData);
+                if (res.error) throw new Error(res.error);
+                if (res.attachment) {
+                    const a = res.attachment;
+                    a.uploader_name = document.querySelector('.user-name')?.textContent || 'You';
+                    a.created_at = new Date().toISOString();
+                    uploaded.push(a);
+                    // Fold into the in-memory comment so subsequent renders
+                    // (and the lightbox sweep) include it.
+                    const comment = (this.currentCard.comments || []).find(
+                        cm => parseInt(cm.id) === parseInt(commentId)
+                    );
+                    if (comment) {
+                        comment.attachments = comment.attachments || [];
+                        comment.attachments.push(a);
+                    }
+                }
+            } catch (e) {
+                App.showToast(e.message || 'Upload failed', 'error');
+            }
+        }
+        // Optional DOM injection: append into a comment-attachments container
+        // belonging to the comment, creating it if absent.
+        if (options.injectIntoCommentDom && uploaded.length) {
+            const commentEl = document.querySelector(`.comment-item[data-comment-id="${commentId}"] .comment-body`);
+            if (commentEl) {
+                let container = commentEl.querySelector('.comment-attachments');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.className = 'comment-attachments';
+                    // Insert after .comment-text and before .comment-actions
+                    const actions = commentEl.querySelector('.comment-actions');
+                    commentEl.insertBefore(container, actions);
+                }
+                const isOwn = true; // user just uploaded; deletion allowed
+                container.insertAdjacentHTML('beforeend',
+                    uploaded.map(a => this.renderCommentAttachment(a, isOwn)).join(''));
+            }
+        }
+        this.refreshBoardCard();
+        return uploaded;
+    },
+
     // ---- Lightbox ----
     openLightbox(attachmentId) {
-        const images = (this.currentCard.attachments || []).filter(a => a.is_image);
-        let currentIdx = images.findIndex(a => a.id === attachmentId);
+        // Sweep both card-level and per-comment attachments so the user can
+        // navigate through every image attached anywhere on this card.
+        const cardImages = (this.currentCard.attachments || []).filter(a => a.is_image);
+        const commentImages = (this.currentCard.comments || [])
+            .flatMap(cm => Array.isArray(cm.attachments) ? cm.attachments : [])
+            .filter(a => a.is_image);
+        const images = [...cardImages, ...commentImages];
+        // is_image arrives as a tinyint string from MySQL via JSON — coerce.
+        const target = parseInt(attachmentId);
+        let currentIdx = images.findIndex(a => parseInt(a.id) === target);
         if (currentIdx === -1) return;
 
         const overlay = document.createElement('div');

@@ -97,6 +97,28 @@ class Card extends Model
             ['card_id' => $cardId]
         )->fetchAll();
 
+        // Attach per-comment file attachments
+        if (!empty($card['comments'])) {
+            $commentIds = array_map(static fn($c) => (int) $c['id'], $card['comments']);
+            $placeholders = implode(',', array_fill(0, count($commentIds), '?'));
+            $stmt = $this->query(
+                "SELECT a.*, u.display_name as uploader_name FROM attachments a
+                 JOIN users u ON a.user_id = u.id
+                 WHERE a.comment_id IN ($placeholders)
+                 ORDER BY a.created_at ASC",
+                $commentIds
+            );
+            $rows = $stmt->fetchAll();
+            $byComment = [];
+            foreach ($rows as $r) {
+                $byComment[(int) $r['comment_id']][] = $r;
+            }
+            foreach ($card['comments'] as &$cm) {
+                $cm['attachments'] = $byComment[(int) $cm['id']] ?? [];
+            }
+            unset($cm);
+        }
+
         // Checklists with items (include assignee info)
         $card['checklists'] = $this->query(
             'SELECT * FROM checklists WHERE card_id = :card_id ORDER BY position ASC',
@@ -114,11 +136,12 @@ class Card extends Model
             )->fetchAll();
         }
 
-        // Attachments
+        // Card-level attachments only (per-comment attachments are attached above)
         $card['attachments'] = $this->query(
             'SELECT a.*, u.display_name as uploader_name FROM attachments a
              JOIN users u ON a.user_id = u.id
-             WHERE a.card_id = :card_id ORDER BY a.created_at DESC',
+             WHERE a.card_id = :card_id AND a.comment_id IS NULL
+             ORDER BY a.created_at DESC',
             ['card_id' => $cardId]
         )->fetchAll();
 

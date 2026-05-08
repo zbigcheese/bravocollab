@@ -587,7 +587,196 @@
     margin-top: 6px;
     display: flex;
     gap: 6px;
+    align-items: center;
 }
+
+/* Action row that holds Submit + Cancel + 😊 trigger across composers. */
+.comment-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.emoji-trigger-btn {
+    background: transparent;
+    border: 0;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-left: auto;          /* pushes the smiley to the row's right edge */
+    transition: background 0.12s;
+}
+.emoji-trigger-btn:hover { background: rgba(9, 30, 66, 0.06); }
+.emoji-trigger-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+/* Paperclip attach button — same chrome as emoji, sits to its left. The
+   margin-left:auto here consumes the slack when both buttons are present
+   (the emoji button's own auto-margin is then a no-op). */
+.attach-trigger-btn {
+    background: transparent;
+    border: 0;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+    transition: background 0.12s;
+}
+.attach-trigger-btn:hover { background: rgba(9, 30, 66, 0.06); }
+.attach-trigger-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.attach-trigger-btn + .emoji-trigger-btn { margin-left: 0; }
+
+/* Staged-files chip list (between textarea and action row). */
+.staged-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.staged-attachments:empty { display: none; }
+.staged-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f4f5f7;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 2px 4px 2px 8px;
+    font-size: 12px;
+    max-width: 240px;
+}
+.staged-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+}
+.staged-file-size { color: var(--color-text-light); font-size: 11px; }
+.staged-remove {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+    color: var(--color-text-light);
+    border-radius: 50%;
+}
+.staged-remove:hover { background: rgba(9,30,66,0.08); color: var(--color-text); }
+
+/* Inline-in-comment attachment renderer */
+.comment-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.comment-attachment {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.comment-attachment.is-image .comment-attach-thumb {
+    display: block;
+    max-width: 160px;
+    max-height: 120px;
+    border-radius: 6px;
+    cursor: pointer;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+}
+.comment-attachment.is-file {
+    background: #f4f5f7;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+.comment-attach-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--color-text);
+    font-size: 13px;
+}
+.comment-attach-link:hover { color: var(--color-primary); }
+.comment-attach-icon {
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.comment-attach-name {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.comment-attach-size { color: var(--color-text-light); font-size: 11px; }
+.comment-attach-delete {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    line-height: 14px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+    color: var(--color-text-light);
+    display: none;
+}
+.comment-attachment:hover .comment-attach-delete { display: inline-block; }
+.comment-attach-delete:hover { color: var(--color-danger); }
+
+/* Floating emoji picker popup */
+.emoji-picker-popup {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    width: 320px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 8px;
+    z-index: 500;
+}
+.emoji-picker-group + .emoji-picker-group { margin-top: 8px; }
+.emoji-picker-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-light);
+    margin: 4px 4px 6px;
+    font-weight: 700;
+}
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+}
+.emoji-pick-btn {
+    background: transparent;
+    border: 0;
+    font-size: 20px;
+    line-height: 1;
+    padding: 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.08s;
+}
+.emoji-pick-btn:hover { background: rgba(9, 30, 66, 0.08); }
 
 /* Label picker popover */
 .label-picker {

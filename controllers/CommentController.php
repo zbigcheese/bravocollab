@@ -31,7 +31,10 @@ class CommentController extends Controller
         // replied to, not the original thread author.
         $directlyRepliedToId = $parentId ?: null;
 
-        // If replying to a reply, flatten to the root comment
+        // Allow nesting up to 2 levels (root → reply → reply-to-reply).
+        // If the parent itself is at depth ≥ 2, walk up the chain to its
+        // depth-1 ancestor and store the new comment there, so the thread
+        // never exceeds 2 levels deep regardless of where Reply was clicked.
         $db = Database::get();
         if ($parentId) {
             $parentStmt = $db->prepare('SELECT id, parent_id FROM comments WHERE id = :id AND card_id = :cid');
@@ -41,10 +44,30 @@ class CommentController extends Controller
                 $parentId = null;
                 $directlyRepliedToId = null;
             } elseif ($parent['parent_id']) {
-                // Parent is itself a reply — flatten storage to root, but
-                // keep $directlyRepliedToId unchanged for notification routing.
-                $parentId = (int) $parent['parent_id'];
+                // Parent is at depth ≥ 1. Check whether its grandparent is
+                // ALSO a reply, which would put parent at depth ≥ 2 and force
+                // a flatten. If grandparent is the root (no parent_id), the
+                // parent is at depth 1 and we keep parent_id as-is — making
+                // the new comment depth 2.
+                $gStmt = $db->prepare('SELECT parent_id FROM comments WHERE id = :id LIMIT 1');
+                $gStmt->execute(['id' => $parent['parent_id']]);
+                $grand = $gStmt->fetch();
+                if ($grand && $grand['parent_id']) {
+                    // Parent is depth ≥ 2 — walk up until we find a comment
+                    // whose own parent is the root (no parent_id).
+                    $cursor = $parent;
+                    while ($cursor['parent_id']) {
+                        $upStmt = $db->prepare('SELECT id, parent_id FROM comments WHERE id = :id LIMIT 1');
+                        $upStmt->execute(['id' => $cursor['parent_id']]);
+                        $up = $upStmt->fetch();
+                        if (!$up || !$up['parent_id']) break;
+                        $cursor = $up;
+                    }
+                    $parentId = (int) $cursor['id'];
+                }
+                // else parent is depth 1, leave parentId pointing at it.
             }
+            // else parent is root, leave parentId pointing at it.
         }
 
         // Resolve the author of the comment that was directly replied to.

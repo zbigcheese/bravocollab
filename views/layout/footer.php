@@ -3,6 +3,7 @@
     <script src="<?php echo asset_url('public/js/app.js'); ?>"></script>
     <script src="<?php echo asset_url('public/js/notifications.js'); ?>"></script>
     <script src="<?php echo asset_url('public/js/pwa.js'); ?>"></script>
+    <script src="<?php echo asset_url('public/js/emoji_picker.js'); ?>"></script>
     <script>
         (function () {
             const trigger  = document.getElementById('userMenuTrigger');

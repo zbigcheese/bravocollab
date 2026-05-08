@@ -23,6 +23,19 @@ class AttachmentController extends Controller
         }
         $this->requireBoardAccess($boardId);
 
+        $commentId = isset($_POST['comment_id']) && $_POST['comment_id'] !== ''
+            ? (int) $_POST['comment_id']
+            : null;
+        if ($commentId) {
+            $db0 = Database::get();
+            $cs = $db0->prepare('SELECT id FROM comments WHERE id = :id AND card_id = :cid LIMIT 1');
+            $cs->execute(['id' => $commentId, 'cid' => $cardId]);
+            if (!$cs->fetch()) {
+                $this->json(['error' => 'Comment not found on this card'], 400);
+                return;
+            }
+        }
+
         if (empty($_FILES['file'])) {
             $this->json(['error' => 'No file uploaded'], 400);
             return;
@@ -37,10 +50,11 @@ class AttachmentController extends Controller
 
         $db = Database::get();
         $db->prepare(
-            'INSERT INTO attachments (card_id, user_id, original_name, stored_name, file_size, mime_type, is_image, thumbnail_path)
-             VALUES (:card_id, :user_id, :original_name, :stored_name, :file_size, :mime_type, :is_image, :thumbnail_path)'
+            'INSERT INTO attachments (card_id, comment_id, user_id, original_name, stored_name, file_size, mime_type, is_image, thumbnail_path)
+             VALUES (:card_id, :comment_id, :user_id, :original_name, :stored_name, :file_size, :mime_type, :is_image, :thumbnail_path)'
         )->execute([
             'card_id'        => $cardId,
+            'comment_id'     => $commentId,
             'user_id'        => Auth::userId(),
             'original_name'  => $fileData['original_name'],
             'stored_name'    => $fileData['stored_name'],
@@ -54,16 +68,22 @@ class AttachmentController extends Controller
 
         $this->publishSSE($boardId, SSE_ATTACHMENT_ADDED, [
             'card_id'       => $cardId,
+            'comment_id'    => $commentId,
             'attachment_id' => $attachmentId,
         ]);
 
-        $this->logActivity($boardId, $cardId, 'attachment_added', ['filename' => $fileData['original_name']]);
+        $this->logActivity($boardId, $cardId, 'attachment_added', [
+            'filename'   => $fileData['original_name'],
+            'comment_id' => $commentId,
+        ]);
 
         $this->json([
             'success'    => true,
             'attachment' => [
                 'id'             => $attachmentId,
+                'comment_id'     => $commentId,
                 'original_name'  => $fileData['original_name'],
+                'mime_type'      => $fileData['mime_type'],
                 'is_image'       => $fileData['is_image'],
                 'file_size'      => $fileData['file_size'],
                 'thumbnail_path' => $fileData['thumbnail_path'],
