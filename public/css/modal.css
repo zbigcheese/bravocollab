@@ -597,37 +597,43 @@
     gap: 6px;
 }
 
-.emoji-trigger-btn {
-    background: transparent;
-    border: 0;
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 4px;
-    margin-left: auto;          /* pushes the smiley to the row's right edge */
-    transition: background 0.12s;
-}
-.emoji-trigger-btn:hover { background: rgba(9, 30, 66, 0.06); }
-.emoji-trigger-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-
-/* Paperclip attach button — same chrome as emoji, sits to its left. The
-   margin-left:auto here consumes the slack when both buttons are present
-   (the emoji button's own auto-margin is then a no-op). */
+/* Composer icon buttons (smiley / paperclip). Plain gray line icons —
+   transparent until hovered. The first of the two consumes flex slack so
+   both buttons sit on the row's right edge regardless of order. */
+.emoji-trigger-btn,
 .attach-trigger-btn {
     background: transparent;
     border: 0;
-    font-size: 16px;
-    line-height: 1;
+    line-height: 0;
     cursor: pointer;
-    padding: 4px 6px;
+    padding: 4px;
     border-radius: 4px;
     margin-left: auto;
-    transition: background 0.12s;
+    color: var(--color-text-light);
+    transition: background 0.12s, color 0.12s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
-.attach-trigger-btn:hover { background: rgba(9, 30, 66, 0.06); }
-.attach-trigger-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.attach-trigger-btn + .emoji-trigger-btn { margin-left: 0; }
+.emoji-trigger-btn svg,
+.attach-trigger-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+.emoji-trigger-btn:hover,
+.attach-trigger-btn:hover {
+    background: rgba(9, 30, 66, 0.06);
+    color: var(--color-text);
+}
+.emoji-trigger-btn:focus,
+.attach-trigger-btn:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+/* When both icon buttons share a row, only the first one needs the auto
+   margin — otherwise they'd separate. */
+.attach-trigger-btn + .emoji-trigger-btn { margin-left: 4px; }
 
 /* Staged-files chip list (between textarea and action row). */
 .staged-attachments {
@@ -740,7 +746,8 @@
 .comment-attachment:hover .comment-attach-delete { display: inline-block; }
 .comment-attach-delete:hover { color: var(--color-danger); }
 
-/* Floating emoji picker popup */
+/* Floating emoji picker popup — above the modal-overlay (z:1000) so it isn't
+   clipped behind the card detail dialog. */
 .emoji-picker-popup {
     background: #fff;
     border: 1px solid var(--color-border);
@@ -750,7 +757,7 @@
     max-height: 320px;
     overflow-y: auto;
     padding: 8px;
-    z-index: 500;
+    z-index: 2200;
 }
 .emoji-picker-group + .emoji-picker-group { margin-top: 8px; }
 .emoji-picker-label {

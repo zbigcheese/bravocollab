@@ -498,8 +498,8 @@ const CardModal = {
                     <div class="staged-attachments" id="newCommentStaged"></div>
                     <div class="comment-form-actions">
                         <button class="btn btn-primary btn-sm" id="submitComment">Comment</button>
-                        <button type="button" class="attach-trigger-btn" id="newCommentAttachBtn" title="Attach file" aria-label="Attach file">📎</button>
-                        <button type="button" class="emoji-trigger-btn" id="newCommentEmojiBtn" title="Insert emoji" aria-label="Insert emoji">😊</button>
+                        <button type="button" class="attach-trigger-btn" id="newCommentAttachBtn" title="Attach file" aria-label="Attach file"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                        <button type="button" class="emoji-trigger-btn" id="newCommentEmojiBtn" title="Insert emoji" aria-label="Insert emoji"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
                     </div>
                 </div>
                 <div id="commentsList">${commentsHtml || '<p class="text-muted text-sm">No comments yet.</p>'}</div>
@@ -912,8 +912,8 @@ const CardModal = {
             <div class="comment-form-actions" style="margin-top:4px;">
                 <button class="btn btn-primary btn-sm inline-reply-submit">Reply</button>
                 <button class="btn btn-secondary btn-sm inline-reply-cancel">Cancel</button>
-                <button type="button" class="attach-trigger-btn inline-reply-attach" title="Attach file" aria-label="Attach file">📎</button>
-                <button type="button" class="emoji-trigger-btn inline-reply-emoji" title="Insert emoji" aria-label="Insert emoji">😊</button>
+                <button type="button" class="attach-trigger-btn inline-reply-attach" title="Attach file" aria-label="Attach file"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                <button type="button" class="emoji-trigger-btn inline-reply-emoji" title="Insert emoji" aria-label="Insert emoji"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
             </div>
         `;
         // Place reply form at top so newest reply lands above existing ones.
@@ -1084,8 +1084,8 @@ const CardModal = {
             <div class="comment-edit-actions">
                 <button class="btn btn-primary btn-sm save-edit-comment">Save</button>
                 <button class="btn btn-secondary btn-sm cancel-edit-comment">Cancel</button>
-                <button type="button" class="attach-trigger-btn comment-edit-attach" title="Attach file" aria-label="Attach file">📎</button>
-                <button type="button" class="emoji-trigger-btn comment-edit-emoji" title="Insert emoji" aria-label="Insert emoji">😊</button>
+                <button type="button" class="attach-trigger-btn comment-edit-attach" title="Attach file" aria-label="Attach file"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                <button type="button" class="emoji-trigger-btn comment-edit-emoji" title="Insert emoji" aria-label="Insert emoji"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
             </div>
         `;
 
