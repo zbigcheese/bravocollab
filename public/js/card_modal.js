@@ -40,8 +40,17 @@ const CardModal = {
             this.boardMembers = Board.data?.members || [];
             this.boardLabels = Board.data?.labels || [];
             this.render();
-            // Update URL with card param
+            // URL bookkeeping: always set `?card=N`. The `?task=` param is
+            // preserved when re-opening the same card (so deep-links and
+            // notification-driven opens that pre-set the URL keep working);
+            // dropped when navigating to a different card (otherwise the
+            // user would land in a stale task page belonging to the prior
+            // card).
             const url = new URL(window.location);
+            const currentCardInUrl = parseInt(url.searchParams.get('card') || '0');
+            if (currentCardInUrl !== parseInt(cardId)) {
+                url.searchParams.delete('task');
+            }
             url.searchParams.set('card', cardId);
             history.replaceState(null, '', url);
 
@@ -540,6 +549,9 @@ const CardModal = {
         this.currentCard = null;
         const url = new URL(window.location);
         url.searchParams.delete('card');
+        // Also drop `task` — closing the modal collapses the entire
+        // card→task hierarchy back to the board view.
+        url.searchParams.delete('task');
         history.replaceState(null, '', url);
     },
 

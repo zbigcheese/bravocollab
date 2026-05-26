@@ -83,7 +83,7 @@ const Notifications = {
                 const icon = this.getIcon(n.type);
 
                 return `
-                    <div class="notification-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}" data-notif-type="${n.type}" data-board-id="${data.board_id || ''}" data-card-id="${data.card_id || ''}">
+                    <div class="notification-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}" data-notif-type="${n.type}" data-board-id="${data.board_id || ''}" data-card-id="${data.card_id || ''}" data-task-id="${data.task_id || ''}">
                         <div class="notif-icon">${icon}</div>
                         <div class="notif-content">
                             <div class="notif-text">${text}</div>
@@ -99,6 +99,7 @@ const Notifications = {
                     const notifId = el.dataset.notifId;
                     const boardId = el.dataset.boardId;
                     const cardId = el.dataset.cardId;
+                    const taskId = el.dataset.taskId;
 
                     await App.api('notifications.mark_read', { id: parseInt(notifId) });
 
@@ -113,6 +114,7 @@ const Notifications = {
                     if (boardId) {
                         let url = `index.php?page=board&id=${boardId}`;
                         if (cardId) url += `&card=${cardId}`;
+                        if (cardId && taskId) url += `&task=${taskId}`;
 
                         // If already on this board, just open the card modal.
                         // `Board` is only defined on the board view, so guard with typeof
@@ -120,6 +122,16 @@ const Notifications = {
                         const onSameBoard = typeof Board !== 'undefined'
                             && Board.boardId === parseInt(boardId);
                         if (onSameBoard && cardId) {
+                            // Pre-set both card and task in the URL so CardModal.open
+                            // preserves `task` (it only does so when the URL's card
+                            // matches the new cardId) and TaskView.bootstrap picks
+                            // up the task on render.
+                            const u = new URL(window.location);
+                            u.searchParams.set('card', cardId);
+                            if (taskId) u.searchParams.set('task', taskId);
+                            else        u.searchParams.delete('task');
+                            history.replaceState(null, '', u);
+
                             CardModal.open(parseInt(cardId));
                             document.getElementById('notificationDropdown')?.classList.remove('open');
                             el.classList.remove('unread');

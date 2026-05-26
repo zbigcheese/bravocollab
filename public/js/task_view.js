@@ -40,10 +40,21 @@ const TaskView = {
         this.openTaskId = null;
         this.openTask = null;
         this.navStack = [];
+        this._stagedFiles = {};
 
         document.getElementById('taskAddRootBtn')?.addEventListener('click', () => this.addRootTask());
 
         this.refresh();
+
+        // Deep-link support: if the URL carries `?task=N`, jump straight to
+        // that task page. Works for first-paint (`index.php?...&task=N`),
+        // notification clicks (which set the URL before opening the card),
+        // and refresh on a task page. `openTaskPage` re-fetches via the
+        // tasks.get endpoint so it doesn't need the root list to be loaded.
+        try {
+            const urlTaskId = parseInt(new URL(window.location).searchParams.get('task') || '0');
+            if (urlTaskId) this.openTaskPage(urlTaskId, /*push*/ false);
+        } catch (e) { /* ignore */ }
     },
 
     async refresh() {
@@ -146,9 +157,25 @@ const TaskView = {
             this.openTaskId = parseInt(task.id);
             this.openTask = task;
             this.renderTaskPage(task);
+            this.syncUrl(this.openTaskId);
         } catch (e) {
             App.showToast(e.message || 'Failed to open task', 'error');
         }
+    },
+
+    /**
+     * Push the currently-open task id into the URL as `?task=N` so the link
+     * is shareable / refresh-stable. Pass null to remove the param. We use
+     * replaceState (not pushState) to avoid polluting browser history with
+     * an entry for every sub-page hop — back nav stays handled by navStack.
+     */
+    syncUrl(taskId) {
+        try {
+            const url = new URL(window.location);
+            if (taskId) url.searchParams.set('task', String(taskId));
+            else        url.searchParams.delete('task');
+            history.replaceState(null, '', url);
+        } catch (e) { /* ignore */ }
     },
 
     closeTaskPage() {
@@ -165,6 +192,8 @@ const TaskView = {
         const sidebar = overlay?.querySelector('.card-detail-sidebar');
         if (main) main.style.display = '';
         if (sidebar) sidebar.style.display = '';
+        // Drop ?task= so the URL reflects "card only" once again.
+        this.syncUrl(null);
     },
 
     goBack() {
@@ -290,12 +319,13 @@ const TaskView = {
                 <div class="task-description" id="taskDescription">${description}</div>
             </div>
 
+            ${task.parent_task_id ? '' : `
             <div class="task-page-section">
                 <div class="task-section-header"><h4>Sub-tasks</h4>
-                    ${task.parent_task_id ? '' : '<button class="btn btn-sm btn-secondary" id="taskAddChildBtn">+ Add sub-task</button>'}
+                    <button class="btn btn-sm btn-secondary" id="taskAddChildBtn">+ Add sub-task</button>
                 </div>
                 <div class="task-children-list" id="taskChildrenList">${childrenHtml}</div>
-            </div>
+            </div>`}
 
             <div class="task-page-section">
                 <div class="task-section-header"><h4>Attachments</h4>

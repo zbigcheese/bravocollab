@@ -486,8 +486,13 @@ class Mailer
     {
         $boardId = (int) ($data['board_id'] ?? 0);
         $cardId  = (int) ($data['card_id'] ?? 0);
+        $taskId  = (int) ($data['task_id'] ?? 0);
         $url = rtrim($baseUrl, '/') . '/index.php?page=board&id=' . $boardId;
         if ($cardId) $url .= '&card=' . $cardId;
+        // Task deep-link: only meaningful when a card context is present.
+        // The board page reads `task` after CardModal renders, so the
+        // notification recipient lands directly on the relevant task/sub-task.
+        if ($cardId && $taskId) $url .= '&task=' . $taskId;
         return $url;
     }
 
