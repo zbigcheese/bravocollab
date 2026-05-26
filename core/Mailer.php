@@ -382,6 +382,39 @@ class Mailer
             }
             case 'due_soon':        $line = "<strong>{$card}</strong> is due soon"; break;
             case 'due_overdue':     $line = "<strong>{$card}</strong> is overdue"; break;
+            case 'due_changed': {
+                $newDue = $data['new_due'] ?? null;
+                $oldDue = $data['old_due'] ?? null;
+                if ($newDue === null) {
+                    $line = "<strong>{$actor}</strong> removed the due date from <strong>{$card}</strong>";
+                } else {
+                    $formatted = self::formatDueForEmail($newDue);
+                    $verb = $oldDue ? 'changed' : 'set';
+                    $line = "<strong>{$actor}</strong> {$verb} the due date on <strong>{$card}</strong> to <strong>{$formatted}</strong>";
+                }
+                break;
+            }
+            case 'task_assigned': {
+                $taskTitle = htmlspecialchars((string) ($data['task_title'] ?? ''), ENT_QUOTES);
+                $line = "<strong>{$actor}</strong> assigned you to task "
+                      . ($taskTitle !== '' ? "<em>{$taskTitle}</em> on " : '')
+                      . "<strong>{$card}</strong>";
+                break;
+            }
+            case 'task_accepted': {
+                $taskTitle = htmlspecialchars((string) ($data['task_title'] ?? ''), ENT_QUOTES);
+                $line = "<strong>{$actor}</strong> accepted task "
+                      . ($taskTitle !== '' ? "<em>{$taskTitle}</em> on " : '')
+                      . "<strong>{$card}</strong>";
+                break;
+            }
+            case 'checklist_accepted': {
+                $itemContent = htmlspecialchars((string) ($data['item_content'] ?? ''), ENT_QUOTES);
+                $line = "<strong>{$actor}</strong> accepted checklist item "
+                      . ($itemContent !== '' ? "<em>{$itemContent}</em> on " : '')
+                      . "<strong>{$card}</strong>";
+                break;
+            }
             case 'board_invited':   $line = "<strong>{$actor}</strong> added you to <strong>{$board}</strong>"; break;
             default:                $line = "You have a new notification"; break;
         }
@@ -402,6 +435,27 @@ class Mailer
         return $line;
     }
 
+    /**
+     * Format a stored DATETIME (e.g. 'YYYY-MM-DD HH:MM:SS') or ISO date for
+     * an HTML-safe email/notification display, appending HH:MM only when a
+     * non-midnight time component was set.
+     */
+    private static function formatDueForEmail(string $dueDate): string
+    {
+        try {
+            $d = new DateTime($dueDate);
+            $date = $d->format('M j, Y');
+            $hour = (int) $d->format('H');
+            $min  = (int) $d->format('i');
+            if ($hour === 0 && $min === 0) {
+                return htmlspecialchars($date, ENT_QUOTES);
+            }
+            return htmlspecialchars($date . ' at ' . $d->format('H:i'), ENT_QUOTES);
+        } catch (Throwable $e) {
+            return htmlspecialchars($dueDate, ENT_QUOTES);
+        }
+    }
+
     private static function notificationSubject(array $n, string $appName): string
     {
         $data = is_string($n['data']) ? json_decode($n['data'], true) : ($n['data'] ?? []);
@@ -419,6 +473,10 @@ class Mailer
             case 'item_completed':  return "{$actor} checked off a task on {$card} — {$appName}";
             case 'due_soon':        return "{$card} is due soon — {$appName}";
             case 'due_overdue':     return "{$card} is overdue — {$appName}";
+            case 'due_changed':     return "{$actor} changed the due date on {$card} — {$appName}";
+            case 'task_assigned':   return "{$actor} assigned you to a task on {$card} — {$appName}";
+            case 'task_accepted':   return "{$actor} accepted a task on {$card} — {$appName}";
+            case 'checklist_accepted': return "{$actor} accepted an item on {$card} — {$appName}";
             case 'board_invited':   return "You were added to {$board} — {$appName}";
             default:                return "New notification — {$appName}";
         }

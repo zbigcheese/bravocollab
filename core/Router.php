@@ -15,6 +15,8 @@ class Router
         'users'        => 'UserController',
         'google_calendar' => 'GoogleCalendarController',
         'push'         => 'PushController',
+        'search'       => 'SearchController',
+        'tasks'        => 'TaskController',
     ];
 
     public static function dispatch(): void

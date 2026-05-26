@@ -17,6 +17,18 @@ require_once __DIR__ . '/core/Router.php';
 
 Auth::init();
 
+// Idempotent additive schema migrations — runs at most once per request
+// (memoized). Same self-heal pattern as index.php so users hitting the API
+// directly (mobile clients, deep-linked actions) get the upgraded schema too.
+if (Auth::isLoggedIn()) {
+    try {
+        require_once __DIR__ . '/core/SchemaUpgrades.php';
+        SchemaUpgrades::ensureAll();
+    } catch (Throwable $e) {
+        error_log('SchemaUpgrades (api) failed: ' . $e->getMessage());
+    }
+}
+
 header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
 

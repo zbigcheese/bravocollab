@@ -10,6 +10,11 @@ const Board = {
     isAdmin: false,
     isPersonal: false,
 
+    // Label filter: set of label IDs (ints). Empty = no filter. AND-mode
+    // matches cards that carry ALL selected labels; OR mode matches any.
+    labelFilter: new Set(),
+    labelFilterMode: 'or', // 'or' | 'and'
+
     async init() {
         const wrapper = document.getElementById('boardWrapper');
         if (!wrapper) return;
@@ -17,6 +22,7 @@ const Board = {
         this.boardId = parseInt(wrapper.dataset.boardId);
         this.isAdmin = wrapper.dataset.isAdmin === '1';
         this.isPersonal = wrapper.dataset.isPersonal === '1';
+        this.restoreLabelFilter();
         await this.load();
         this.bindEvents();
         this.initDragScroll();
@@ -110,7 +116,8 @@ const Board = {
     },
 
     listHtml(list) {
-        const cardsHtml = list.cards.map(card => this.cardHtml(card)).join('');
+        const visible = list.cards.filter(c => this.cardPassesLabelFilter(c));
+        const cardsHtml = visible.map(card => this.cardHtml(card)).join('');
 
         return `
             <div class="list-column" data-list-id="${list.id}">
@@ -569,6 +576,13 @@ const Board = {
             });
         }
 
+        // Filter dropdown (label filter)
+        document.getElementById('boardFilterBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showFilterMenu();
+        });
+        this.updateFilterBadge();
+
         // Manage members
         document.getElementById('manageMembersBtn')?.addEventListener('click', () => this.showMembersModal());
 
@@ -931,6 +945,154 @@ const Board = {
         } catch (e) {
             App.showToast(e.message, 'error');
         }
+    },
+
+    // ---- Label filter ----
+    cardPassesLabelFilter(card) {
+        if (this.labelFilter.size === 0) return true;
+        const cardLabelIds = new Set((card.labels || []).map(l => parseInt(l.id)));
+        if (this.labelFilterMode === 'and') {
+            for (const id of this.labelFilter) {
+                if (!cardLabelIds.has(id)) return false;
+            }
+            return true;
+        }
+        // OR mode
+        for (const id of this.labelFilter) {
+            if (cardLabelIds.has(id)) return true;
+        }
+        return false;
+    },
+
+    restoreLabelFilter() {
+        try {
+            const raw = localStorage.getItem('labelFilter:' + this.boardId);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.ids)) {
+                this.labelFilter = new Set(parsed.ids.map(x => parseInt(x)).filter(Boolean));
+            }
+            if (parsed.mode === 'and' || parsed.mode === 'or') {
+                this.labelFilterMode = parsed.mode;
+            }
+        } catch (e) { /* ignore corrupted state */ }
+    },
+
+    persistLabelFilter() {
+        try {
+            localStorage.setItem(
+                'labelFilter:' + this.boardId,
+                JSON.stringify({ ids: [...this.labelFilter], mode: this.labelFilterMode })
+            );
+        } catch (e) { /* ignore quota issues */ }
+    },
+
+    updateFilterBadge() {
+        const badge = document.getElementById('boardFilterBadge');
+        const btn = document.getElementById('boardFilterBtn');
+        if (!badge || !btn) return;
+        const n = this.labelFilter.size;
+        if (n === 0) {
+            badge.hidden = true;
+            btn.classList.remove('is-active');
+        } else {
+            badge.hidden = false;
+            badge.textContent = n;
+            btn.classList.add('is-active');
+        }
+    },
+
+    showFilterMenu() {
+        document.querySelectorAll('.context-menu').forEach(m => m.remove());
+
+        const btn = document.getElementById('boardFilterBtn');
+        if (!btn) return;
+        const rect = btn.getBoundingClientRect();
+        const labels = this.data?.labels || [];
+
+        const menu = document.createElement('div');
+        menu.className = 'context-menu board-filter-menu';
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.left = Math.max(8, rect.left) + 'px';
+        menu.style.minWidth = '240px';
+        menu.style.padding = '8px 0';
+
+        const labelsHtml = labels.length
+            ? labels.map(l => {
+                const checked = this.labelFilter.has(parseInt(l.id)) ? 'checked' : '';
+                return `
+                    <label class="board-filter-row" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;">
+                        <input type="checkbox" data-label-id="${l.id}" ${checked}>
+                        <span class="card-label" style="background:${l.color};color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;min-width:40px;display:inline-block;">${App.escapeHtml(l.name || ' ')}</span>
+                    </label>
+                `;
+            }).join('')
+            : '<div style="padding:8px 12px;color:var(--color-text-light);font-size:13px;">No labels defined on this board.</div>';
+
+        menu.innerHTML = `
+            <div style="padding:4px 12px 8px;font-size:12px;color:var(--color-text-light);text-transform:uppercase;letter-spacing:0.04em;">Filter by label</div>
+            <div class="board-filter-mode" style="padding:0 12px 8px;display:flex;gap:6px;">
+                <button type="button" class="btn btn-sm ${this.labelFilterMode==='or' ? 'btn-primary' : 'btn-secondary'}" data-mode="or">Any</button>
+                <button type="button" class="btn btn-sm ${this.labelFilterMode==='and' ? 'btn-primary' : 'btn-secondary'}" data-mode="and">All</button>
+            </div>
+            <div class="board-filter-list" style="max-height:300px;overflow:auto;">${labelsHtml}</div>
+            <div style="padding:8px 12px 4px;display:flex;justify-content:space-between;border-top:1px solid var(--color-border);">
+                <button type="button" class="btn btn-sm btn-secondary" id="filterClearBtn">Clear</button>
+                <button type="button" class="btn btn-sm btn-primary" id="filterDoneBtn">Done</button>
+            </div>
+        `;
+        document.body.appendChild(menu);
+
+        const refreshMenuModeButtons = () => {
+            menu.querySelectorAll('.board-filter-mode button').forEach(b => {
+                const isSel = b.dataset.mode === this.labelFilterMode;
+                b.classList.toggle('btn-primary', isSel);
+                b.classList.toggle('btn-secondary', !isSel);
+            });
+        };
+
+        menu.addEventListener('change', (e) => {
+            const cb = e.target.closest('input[type="checkbox"][data-label-id]');
+            if (!cb) return;
+            const id = parseInt(cb.dataset.labelId);
+            if (cb.checked) this.labelFilter.add(id);
+            else this.labelFilter.delete(id);
+            this.persistLabelFilter();
+            this.updateFilterBadge();
+            this.renderLists();
+        });
+
+        menu.addEventListener('click', (e) => {
+            const modeBtn = e.target.closest('[data-mode]');
+            if (modeBtn) {
+                this.labelFilterMode = modeBtn.dataset.mode;
+                this.persistLabelFilter();
+                refreshMenuModeButtons();
+                this.updateFilterBadge();
+                this.renderLists();
+                return;
+            }
+            if (e.target.closest('#filterClearBtn')) {
+                this.labelFilter.clear();
+                this.persistLabelFilter();
+                this.updateFilterBadge();
+                this.renderLists();
+                menu.querySelectorAll('input[type="checkbox"][data-label-id]').forEach(cb => cb.checked = false);
+                return;
+            }
+            if (e.target.closest('#filterDoneBtn')) {
+                menu.remove();
+            }
+        });
+
+        // Outside-click close — defer one tick so the open click doesn't immediately close it.
+        const closeOnOutside = (ev) => {
+            if (ev.target.closest('.board-filter-menu') || ev.target.closest('#boardFilterBtn')) return;
+            menu.remove();
+            document.removeEventListener('click', closeOnOutside, true);
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutside, true), 0);
     },
 
     showLabelsEditor() {

@@ -70,6 +70,12 @@ if (Auth::isLoggedIn()) {
     } catch (Throwable $e) {
         error_log('UserPreferences ensureSchema failed: ' . $e->getMessage());
     }
+    try {
+        require_once __DIR__ . '/core/SchemaUpgrades.php';
+        SchemaUpgrades::ensureAll();
+    } catch (Throwable $e) {
+        error_log('SchemaUpgrades ensureAll failed: ' . $e->getMessage());
+    }
 }
 
 // Page routing
@@ -84,6 +90,7 @@ $pageMap = [
     'settings_preferences' => 'settings/preferences.php',
     'settings_calendar'   => 'settings/calendar.php',
     'whats_next'          => 'whats_next/index.php',
+    'search'              => 'search/index.php',
     'google_connect'    => 'google/connect.php',
     'google_callback'   => 'google/callback.php',
 ];

@@ -44,6 +44,13 @@ $_gcalConnected  = $_gcalConfigured && Auth::isLoggedIn() && GoogleCalendar::isC
             </a>
         </div>
         <div class="navbar-right">
+            <div class="global-search" id="globalSearch">
+                <form class="global-search-form" id="globalSearchForm" autocomplete="off" role="search">
+                    <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="globalSearchInput" class="global-search-input" name="q" placeholder="Search..." aria-label="Search">
+                </form>
+                <div class="global-search-dropdown" id="globalSearchDropdown" role="listbox" aria-label="Search suggestions"></div>
+            </div>
             <button type="button" id="installAppBtn" class="install-app-btn" hidden aria-label="Install app" title="Install BravoCollab">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>

@@ -96,6 +96,7 @@ const CardModal = {
                             ${this.renderLabelsSection()}
                             ${this.renderDueDateSection()}
                             ${this.renderDescriptionSection()}
+                            ${this.renderTasksSection()}
                             ${this.renderChecklistsSection()}
                             ${this.renderAttachmentsSection()}
                             ${this.renderCommentsSection()}
@@ -130,6 +131,10 @@ const CardModal = {
         document.body.appendChild(overlay);
         this.bindModalEvents(overlay);
         this.autoResizeTextarea(document.getElementById('cardTitle'));
+        // Tasks subsystem — bootstrap after the modal DOM is in place.
+        if (typeof TaskView !== 'undefined') {
+            TaskView.bootstrap(this.currentCard, this.boardMembers);
+        }
     },
 
     renderCoordinatorSection() {
@@ -198,6 +203,9 @@ const CardModal = {
 
         const due = App.formatDueDate(c.due_date);
         const cls = c.due_complete ? 'complete' : due.class;
+        const datePart = new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timePart = App.formatTimeOnly(c.due_date);
+        const display = timePart ? `${datePart} at ${timePart}` : datePart;
 
         return `
             <div class="card-section" id="dueDateSection">
@@ -205,9 +213,7 @@ const CardModal = {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                     <h3>Due Date</h3>
                 </div>
-                <span class="due-date-display ${cls}">
-                    ${new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
+                <span class="due-date-display ${cls}">${display}</span>
             </div>
         `;
     },
@@ -252,6 +258,22 @@ const CardModal = {
         `;
     },
 
+    renderTasksSection() {
+        // Lazy-loaded by TaskView once the modal opens — render the empty
+        // container plus an "Add task" affordance. TaskView populates the
+        // root list with .tasks.list and keeps it in sync with SSE events.
+        return `
+            <div class="card-section" id="tasksSection">
+                <div class="card-section-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <h3>Tasks</h3>
+                    <button type="button" class="btn btn-sm btn-secondary" id="taskAddRootBtn" style="margin-left:auto;">+ Add task</button>
+                </div>
+                <div id="tasksRootList" class="tasks-root-list"></div>
+            </div>
+        `;
+    },
+
     renderChecklistsSection() {
         const c = this.currentCard;
         if (!c.checklists || c.checklists.length === 0) return '<div id="checklistsContainer"></div>';
@@ -272,15 +294,21 @@ const CardModal = {
             }
             if (item.due_date) {
                 const due = App.formatDueDate(item.due_date);
-                // Append HH:MM if the stored value carries a non-midnight time.
-                let txt = due.text;
-                if (item.due_date.length > 10) {
-                    const t = item.due_date.substring(11, 16);
-                    if (t && t !== '00:00') txt += ` ${t}`;
-                }
                 const cls = item.is_checked ? 'complete' : due.class;
-                meta += `<span class="cl-item-due ${cls}">${App.escapeHtml(txt)}</span>`;
+                meta += `<span class="cl-item-due ${cls}">${App.escapeHtml(due.text)}</span>`;
             }
+            // Accept button — visible only if the current user is the assignee
+            // and the item hasn't been accepted yet. Accepted items show a
+            // small confirmation pill instead.
+            const meAssigned = parseInt(item.assigned_to) === App.userId;
+            let acceptHtml = '';
+            if (item.accepted_at) {
+                acceptHtml = `<span class="cl-item-accepted" title="Accepted on ${App.escapeHtml(item.accepted_at)}">&#10003; Accepted</span>`;
+            } else if (meAssigned) {
+                acceptHtml = `<button class="cl-item-accept-btn" data-item-id="${item.id}" title="Accept this item">Accept</button>`;
+            }
+            if (acceptHtml) meta += acceptHtml;
+
             return `
                 <div class="checklist-item ${item.is_checked ? 'checked' : ''}" data-item-id="${item.id}">
                     <input type="checkbox" ${item.is_checked ? 'checked' : ''} data-item-id="${item.id}" data-checklist-id="${cl.id}">
@@ -686,6 +714,9 @@ const CardModal = {
 
             const clItemAssign = e.target.closest('.cl-item-assign-btn');
             if (clItemAssign) { this.showChecklistItemEditor(parseInt(clItemAssign.dataset.itemId), parseInt(clItemAssign.dataset.checklistId)); return; }
+
+            const clItemAccept = e.target.closest('.cl-item-accept-btn');
+            if (clItemAccept) { this.acceptChecklistItem(parseInt(clItemAccept.dataset.itemId)); return; }
 
             const delCl = e.target.closest('.delete-checklist');
             if (delCl) { this.deleteChecklist(parseInt(delCl.dataset.checklistId)); return; }
@@ -1312,6 +1343,29 @@ const CardModal = {
             }
         } catch (e) {
             App.showToast(e.message, 'error');
+        }
+    },
+
+    async acceptChecklistItem(itemId) {
+        this.suppressSSE();
+        try {
+            const res = await App.api('checklists.accept_item', { id: itemId });
+            // Mark the item locally and swap the button for the accepted pill.
+            for (const cl of (this.currentCard.checklists || [])) {
+                const item = cl.items.find(i => parseInt(i.id) === itemId);
+                if (item) {
+                    item.accepted_at = res.accepted_at || new Date().toISOString();
+                    break;
+                }
+            }
+            const itemEl = document.querySelector(`.checklist-item[data-item-id="${itemId}"]`);
+            const acceptBtn = itemEl?.querySelector('.cl-item-accept-btn');
+            if (acceptBtn) {
+                acceptBtn.outerHTML = '<span class="cl-item-accepted" title="Accepted just now">&#10003; Accepted</span>';
+            }
+            App.showToast(res.already_accepted ? 'Already accepted' : 'Item accepted', 'success');
+        } catch (e) {
+            App.showToast(e.message || 'Failed to accept item', 'error');
         }
     },
 
@@ -1959,14 +2013,15 @@ const CardModal = {
         }
         const due = App.formatDueDate(c.due_date);
         const cls = c.due_complete ? 'complete' : due.class;
+        const datePart = new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timePart = App.formatTimeOnly(c.due_date);
+        const display = timePart ? `${datePart} at ${timePart}` : datePart;
         section.innerHTML = `
             <div class="card-section-header">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                 <h3>Due Date</h3>
             </div>
-            <span class="due-date-display ${cls}">
-                ${new Date(c.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </span>
+            <span class="due-date-display ${cls}">${display}</span>
         `;
     },
 

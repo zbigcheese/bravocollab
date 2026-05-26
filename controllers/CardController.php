@@ -172,15 +172,19 @@ class CardController extends Controller
             return;
         }
 
-        // Snapshot due_complete before applying updates so we know if this
-        // request transitions the card from incomplete → complete (only the
-        // forward transition fires a notification; un-completing doesn't).
+        // Snapshot due_complete + due_date before applying updates so we can
+        // detect: incomplete→complete transitions (one-shot notification) and
+        // due-date changes (notify subscribers about the new date).
         $prevDueComplete = null;
-        if (isset($updates['due_complete'])) {
-            $stmt = Database::get()->prepare('SELECT due_complete FROM cards WHERE id = :id');
+        $prevDueDate     = null;
+        if (isset($updates['due_complete']) || array_key_exists('due_date', $updates)) {
+            $stmt = Database::get()->prepare('SELECT due_complete, due_date FROM cards WHERE id = :id');
             $stmt->execute(['id' => $cardId]);
             $row = $stmt->fetch();
-            $prevDueComplete = $row ? (int) $row['due_complete'] : null;
+            if ($row) {
+                $prevDueComplete = (int) $row['due_complete'];
+                $prevDueDate     = $row['due_date'];
+            }
         }
 
         $this->cardModel->update($cardId, $updates);
@@ -191,6 +195,30 @@ class CardController extends Controller
             && $prevDueComplete === 0
         ) {
             $this->notifyCardEvent($cardId, $boardId, NOTIF_CARD_COMPLETED);
+        }
+
+        // Notify subscribers on any due_date change (set / changed / cleared)
+        // — but not on no-op writes where the value didn't actually change.
+        // The DB stores 'YYYY-MM-DD HH:MM:SS' while the client sends
+        // 'YYYY-MM-DDTHH:MM' (ISO-ish), so compare via DateTime parse to
+        // avoid spurious notifications.
+        if (array_key_exists('due_date', $updates)) {
+            $normalize = static function ($v): ?string {
+                if ($v === null || $v === '') return null;
+                try {
+                    return (new DateTime($v))->format('Y-m-d H:i:s');
+                } catch (Throwable $e) {
+                    return is_string($v) ? $v : null;
+                }
+            };
+            $prevNorm = $normalize($prevDueDate);
+            $newNorm  = $normalize($updates['due_date']);
+            if ($prevNorm !== $newNorm) {
+                $this->notifyCardEvent($cardId, $boardId, NOTIF_DUE_CHANGED, [
+                    'old_due' => $prevNorm,
+                    'new_due' => $newNorm,
+                ]);
+            }
         }
 
         $card = $this->cardModel->find($cardId);
@@ -397,6 +425,15 @@ class CardController extends Controller
                     'assigned' => $it['assigned_to'],
                 ]);
             }
+        }
+
+        // Clone the task hierarchy too (titles + structure only — assignees,
+        // due dates, comments, attachments are reset per spec).
+        try {
+            require_once __DIR__ . '/TaskController.php';
+            TaskController::cloneForCard($cardId, $newCardId);
+        } catch (Throwable $e) {
+            error_log('TaskController::cloneForCard failed: ' . $e->getMessage());
         }
 
         $newCard = $this->cardModel->getSummary($newCardId);

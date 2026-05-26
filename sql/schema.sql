@@ -258,11 +258,82 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
     `due_date`     DATETIME DEFAULT NULL,
     `checked_by`   INT UNSIGNED DEFAULT NULL,
     `checked_at`   DATETIME DEFAULT NULL,
+    `accepted_at`  DATETIME DEFAULT NULL,
     `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`checklist_id`) REFERENCES `checklists`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL,
     FOREIGN KEY (`checked_by`) REFERENCES `users`(`id`) ON DELETE SET NULL,
     INDEX `idx_checklist` (`checklist_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TASKS (card sub-work with hierarchy + own comment thread)
+-- ============================================================
+-- Tasks are a richer alternative to checklist items: each one can have its
+-- own assignees, due date, attachments, and comment thread, plus sub-tasks
+-- (parent_task_id) to one level of nesting. Acceptance is opt-in per
+-- assignee — they explicitly acknowledge the task, which notifies the card
+-- coordinator. Card cloning copies the task hierarchy (titles + structure)
+-- but resets all assignments, due dates, attachments, comments.
+CREATE TABLE IF NOT EXISTS `tasks` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `card_id`        INT UNSIGNED NOT NULL,
+    `parent_task_id` INT UNSIGNED DEFAULT NULL,
+    `title`          VARCHAR(500) NOT NULL,
+    `description`    TEXT,
+    `position`       INT UNSIGNED NOT NULL DEFAULT 0,
+    `due_date`       DATETIME DEFAULT NULL,
+    `is_complete`    TINYINT(1) NOT NULL DEFAULT 0,
+    `completed_by`   INT UNSIGNED DEFAULT NULL,
+    `completed_at`   DATETIME DEFAULT NULL,
+    `created_by`     INT UNSIGNED NOT NULL,
+    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`card_id`) REFERENCES `cards`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`parent_task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_card` (`card_id`),
+    INDEX `idx_parent` (`parent_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_assignments` (
+    `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `task_id`     INT UNSIGNED NOT NULL,
+    `user_id`     INT UNSIGNED NOT NULL,
+    `accepted_at` DATETIME DEFAULT NULL,
+    `assigned_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    UNIQUE KEY `uk_task_user` (`task_id`, `user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_comments` (
+    `id`         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `task_id`    INT UNSIGNED NOT NULL,
+    `user_id`    INT UNSIGNED NOT NULL,
+    `body`       TEXT NOT NULL,
+    `is_edited`  TINYINT(1) NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_task` (`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `task_attachments` (
+    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `task_id`        INT UNSIGNED NOT NULL,
+    `user_id`        INT UNSIGNED NOT NULL,
+    `original_name`  VARCHAR(255) NOT NULL,
+    `stored_name`    VARCHAR(255) NOT NULL,
+    `file_size`      INT UNSIGNED NOT NULL,
+    `mime_type`      VARCHAR(100) NOT NULL,
+    `is_image`       TINYINT(1) NOT NULL DEFAULT 0,
+    `thumbnail_path` VARCHAR(255) DEFAULT NULL,
+    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_task` (`task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

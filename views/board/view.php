@@ -32,6 +32,11 @@ $_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
         <div class="board-header-right">
             <div class="board-members-preview" id="boardMembersPreview"></div>
             <div class="board-header-controls" id="boardHeaderControls">
+                <button type="button" class="btn btn-sm btn-secondary board-filter-btn" id="boardFilterBtn" aria-haspopup="true" aria-expanded="false" title="Filter cards by label">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    <span>Filter</span>
+                    <span class="board-filter-badge" id="boardFilterBadge" hidden>0</span>
+                </button>
                 <label class="archived-toggle" title="Show archived cards">
                     <input type="checkbox" id="showArchivedToggle">
                     <span class="archived-toggle-slider"></span>
@@ -88,5 +93,6 @@ $_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
 <script src="<?php echo asset_url('public/vendor/sortable.min.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/board.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/card_modal.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/task_view.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/board_views.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/sse_client.js'); ?>"></script>

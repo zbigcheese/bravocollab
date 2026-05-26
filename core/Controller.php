@@ -156,6 +156,7 @@ class Controller
         SSE_LIST_UPDATED    => 'list_id',
         SSE_LIST_REORDERED  => null,            // null = one per board (no sub-key)
         SSE_CHECKLIST_CHANGED => 'card_id',
+        SSE_TASK_CHANGED    => 'card_id',
         SSE_LABEL_CHANGED   => null,
     ];
 

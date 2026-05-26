@@ -97,6 +97,19 @@ const App = {
         });
     },
 
+    // Detect whether a date string contains a non-midnight time component.
+    // Treats both ISO 'YYYY-MM-DDTHH:MM' and SQL 'YYYY-MM-DD HH:MM:SS' shapes.
+    hasTime(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string' || dateStr.length <= 10) return false;
+        const t = dateStr.substring(11, 16);
+        return t && t !== '00:00';
+    },
+
+    formatTimeOnly(dateStr) {
+        if (!this.hasTime(dateStr)) return '';
+        return dateStr.substring(11, 16);
+    },
+
     formatDueDate(dateStr) {
         if (!dateStr) return '';
         const d = new Date(dateStr);
@@ -107,12 +120,14 @@ const App = {
         const diff = Math.ceil((due - now) / 86400000);
 
         const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = this.formatTimeOnly(dateStr);
+        const withTime = (txt) => timeStr ? `${txt} ${timeStr}` : txt;
 
-        if (diff < 0) return { text: formatted, class: 'overdue' };
-        if (diff === 0) return { text: 'Today', class: 'due-today' };
-        if (diff === 1) return { text: 'Tomorrow', class: 'due-soon' };
-        if (diff <= 3) return { text: formatted, class: 'due-soon' };
-        return { text: formatted, class: '' };
+        if (diff < 0) return { text: withTime(formatted), class: 'overdue' };
+        if (diff === 0) return { text: withTime('Today'), class: 'due-today' };
+        if (diff === 1) return { text: withTime('Tomorrow'), class: 'due-soon' };
+        if (diff <= 3) return { text: withTime(formatted), class: 'due-soon' };
+        return { text: withTime(formatted), class: '' };
     },
 
     showToast(message, type = 'info') {

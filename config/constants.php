@@ -18,7 +18,11 @@ define('NOTIF_CARD_COMPLETED',  'card_completed');
 define('NOTIF_ITEM_COMPLETED',  'item_completed');
 define('NOTIF_DUE_SOON', 'due_soon');
 define('NOTIF_DUE_OVERDUE', 'due_overdue');
+define('NOTIF_DUE_CHANGED', 'due_changed');
 define('NOTIF_BOARD_INVITED', 'board_invited');
+define('NOTIF_TASK_ASSIGNED', 'task_assigned');
+define('NOTIF_TASK_ACCEPTED', 'task_accepted');
+define('NOTIF_CHECKLIST_ACCEPTED', 'checklist_accepted');
 
 // SSE event types
 define('SSE_CARD_CREATED', 'card_created');
@@ -37,6 +41,7 @@ define('SSE_CHECKLIST_CHANGED', 'checklist_changed');
 define('SSE_ATTACHMENT_ADDED', 'attachment_added');
 define('SSE_ATTACHMENT_DELETED', 'attachment_deleted');
 define('SSE_NOTIFICATION', 'notification');
+define('SSE_TASK_CHANGED', 'task_changed');
 
 // Default label colors
 define('DEFAULT_LABEL_COLORS', [

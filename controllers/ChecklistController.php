@@ -221,6 +221,78 @@ class ChecklistController extends Controller
         $this->pushGoogleSync('item', $itemId);
     }
 
+    /**
+     * Acceptance is a one-shot per-item ack from the assigned user. Mirrors
+     * the task-acceptance flow: writing accepted_at = NOW() and notifying
+     * the card coordinator (if any). Only the assignee can accept their own
+     * item; admins are not allowed to accept on someone else's behalf (the
+     * point of the action is that the assignee has personally confirmed).
+     */
+    public function acceptItem(): void
+    {
+        $this->requireAuth();
+        $this->requirePost();
+        $this->validateCSRF();
+
+        $data = $this->getJSON();
+        $itemId = (int) ($data['id'] ?? 0);
+        if (!$itemId) {
+            $this->json(['error' => 'Item ID required'], 400);
+            return;
+        }
+
+        $db = Database::get();
+        $stmt = $db->prepare(
+            'SELECT ci.*, cl.card_id FROM checklist_items ci
+             JOIN checklists cl ON ci.checklist_id = cl.id
+             WHERE ci.id = :id'
+        );
+        $stmt->execute(['id' => $itemId]);
+        $item = $stmt->fetch();
+        if (!$item) {
+            $this->json(['error' => 'Item not found'], 404);
+            return;
+        }
+
+        $boardId = $this->getBoardIdForCard($item['card_id']);
+        $this->requireBoardAccess($boardId);
+
+        $userId = Auth::userId();
+        if ((int) ($item['assigned_to'] ?? 0) !== $userId) {
+            $this->json(['error' => 'Only the assigned user can accept this item'], 403);
+            return;
+        }
+        if (!empty($item['accepted_at'])) {
+            // Idempotent — already accepted. Don't re-notify the coordinator.
+            $this->json(['success' => true, 'already_accepted' => true]);
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $db->prepare('UPDATE checklist_items SET accepted_at = :at WHERE id = :id')
+           ->execute(['at' => $now, 'id' => $itemId]);
+
+        // Notify card coordinator (single recipient) so they know the
+        // assignee has explicitly taken on the item.
+        $coordStmt = $db->prepare('SELECT coordinator_id, title FROM cards WHERE id = :id');
+        $coordStmt->execute(['id' => $item['card_id']]);
+        $cardRow = $coordStmt->fetch();
+        $coordinatorId = (int) ($cardRow['coordinator_id'] ?? 0);
+        if ($coordinatorId > 0) {
+            $this->createNotification($coordinatorId, NOTIF_CHECKLIST_ACCEPTED, [
+                'board_id'     => $boardId,
+                'card_id'      => (int) $item['card_id'],
+                'card_title'   => $cardRow['title'] ?? '',
+                'item_content' => $item['content'] ?? '',
+                'actor_name'   => Auth::userName(),
+            ]);
+        }
+
+        $this->publishSSE($boardId, SSE_CHECKLIST_CHANGED, ['card_id' => (int) $item['card_id']]);
+
+        $this->json(['success' => true, 'accepted_at' => $now]);
+    }
+
     public function updateItem(): void
     {
         $this->requireAuth();

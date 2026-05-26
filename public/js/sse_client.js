@@ -77,6 +77,18 @@ const SSEClient = {
         this.source.addEventListener('attachment_added', (e) => handleSubItemEvent(JSON.parse(e.data)));
         this.source.addEventListener('attachment_deleted', (e) => handleSubItemEvent(JSON.parse(e.data)));
 
+        // Tasks subsystem — refresh the open card's task tree if it's the
+        // currently-open card. Skip when the actor's own SSE suppression
+        // window is still active (the local DOM is already up-to-date).
+        this.source.addEventListener('task_changed', (e) => {
+            const data = JSON.parse(e.data);
+            const cardId = parseInt(data.card_id);
+            const openCardId = CardModal.currentCard ? parseInt(CardModal.currentCard.id) : null;
+            if (openCardId === cardId && typeof TaskView !== 'undefined' && !CardModal.isSuppressed()) {
+                TaskView.refresh();
+            }
+        });
+
         // Board-level label changes (created/updated/deleted) — reload board data
         // so all cards pick up new colors/names without reconnecting SSE.
         this.source.addEventListener('label_changed', () => {

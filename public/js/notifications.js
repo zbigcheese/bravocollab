@@ -168,11 +168,47 @@ const Notifications = {
                 return `<strong>${card}</strong> is due soon`;
             case 'due_overdue':
                 return `<strong>${card}</strong> is overdue`;
+            case 'due_changed': {
+                if (!data.new_due) {
+                    return `<strong>${actor}</strong> removed the due date from <strong>${card}</strong>`;
+                }
+                const verb = data.old_due ? 'changed' : 'set';
+                const formatted = this.formatDueDateForText(data.new_due);
+                return `<strong>${actor}</strong> ${verb} the due date on <strong>${card}</strong> to <strong>${App.escapeHtml(formatted)}</strong>`;
+            }
+            case 'task_assigned': {
+                const task = App.escapeHtml(data.task_title || '');
+                return task
+                    ? `<strong>${actor}</strong> assigned you to task <em>${task}</em> on <strong>${card}</strong>`
+                    : `<strong>${actor}</strong> assigned you to a task on <strong>${card}</strong>`;
+            }
+            case 'task_accepted': {
+                const task = App.escapeHtml(data.task_title || '');
+                return task
+                    ? `<strong>${actor}</strong> accepted task <em>${task}</em> on <strong>${card}</strong>`
+                    : `<strong>${actor}</strong> accepted a task on <strong>${card}</strong>`;
+            }
+            case 'checklist_accepted': {
+                const item = App.escapeHtml(data.item_content || '');
+                return item
+                    ? `<strong>${actor}</strong> accepted item <em>${item}</em> on <strong>${card}</strong>`
+                    : `<strong>${actor}</strong> accepted an item on <strong>${card}</strong>`;
+            }
             case 'board_invited':
                 return `<strong>${actor}</strong> added you to <strong>${board}</strong>`;
             default:
                 return `New notification`;
         }
+    },
+
+    // Compact display for the notification dropdown: "May 26" or "May 26 at 14:30".
+    formatDueDateForText(dueStr) {
+        if (!dueStr) return '';
+        const d = new Date(dueStr);
+        if (isNaN(d.getTime())) return dueStr;
+        const datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const time = App.formatTimeOnly(dueStr);
+        return time ? `${datePart} at ${time}` : datePart;
     },
 
     getIcon(type) {
@@ -186,7 +222,12 @@ const Notifications = {
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0079BF" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
             case 'due_soon':
             case 'due_overdue':
+            case 'due_changed':
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EB5A46" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            case 'task_assigned':
+            case 'task_accepted':
+            case 'checklist_accepted':
+                return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#61BD4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
             case 'card_completed':
             case 'item_completed':
                 // Filled checkmark in a circle so completion notifications
