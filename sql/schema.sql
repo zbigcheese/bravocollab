@@ -321,19 +321,22 @@ CREATE TABLE IF NOT EXISTS `task_comments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `task_attachments` (
-    `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `task_id`        INT UNSIGNED NOT NULL,
-    `user_id`        INT UNSIGNED NOT NULL,
-    `original_name`  VARCHAR(255) NOT NULL,
-    `stored_name`    VARCHAR(255) NOT NULL,
-    `file_size`      INT UNSIGNED NOT NULL,
-    `mime_type`      VARCHAR(100) NOT NULL,
-    `is_image`       TINYINT(1) NOT NULL DEFAULT 0,
-    `thumbnail_path` VARCHAR(255) DEFAULT NULL,
-    `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-    INDEX `idx_task` (`task_id`)
+    `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `task_id`         INT UNSIGNED NOT NULL,
+    `task_comment_id` INT UNSIGNED DEFAULT NULL,
+    `user_id`         INT UNSIGNED NOT NULL,
+    `original_name`   VARCHAR(255) NOT NULL,
+    `stored_name`     VARCHAR(255) NOT NULL,
+    `file_size`       INT UNSIGNED NOT NULL,
+    `mime_type`       VARCHAR(100) NOT NULL,
+    `is_image`        TINYINT(1) NOT NULL DEFAULT 0,
+    `thumbnail_path`  VARCHAR(255) DEFAULT NULL,
+    `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`task_id`)         REFERENCES `tasks`(`id`)         ON DELETE CASCADE,
+    FOREIGN KEY (`task_comment_id`) REFERENCES `task_comments`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`)         REFERENCES `users`(`id`)         ON DELETE CASCADE,
+    INDEX `idx_task`         (`task_id`),
+    INDEX `idx_task_comment` (`task_comment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

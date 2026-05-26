@@ -27,6 +27,10 @@ const TaskView = {
     openTask: null,
     // Stack of task IDs the user navigated into — feeds the back button.
     navStack: [],
+    // Per-task-page staged file lists keyed by task id. Stored on the
+    // instance so re-renders during the same session don't drop pending
+    // files. Cleared when the task page closes.
+    _stagedFiles: {},
 
     bootstrap(card, boardMembers) {
         this.cardId = parseInt(card.id);
@@ -151,6 +155,9 @@ const TaskView = {
         this.openTaskId = null;
         this.openTask = null;
         this.navStack = [];
+        // Drop any files staged for this session — they were never uploaded
+        // and have no on-disk presence to clean up.
+        this._stagedFiles = {};
         const overlay = document.getElementById('cardDetailModal');
         const existing = overlay?.querySelector('#taskPage');
         if (existing) existing.remove();
@@ -300,8 +307,16 @@ const TaskView = {
             <div class="task-page-section">
                 <div class="task-section-header"><h4>Comments</h4></div>
                 <div class="task-comment-form">
-                    <textarea id="taskCommentInput" placeholder="Write a comment..."></textarea>
-                    <button class="btn btn-primary btn-sm" id="taskCommentSubmit">Comment</button>
+                    <div style="position:relative;">
+                        <textarea id="taskCommentInput" placeholder="Write a comment... Use @ to mention members"></textarea>
+                        <div id="taskCommentMentionDropdown" class="mention-dropdown" style="display:none;"></div>
+                    </div>
+                    <div class="staged-attachments" id="taskCommentStaged"></div>
+                    <div class="comment-form-actions">
+                        <button class="btn btn-primary btn-sm" id="taskCommentSubmit">Comment</button>
+                        <button type="button" class="attach-trigger-btn" id="taskCommentAttachBtn" title="Attach file" aria-label="Attach file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                        <button type="button" class="emoji-trigger-btn" id="taskCommentEmojiBtn" title="Insert emoji" aria-label="Insert emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+                    </div>
                 </div>
                 <div class="task-comments-list" id="taskCommentsList">${commentsHtml}</div>
             </div>
@@ -333,6 +348,10 @@ const TaskView = {
     },
 
     commentHtml(c, isOwn) {
+        const atts = Array.isArray(c.attachments) ? c.attachments : [];
+        const attsHtml = atts.length
+            ? `<div class="comment-attachments">${atts.map(a => this.attachmentInCommentHtml(a, isOwn)).join('')}</div>`
+            : '';
         return `
             <div class="task-comment" data-comment-id="${c.id}">
                 ${App.avatarHtml(c.author_name, 'sm')}
@@ -341,7 +360,8 @@ const TaskView = {
                         <span class="task-comment-author">${App.escapeHtml(c.author_name)}</span>
                         <span class="task-comment-time">${App.formatDate(c.created_at)}${parseInt(c.is_edited) === 1 ? ' (edited)' : ''}</span>
                     </div>
-                    <div class="task-comment-text">${App.escapeHtml(c.body).replace(/\n/g, '<br>')}</div>
+                    <div class="task-comment-text">${this.formatCommentBody(c.body)}</div>
+                    ${attsHtml}
                     ${isOwn ? `<div class="task-comment-actions">
                         <button class="task-comment-edit" data-comment-id="${c.id}">Edit</button>
                         <button class="task-comment-delete" data-comment-id="${c.id}">Delete</button>
@@ -349,6 +369,63 @@ const TaskView = {
                 </div>
             </div>
         `;
+    },
+
+    /**
+     * Format a comment body for display: linkify URLs, then replace any
+     * @<member name> token with a styled mention chip. Reuses CardModal's
+     * implementation when present so we stay in sync with its rules. The
+     * input is already trusted to be plain text — escaping happens inside
+     * the formatter.
+     */
+    formatCommentBody(body) {
+        if (typeof CardModal !== 'undefined' && typeof CardModal.formatCommentBody === 'function') {
+            // CardModal pulls names from its own boardMembers — same list we got.
+            return CardModal.formatCommentBody(body);
+        }
+        return App.escapeHtml(body || '').replace(/\n/g, '<br>');
+    },
+
+    /**
+     * Inline-in-comment attachment row. Images are clickable thumbnails
+     * (opens the per-task lightbox); non-images are a downloadable file
+     * tile. The owner gets a remove (×) button overlaid on hover.
+     */
+    attachmentInCommentHtml(a, isOwn) {
+        const isImg = parseInt(a.is_image) === 1;
+        const url = `api.php?action=tasks.download_attachment&id=${a.id}`;
+        const delBtn = isOwn
+            ? `<button class="comment-attach-delete task-attach-comment-del" data-task-attach-id="${a.id}" title="Remove" aria-label="Remove">&times;</button>`
+            : '';
+        if (isImg) {
+            return `
+                <div class="comment-attachment is-image" data-attachment-id="${a.id}">
+                    <img class="comment-attach-thumb task-attach-lightbox"
+                         src="${url}&thumb=1"
+                         data-task-attach-lightbox="${a.id}"
+                         alt="${App.escapeHtml(a.original_name)}">
+                    ${delBtn}
+                </div>
+            `;
+        }
+        const ext = (a.original_name.split('.').pop() || '').toUpperCase().slice(0, 4);
+        return `
+            <div class="comment-attachment is-file" data-attachment-id="${a.id}">
+                <a class="comment-attach-link" href="${url}" download>
+                    <span class="comment-attach-icon">${ext}</span>
+                    <span class="comment-attach-name">${App.escapeHtml(a.original_name)}</span>
+                    <span class="comment-attach-size">${this.formatFileSize(a.file_size)}</span>
+                </a>
+                ${delBtn}
+            </div>
+        `;
+    },
+
+    formatFileSize(bytes) {
+        bytes = parseInt(bytes) || 0;
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+        if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+        return bytes + ' B';
     },
 
     bindTaskPageEvents(page, task) {
@@ -466,11 +543,38 @@ const TaskView = {
             });
         });
 
-        // Comments
+        // ---- Comments composer wiring ----
+        const taskKey = String(task.id);
+        if (!Array.isArray(this._stagedFiles[taskKey])) this._stagedFiles[taskKey] = [];
+        const stagedList = this._stagedFiles[taskKey];
+
+        const composerTextarea = page.querySelector('#taskCommentInput');
+        const composerDropdown = page.querySelector('#taskCommentMentionDropdown');
+        const composerAttachBtn = page.querySelector('#taskCommentAttachBtn');
+        const composerEmojiBtn = page.querySelector('#taskCommentEmojiBtn');
+        const composerStagedEl = page.querySelector('#taskCommentStaged');
+
+        // @mention autocomplete — uses CardModal's helper which already knows
+        // the boardMembers list (TaskView always runs inside an open card modal).
+        if (composerTextarea && composerDropdown && typeof CardModal !== 'undefined') {
+            CardModal.initMentionAutocomplete(composerTextarea, composerDropdown);
+        }
+        // Emoji picker
+        if (composerTextarea && composerEmojiBtn && typeof EmojiPicker !== 'undefined') {
+            EmojiPicker.attach(composerTextarea, composerEmojiBtn);
+        }
+        // File staging — CardModal already implements the input + chip-list pattern.
+        if (composerAttachBtn && composerStagedEl && typeof CardModal !== 'undefined') {
+            CardModal.attachFileStaging(composerAttachBtn, composerStagedEl, stagedList);
+            // Re-render any files that were staged before this re-render.
+            CardModal.renderStagedFiles(composerStagedEl, stagedList);
+        }
+
         page.querySelector('#taskCommentSubmit')?.addEventListener('click', () => this.submitComment(task));
-        page.querySelector('#taskCommentInput')?.addEventListener('keydown', (e) => {
+        composerTextarea?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) this.submitComment(task);
         });
+
         page.querySelectorAll('.task-comment-edit').forEach(btn => {
             btn.addEventListener('click', () => this.editComment(task, parseInt(btn.dataset.commentId)));
         });
@@ -482,6 +586,29 @@ const TaskView = {
                     await App.api('tasks.delete_comment', { id });
                     await this.openTaskPage(task.id, false);
                 } catch (e) { App.showToast(e.message, 'error'); }
+            });
+        });
+
+        // Delete an attachment that lives inside a task comment.
+        page.querySelectorAll('.task-attach-comment-del').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const id = parseInt(btn.dataset.taskAttachId);
+                try {
+                    await App.api('tasks.delete_attachment', { id });
+                    await this.openTaskPage(task.id, false);
+                } catch (err) { App.showToast(err.message || 'Failed to delete', 'error'); }
+            });
+        });
+
+        // Click an image thumbnail in a comment → lightbox sweep across all
+        // task-level + per-comment images on this task.
+        page.querySelectorAll('.task-attach-lightbox').forEach(img => {
+            img.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.openLightbox(parseInt(img.dataset.taskAttachLightbox));
             });
         });
 
@@ -617,12 +744,56 @@ const TaskView = {
     async submitComment(task) {
         const ta = document.getElementById('taskCommentInput');
         const body = (ta?.value || '').trim();
+        const taskKey = String(task.id);
+        const stagedList = this._stagedFiles[taskKey] || [];
+        // Allow attach-only? No — mirror CardModal: body required so the
+        // comment row has visible content.
         if (!body) return;
+
         try {
-            await App.api('tasks.add_comment', { task_id: task.id, body });
-            ta.value = '';
+            const res = await App.api('tasks.add_comment', { task_id: task.id, body });
+            const newCommentId = res?.comment_id;
+            if (ta) ta.value = '';
+
+            // Drain staged files into the new comment.
+            if (newCommentId && stagedList.length) {
+                const filesToUpload = stagedList.slice();
+                stagedList.length = 0;
+                const stagedEl = document.getElementById('taskCommentStaged');
+                if (stagedEl && typeof CardModal !== 'undefined') {
+                    CardModal.renderStagedFiles(stagedEl, stagedList);
+                }
+                await this.uploadCommentAttachments(filesToUpload, newCommentId);
+            }
+
             await this.openTaskPage(task.id, false);
-        } catch (e) { App.showToast(e.message, 'error'); }
+        } catch (e) {
+            App.showToast(e.message || 'Failed to comment', 'error');
+        }
+    },
+
+    /**
+     * Upload each File against an existing task comment. Errors are
+     * surfaced per-file so a single bad upload doesn't block the rest.
+     * The caller is responsible for refreshing the open task page after.
+     */
+    async uploadCommentAttachments(files, taskCommentId) {
+        if (!files || !files.length) return [];
+        const uploaded = [];
+        for (const file of files) {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('task_id', this.openTaskId);
+            fd.append('task_comment_id', taskCommentId);
+            try {
+                const res = await App.upload('tasks.upload_attachment', fd);
+                if (res && res.error) throw new Error(res.error);
+                if (res && res.attachment) uploaded.push(res.attachment);
+            } catch (e) {
+                App.showToast(e.message || 'Upload failed', 'error');
+            }
+        }
+        return uploaded;
     },
 
     editComment(task, commentId) {
@@ -631,15 +802,50 @@ const TaskView = {
         const c = (task.comments || []).find(x => parseInt(x.id) === commentId);
         if (!c) return;
         const original = c.body;
+
+        // Reuse the same composer affordances (mention dropdown, emoji button,
+        // attach button) inside the edit form so editing has feature parity
+        // with composing a new comment.
+        const editId = `taskCommentEdit_${commentId}`;
         wrap.innerHTML = `
-            <textarea class="task-comment-edit-area">${App.escapeHtml(original)}</textarea>
-            <div style="display:flex;gap:6px;margin-top:4px;">
+            <div style="position:relative;">
+                <textarea id="${editId}_area" class="task-comment-edit-area"></textarea>
+                <div id="${editId}_mention" class="mention-dropdown" style="display:none;"></div>
+            </div>
+            <div class="comment-form-actions" style="margin-top:6px;">
                 <button class="btn btn-primary btn-sm" data-task-comment-save>Save</button>
                 <button class="btn btn-secondary btn-sm" data-task-comment-cancel>Cancel</button>
+                <button type="button" class="attach-trigger-btn" id="${editId}_attach" title="Attach file" aria-label="Attach file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                <button type="button" class="emoji-trigger-btn" id="${editId}_emoji" title="Insert emoji" aria-label="Insert emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
             </div>
         `;
-        const ta = wrap.querySelector('textarea');
+        const ta = wrap.querySelector(`#${editId}_area`);
+        ta.value = original;
         ta.focus();
+        ta.selectionStart = ta.selectionEnd = original.length;
+
+        if (typeof CardModal !== 'undefined') {
+            CardModal.initMentionAutocomplete(ta, wrap.querySelector(`#${editId}_mention`));
+        }
+        if (typeof EmojiPicker !== 'undefined') {
+            EmojiPicker.attach(ta, wrap.querySelector(`#${editId}_emoji`));
+        }
+
+        // Attach-during-edit uploads immediately against the existing
+        // comment id — same UX as the card-comment edit flow.
+        wrap.querySelector(`#${editId}_attach`)?.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.addEventListener('change', async () => {
+                const files = Array.from(input.files);
+                if (!files.length) return;
+                await this.uploadCommentAttachments(files, commentId);
+                await this.openTaskPage(task.id, false);
+            });
+            input.click();
+        });
+
         wrap.querySelector('[data-task-comment-save]').addEventListener('click', async () => {
             const v = ta.value.trim();
             if (!v) return;
@@ -649,7 +855,66 @@ const TaskView = {
             } catch (e) { App.showToast(e.message, 'error'); }
         });
         wrap.querySelector('[data-task-comment-cancel]').addEventListener('click', () => {
-            wrap.textContent = original;
+            // Restore the original formatted body in place.
+            wrap.innerHTML = this.formatCommentBody(original);
         });
+    },
+
+    /**
+     * Lightbox sweep across every image attached anywhere on the open task:
+     * task-level attachments first, then every image inside a comment's
+     * attachments. Mirrors CardModal.openLightbox' structure but with the
+     * task download URL.
+     */
+    openLightbox(attachmentId) {
+        if (!this.openTask) return;
+        const taskImages = (this.openTask.attachments || []).filter(a => parseInt(a.is_image) === 1);
+        const commentImages = (this.openTask.comments || [])
+            .flatMap(cm => Array.isArray(cm.attachments) ? cm.attachments : [])
+            .filter(a => parseInt(a.is_image) === 1);
+        const images = [...taskImages, ...commentImages];
+
+        const target = parseInt(attachmentId);
+        let idx = images.findIndex(a => parseInt(a.id) === target);
+        if (idx === -1) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'lightbox-overlay';
+
+        const show = (i) => {
+            const img = images[i];
+            const src = `api.php?action=tasks.download_attachment&id=${img.id}`;
+            overlay.innerHTML = `
+                <button class="lightbox-close" aria-label="Close">&times;</button>
+                ${images.length > 1 ? '<button class="lightbox-nav lightbox-prev" aria-label="Previous">&lsaquo;</button>' : ''}
+                <img class="lightbox-image" src="${src}" alt="${App.escapeHtml(img.original_name)}">
+                ${images.length > 1 ? '<button class="lightbox-nav lightbox-next" aria-label="Next">&rsaquo;</button>' : ''}
+                ${images.length > 1 ? `<div class="lightbox-counter">${i + 1} / ${images.length}</div>` : ''}
+            `;
+            overlay.querySelector('.lightbox-close').addEventListener('click', () => overlay.remove());
+            overlay.querySelector('.lightbox-prev')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                idx = (idx - 1 + images.length) % images.length;
+                show(idx);
+            });
+            overlay.querySelector('.lightbox-next')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                idx = (idx + 1) % images.length;
+                show(idx);
+            });
+        };
+        show(idx);
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+
+        const keyHandler = (e) => {
+            if (e.key === 'Escape')      { overlay.remove(); document.removeEventListener('keydown', keyHandler); }
+            if (e.key === 'ArrowLeft')   { idx = (idx - 1 + images.length) % images.length; show(idx); }
+            if (e.key === 'ArrowRight')  { idx = (idx + 1) % images.length; show(idx); }
+        };
+        document.addEventListener('keydown', keyHandler);
     },
 };

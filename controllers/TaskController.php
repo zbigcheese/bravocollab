@@ -395,9 +395,74 @@ class TaskController extends Controller
         )->execute(['tid' => $taskId, 'uid' => Auth::userId(), 'body' => $body]);
 
         $commentId = (int) $db->lastInsertId();
+
+        // Notify mentioned users — same algorithm as CommentController:
+        // resolve @<display_name> tokens against board members and notify
+        // each unique mentioned user once.
+        $cardStmt = $db->prepare('SELECT title FROM cards WHERE id = :id');
+        $cardStmt->execute(['id' => $task['card_id']]);
+        $cardTitle = ($cardStmt->fetch())['title'] ?? '';
+
+        $mentionPayload = [
+            'board_id'   => $boardId,
+            'card_id'    => (int) $task['card_id'],
+            'card_title' => $cardTitle,
+            'task_id'    => $taskId,
+            'task_title' => $task['title'],
+            'actor_name' => Auth::userName(),
+            'body'       => $body,
+        ];
+        foreach ($this->resolveMentions($body, $boardId) as $mentionedUserId) {
+            $this->createNotification($mentionedUserId, NOTIF_COMMENT_MENTION, $mentionPayload);
+        }
+
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $task['card_id']]);
 
         $this->json(['success' => true, 'comment_id' => $commentId]);
+    }
+
+    /**
+     * Scan the comment body for @<display_name> tokens that match a board
+     * member (or admin) and return the unique set of user IDs. The actor
+     * (current user) is excluded — self-mentions don't notify. Matching is
+     * longest-name-first so that "@Anna Smith" doesn't get stolen by an
+     * earlier "@Anna" match.
+     *
+     * @return int[]
+     */
+    private function resolveMentions(string $body, int $boardId): array
+    {
+        // Pool of names eligible to be mentioned: board members + site admins.
+        $stmt = Database::get()->prepare(
+            'SELECT u.id, u.display_name
+             FROM board_members bm
+             JOIN users u ON bm.user_id = u.id
+             WHERE bm.board_id = :bid
+             UNION
+             SELECT id, display_name FROM users WHERE role = "admin"'
+        );
+        $stmt->execute(['bid' => $boardId]);
+        $candidates = $stmt->fetchAll();
+        if (!$candidates) return [];
+
+        // Sort longest name first so overlapping names match deterministically.
+        usort($candidates, static fn($a, $b) => mb_strlen($b['display_name']) <=> mb_strlen($a['display_name']));
+
+        $matched = [];
+        $remaining = $body;
+        foreach ($candidates as $u) {
+            $name = $u['display_name'];
+            if ($name === '' || (int) $u['id'] === Auth::userId()) continue;
+            // Word-boundary-ish match: require non-name-char after, or end of string.
+            // Tokenization mirrors the JS side (which only checks for the literal '@<name>' string).
+            $needle = '@' . $name;
+            if (mb_stripos($remaining, $needle) !== false) {
+                $matched[(int) $u['id']] = true;
+                // Strip the matched name so a substring of it can't double-count.
+                $remaining = str_ireplace($needle, '', $remaining);
+            }
+        }
+        return array_keys($matched);
     }
 
     public function updateComment(): void
@@ -464,6 +529,17 @@ class TaskController extends Controller
             return;
         }
 
+        // Best-effort cleanup of disk files for any attachments owned by this
+        // comment. The DB rows cascade via FK; the files would otherwise leak.
+        require_once __DIR__ . '/../core/FileUpload.php';
+        $aStmt = $db->prepare(
+            'SELECT stored_name FROM task_attachments WHERE task_comment_id = :id'
+        );
+        $aStmt->execute(['id' => $commentId]);
+        foreach ($aStmt->fetchAll() as $a) {
+            FileUpload::deleteFile($a['stored_name']);
+        }
+
         $db->prepare('DELETE FROM task_comments WHERE id = :id')->execute(['id' => $commentId]);
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $row['card_id']]);
 
@@ -488,6 +564,22 @@ class TaskController extends Controller
         $boardId = $this->getBoardIdForCard((int) $task['card_id']);
         $this->requireBoardAccess($boardId);
 
+        // Optional task_comment_id — when present, the upload belongs to
+        // the comment thread rather than the task itself. Validate it
+        // actually lives on this task to prevent cross-task injection.
+        $commentId = (isset($_POST['task_comment_id']) && $_POST['task_comment_id'] !== '')
+            ? (int) $_POST['task_comment_id']
+            : null;
+        if ($commentId !== null) {
+            $db0 = Database::get();
+            $cs = $db0->prepare('SELECT id FROM task_comments WHERE id = :id AND task_id = :tid LIMIT 1');
+            $cs->execute(['id' => $commentId, 'tid' => $taskId]);
+            if (!$cs->fetch()) {
+                $this->json(['error' => 'Comment not found on this task'], 400);
+                return;
+            }
+        }
+
         if (empty($_FILES['file'])) {
             $this->json(['error' => 'No file uploaded'], 400);
             return;
@@ -504,13 +596,15 @@ class TaskController extends Controller
         $db = Database::get();
         $db->prepare(
             'INSERT INTO task_attachments
-                (task_id, user_id, original_name, stored_name, file_size, mime_type, is_image, thumbnail_path)
-             VALUES (:tid, :uid, :on, :sn, :fs, :mt, :ii, :tp)'
+                (task_id, task_comment_id, user_id, original_name, stored_name, file_size, mime_type, is_image, thumbnail_path)
+             VALUES (:tid, :tcid, :uid, :on, :sn, :fs, :mt, :ii, :tp)'
         )->execute([
-            'tid' => $taskId, 'uid' => Auth::userId(),
-            'on'  => $fileData['original_name'], 'sn' => $fileData['stored_name'],
-            'fs'  => $fileData['file_size'],     'mt' => $fileData['mime_type'],
-            'ii'  => $fileData['is_image'],      'tp' => $fileData['thumbnail_path'],
+            'tid'  => $taskId,
+            'tcid' => $commentId,
+            'uid'  => Auth::userId(),
+            'on'   => $fileData['original_name'], 'sn' => $fileData['stored_name'],
+            'fs'   => $fileData['file_size'],     'mt' => $fileData['mime_type'],
+            'ii'   => $fileData['is_image'],      'tp' => $fileData['thumbnail_path'],
         ]);
 
         $attId = (int) $db->lastInsertId();
@@ -519,13 +613,14 @@ class TaskController extends Controller
         $this->json([
             'success' => true,
             'attachment' => [
-                'id' => $attId,
-                'original_name'  => $fileData['original_name'],
-                'stored_name'    => $fileData['stored_name'],
-                'mime_type'      => $fileData['mime_type'],
-                'is_image'       => $fileData['is_image'],
-                'file_size'      => $fileData['file_size'],
-                'thumbnail_path' => $fileData['thumbnail_path'],
+                'id'              => $attId,
+                'task_comment_id' => $commentId,
+                'original_name'   => $fileData['original_name'],
+                'stored_name'     => $fileData['stored_name'],
+                'mime_type'       => $fileData['mime_type'],
+                'is_image'        => $fileData['is_image'],
+                'file_size'       => $fileData['file_size'],
+                'thumbnail_path'  => $fileData['thumbnail_path'],
             ],
         ]);
     }
@@ -719,11 +814,33 @@ class TaskController extends Controller
         $stmt->execute(['tid' => $task['id']]);
         $task['comments'] = $stmt->fetchAll();
 
-        // Attachments
+        // Per-comment attachments — batched lookup, then bucketed by comment_id
+        // so the client can render attachments inline under each comment.
+        if (!empty($task['comments'])) {
+            $commentIds = array_map(static fn($c) => (int) $c['id'], $task['comments']);
+            $placeholders = implode(',', array_fill(0, count($commentIds), '?'));
+            $cStmt = $db->prepare(
+                "SELECT ta.*, u.display_name AS uploader_name
+                 FROM task_attachments ta JOIN users u ON ta.user_id = u.id
+                 WHERE ta.task_comment_id IN ($placeholders)
+                 ORDER BY ta.created_at ASC"
+            );
+            $cStmt->execute($commentIds);
+            $byComment = [];
+            foreach ($cStmt->fetchAll() as $r) {
+                $byComment[(int) $r['task_comment_id']][] = $r;
+            }
+            foreach ($task['comments'] as &$cm) {
+                $cm['attachments'] = $byComment[(int) $cm['id']] ?? [];
+            }
+            unset($cm);
+        }
+
+        // Task-level attachments only (per-comment attachments are attached above).
         $stmt = $db->prepare(
             'SELECT ta.*, u.display_name AS uploader_name
              FROM task_attachments ta JOIN users u ON ta.user_id = u.id
-             WHERE ta.task_id = :tid
+             WHERE ta.task_id = :tid AND ta.task_comment_id IS NULL
              ORDER BY ta.created_at DESC'
         );
         $stmt->execute(['tid' => $task['id']]);
