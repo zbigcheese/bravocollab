@@ -111,13 +111,13 @@ const CardModal = {
                             ${this.renderCommentsSection()}
                         </div>
                         <div class="card-detail-sidebar">
-                            <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Add to card</h4>
+                            <h4 style="font-size: 0.8571rem;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Add to card</h4>
                             <button class="btn btn-secondary btn-sm" id="sidebarLabels">Labels</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarChecklist">Checklist</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarDueDate">Due Date</button>
                             <button class="btn btn-secondary btn-sm" id="sidebarAttachment">Attachment</button>
                             <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0;">
-                            <h4 style="font-size:12px;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
+                            <h4 style="font-size: 0.8571rem;color:var(--color-text-light);text-transform:uppercase;margin-bottom:4px;">Actions</h4>
                             ${this.isPersonalBoard() ? '' : `
                                 <button class="btn btn-secondary btn-sm" id="sidebarMembers">Assign</button>
                                 <button class="btn btn-secondary btn-sm" id="sidebarCoordinator">Set Coordinator</button>
@@ -127,7 +127,7 @@ const CardModal = {
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
-                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-light);">
+                            <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--color-border);font-size: 0.8571rem;color:var(--color-text-light);">
                                 Created by <strong style="color:var(--color-text);">${App.escapeHtml(c.creator_name)}</strong><br>
                                 ${App.formatDateTime(c.created_at)}
                             </div>
@@ -1440,7 +1440,7 @@ const CardModal = {
                     <input type="date" id="clItemDueDate" value="${datePart}" style="flex:1;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
                     <input type="time" id="clItemDueTime" value="${timePart}" style="width:120px;padding:8px;border:2px solid var(--color-border);border-radius:4px;">
                 </div>
-                <div style="font-size:12px;color:var(--color-text-light);margin-top:4px;">Time is optional — leave empty for an all-day item.</div>
+                <div style="font-size: 0.8571rem;color:var(--color-text-light);margin-top:4px;">Time is optional — leave empty for an all-day item.</div>
             </div>
         `, `
             <button class="btn btn-secondary btn-sm" id="clItemClearDue">Clear Due Date</button>
@@ -2115,20 +2115,20 @@ const CardModal = {
         }).join('');
 
         const body = `
-            <p style="margin:0 0 12px;color:var(--color-text-light);font-size:13px;">Moving "<strong style="color:var(--color-text)">${App.escapeHtml(cardTitle)}</strong>"</p>
+            <p style="margin:0 0 12px;color:var(--color-text-light);font-size: 0.9286rem;">Moving "<strong style="color:var(--color-text)">${App.escapeHtml(cardTitle)}</strong>"</p>
             <div class="form-group">
                 <label for="moveBoardSelect" style="font-weight:600;margin-bottom:4px;display:block;">Board</label>
-                <select id="moveBoardSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size:14px;">
+                <select id="moveBoardSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size: 1rem;">
                     ${boardOptions}
                 </select>
             </div>
             <div class="form-group" style="margin-top:12px;">
                 <label for="moveListSelect" style="font-weight:600;margin-bottom:4px;display:block;">List</label>
-                <select id="moveListSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size:14px;">
+                <select id="moveListSelect" style="width:100%;padding:8px;border:2px solid var(--color-border);border-radius:4px;font-family:var(--font-family);font-size: 1rem;">
                     <option value="">Loading...</option>
                 </select>
             </div>
-            <p style="margin:12px 0 0;color:var(--color-text-light);font-size:12px;">When moving to a different board, labels are removed (they're board-specific), and any assignees or coordinator who aren't members of the target board are unassigned.</p>
+            <p style="margin:12px 0 0;color:var(--color-text-light);font-size: 0.8571rem;">When moving to a different board, labels are removed (they're board-specific), and any assignees or coordinator who aren't members of the target board are unassigned.</p>
         `;
 
         const footer = `<button class="btn btn-primary" id="moveCardConfirmBtn" disabled>Move</button>`;

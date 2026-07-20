@@ -1,3 +1,12 @@
+<?php
+// Accessibility text scale. Resolved before any markup so the multiplier can be
+// inlined in <head> — emitting it later would repaint the whole page at the
+// larger size after first paint.
+require_once __DIR__ . '/../../core/UserPreferences.php';
+$_textScale = Auth::isLoggedIn()
+    ? UserPreferences::get(Auth::userId())['text_scale']
+    : UserPreferences::DEFAULTS['text_scale'];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,6 +21,10 @@
     <link rel="stylesheet" href="<?php echo asset_url('public/css/app.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset_url('public/css/board.css'); ?>">
     <link rel="stylesheet" href="<?php echo asset_url('public/css/modal.css'); ?>">
+    <?php if ((float) $_textScale !== 1.0): ?>
+    <!-- Must follow the stylesheets so it wins over the :root default in app.css. -->
+    <style id="textScaleStyle">:root { --text-scale: <?php echo sprintf('%.2F', (float) $_textScale); ?>; }</style>
+    <?php endif; ?>
     <script>
     // Register the service worker as early as possible. Failure here is
     // non-fatal (push is opt-in and the rest of the app is web-only).

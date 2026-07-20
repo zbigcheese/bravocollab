@@ -29,12 +29,18 @@
     --radius-md: 8px;
     --radius-lg: 12px;
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Accessibility text scaling. Overridden per-user by an inline <style> in
+       layout/header.php from the `text_scale` preference. Every font-size in
+       the app is expressed in rem against the 14px base below, so changing
+       this multiplier scales text without touching layout geometry. */
+    --text-scale: 1;
 }
 
 html, body {
     height: 100%;
     font-family: var(--font-family);
-    font-size: 14px;
+    /* Root font size == 1rem. Must stay in px (a rem here is self-referential). */
+    font-size: calc(14px * var(--text-scale, 1));
     line-height: 1.5;
     color: var(--color-text);
     background: var(--color-bg);
@@ -54,7 +60,8 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 48px;
+    /* min-height so the bar can grow rather than clip its own text at 1.5x. */
+    min-height: 48px;
     padding: 0 16px;
     background: #F16820;
     color: #fff;
@@ -68,7 +75,7 @@ a:hover {
     align-items: center;
     gap: 8px;
     color: #fff;
-    font-size: 18px;
+    font-size: 1.2857rem;
     font-weight: 700;
     text-decoration: none;
     letter-spacing: -0.5px;
@@ -115,7 +122,7 @@ a:hover {
     border: 1px solid rgba(255, 255, 255, 0.3);
     background: rgba(255, 255, 255, 0.15);
     color: #fff;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-family: var(--font-family);
     transition: width 0.15s, background 0.15s;
 }
@@ -156,13 +163,13 @@ a:hover {
 .global-search-item:hover { background: #f4f5f7; }
 .global-search-item-title {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: #172b4d;
     margin-bottom: 2px;
 }
 .global-search-item-snippet {
     color: #5e6c84;
-    font-size: 12px;
+    font-size: 0.8571rem;
     line-height: 1.4;
     overflow: hidden;
     display: -webkit-box;
@@ -176,7 +183,7 @@ a:hover {
     border-radius: 2px;
 }
 .global-search-item-meta {
-    font-size: 11px;
+    font-size: 0.7857rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: #5e6c84;
@@ -198,7 +205,7 @@ a:hover {
 }
 .global-search-footer a {
     color: var(--color-primary, #0079BF);
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 600;
     text-decoration: none;
 }
@@ -206,7 +213,7 @@ a:hover {
     padding: 14px;
     text-align: center;
     color: var(--color-text-light);
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 @media (max-width: 720px) {
@@ -248,16 +255,16 @@ a:hover {
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
     padding: 16px 18px;
     line-height: 1.5;
-    font-size: 14px;
+    font-size: 1rem;
 }
-.ios-install-sheet strong { display: block; font-size: 15px; margin-bottom: 6px; }
+.ios-install-sheet strong { display: block; font-size: 1.0714rem; margin-bottom: 6px; }
 .ios-install-sheet ol { margin: 8px 0 0 18px; padding: 0; }
 .ios-install-sheet li { margin: 4px 0; }
 .ios-install-sheet button {
     margin-top: 12px;
     background: #F16820; color: #fff;
     border: 0; border-radius: 6px;
-    padding: 8px 14px; font-weight: 700; cursor: pointer; font-size: 13px;
+    padding: 8px 14px; font-weight: 700; cursor: pointer; font-size: 0.9286rem;
 }
 .ios-install-sheet button:hover { filter: brightness(1.05); }
 
@@ -316,7 +323,7 @@ a:hover {
     align-items: center;
     gap: 8px;
     padding: 8px 14px 10px;
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: var(--color-text-light);
     border-bottom: 1px solid var(--color-border);
 }
@@ -337,7 +344,7 @@ a:hover {
     background: transparent;
     border: 0;
     padding: 8px 14px;
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: var(--color-text);
     cursor: pointer;
     text-decoration: none;
@@ -345,7 +352,7 @@ a:hover {
 }
 .calendar-menu-item:hover { background: var(--color-bg); }
 .calendar-menu-item.primary { color: var(--color-primary-dark); font-weight: 600; }
-.calendar-menu-item.subtle  { color: var(--color-text-light); font-size: 12px; }
+.calendar-menu-item.subtle  { color: var(--color-text-light); font-size: 0.8571rem; }
 
 /* Hide the standalone calendar trigger on small viewports — its actions
    are mirrored inside the user menu dropdown via .user-menu-mobile-cal. */
@@ -367,7 +374,7 @@ a:hover {
     .user-menu-mobile-cal-header {
         display: flex; align-items: center; gap: 6px;
         padding: 6px 14px;
-        font-size: 12px; color: var(--color-text-light);
+        font-size: 0.8571rem; color: var(--color-text-light);
         text-transform: uppercase; letter-spacing: 0.04em;
     }
 }
@@ -379,7 +386,7 @@ a:hover {
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 4px;
     padding: 4px 10px;
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 700;
     cursor: pointer;
     text-transform: lowercase;
@@ -392,7 +399,7 @@ a:hover {
 .nav-link {
     color: #fff;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 1rem;
     text-decoration: none;
     padding: 4px 8px;
     border-radius: var(--radius-sm);
@@ -422,7 +429,7 @@ a:hover {
     color: #fff;
     font: inherit;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 .user-menu-avatar {
@@ -444,7 +451,7 @@ a:hover {
 }
 
 .user-name {
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 700;
     color: #fff;
 }
@@ -478,11 +485,11 @@ a:hover {
 
 .user-menu-name {
     font-weight: 700;
-    font-size: 14px;
+    font-size: 1rem;
 }
 
 .user-menu-email {
-    font-size: 12px;
+    font-size: 0.8571rem;
     color: var(--color-text-light);
     word-break: break-all;
 }
@@ -493,7 +500,7 @@ a:hover {
     margin-top: 4px;
     padding: 2px 8px;
     border-radius: 999px;
-    font-size: 10px;
+    font-size: 0.7143rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -512,7 +519,7 @@ a:hover {
     margin-bottom: 6px;
     border-radius: var(--radius-sm);
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: var(--color-text);
     text-decoration: none;
     border: 1px solid var(--color-border);
@@ -533,7 +540,7 @@ a:hover {
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     font-weight: 600;
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: var(--color-text);
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
@@ -551,7 +558,7 @@ a:hover {
     justify-content: center;
     gap: 6px;
     padding: 8px 16px;
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 500;
     border: none;
     border-radius: var(--radius-sm);
@@ -597,7 +604,7 @@ a:hover {
     color: #fff;
     font-weight: 700;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 0.9286rem;
     padding: 4px 8px;
     border-radius: var(--radius-sm);
 }
@@ -609,7 +616,7 @@ a:hover {
 
 .btn-sm {
     padding: 4px 12px;
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 .btn-block {
@@ -643,7 +650,7 @@ a:hover {
 
 .form-group label {
     display: block;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 600;
     color: var(--color-text);
     margin-bottom: 4px;
@@ -654,7 +661,7 @@ a:hover {
 .form-group select {
     width: 100%;
     padding: 8px 12px;
-    font-size: 14px;
+    font-size: 1rem;
     border: 2px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: var(--color-white);
@@ -687,7 +694,7 @@ a:hover {
     border: 1px solid #FFCDD2;
     padding: 8px 12px;
     border-radius: var(--radius-sm);
-    font-size: 13px;
+    font-size: 0.9286rem;
     margin-bottom: 12px;
 }
 
@@ -727,12 +734,12 @@ a:hover {
     gap: 10px;
 }
 .pwa-push-prompt-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.4; }
-.pwa-push-prompt-text strong { font-size: 15px; }
-.pwa-push-prompt-text span   { font-size: 13px; color: rgba(255,255,255,0.8); }
+.pwa-push-prompt-text strong { font-size: 1.0714rem; }
+.pwa-push-prompt-text span   { font-size: 0.9286rem; color: rgba(255,255,255,0.8); }
 .pwa-push-prompt-actions { display: flex; gap: 10px; justify-content: flex-end; }
 .pwa-push-prompt-no, .pwa-push-prompt-yes {
     padding: 8px 14px; border-radius: 6px; border: 0; cursor: pointer;
-    font-weight: 700; font-size: 13px;
+    font-weight: 700; font-size: 0.9286rem;
 }
 .pwa-push-prompt-no  { background: transparent; color: rgba(255,255,255,0.85); }
 .pwa-push-prompt-no:hover { background: rgba(255,255,255,0.1); }
@@ -753,14 +760,16 @@ a:hover {
     right: -4px;
     background: var(--color-danger);
     color: var(--color-white);
-    font-size: 10px;
+    font-size: 0.7143rem;
     font-weight: 700;
-    min-width: 16px;
-    height: 16px;
-    line-height: 16px;
+    /* em, not px — the box has to grow with the digits inside it when the
+       user raises their text-scale preference, or the count gets clipped. */
+    min-width: 1.6em;
+    height: 1.6em;
+    line-height: 1.6em;
     text-align: center;
-    border-radius: 8px;
-    padding: 0 4px;
+    border-radius: 999px;
+    padding: 0 0.4em;
 }
 
 .notification-dropdown {
@@ -791,14 +800,14 @@ a:hover {
 }
 
 .notification-header h3 {
-    font-size: 14px;
+    font-size: 1rem;
     color: var(--color-text);
     margin: 0;
 }
 
 .notification-header .btn-text {
     color: var(--color-primary);
-    font-size: 12px;
+    font-size: 0.8571rem;
 }
 
 .notification-list {
@@ -840,13 +849,13 @@ a:hover {
 }
 
 .notification-item .notif-text {
-    font-size: 13px;
+    font-size: 0.9286rem;
     color: var(--color-text);
     line-height: 1.4;
 }
 
 .notification-item .notif-time {
-    font-size: 11px;
+    font-size: 0.7857rem;
     color: var(--color-text-light);
     margin-top: 2px;
 }
@@ -855,7 +864,7 @@ a:hover {
     text-align: center;
     color: var(--color-text-light);
     padding: 32px 16px;
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 /* ---- Toast Notifications ---- */
@@ -873,7 +882,7 @@ a:hover {
     padding: 12px 20px;
     border-radius: var(--radius-sm);
     color: var(--color-white);
-    font-size: 14px;
+    font-size: 1rem;
     box-shadow: var(--shadow-md);
     animation: toast-in 0.3s ease;
     max-width: 360px;
@@ -907,13 +916,13 @@ a:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 600;
     flex-shrink: 0;
 }
 
-.avatar-sm { width: 24px; height: 24px; font-size: 10px; }
-.avatar-lg { width: 36px; height: 36px; font-size: 14px; }
+.avatar-sm { width: 24px; height: 24px; font-size: 0.7143rem; }
+.avatar-lg { width: 36px; height: 36px; font-size: 1rem; }
 
 .avatar-stack {
     display: flex;
@@ -931,7 +940,7 @@ a:hover {
 /* ---- Utility ---- */
 .text-muted { color: var(--color-text-light); }
 .text-danger { color: var(--color-danger); }
-.text-sm { font-size: 12px; }
+.text-sm { font-size: 0.8571rem; }
 .mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
 .mb-8 { margin-bottom: 8px; }
@@ -964,7 +973,7 @@ a:hover {
 }
 
 .empty-state h3 {
-    font-size: 18px;
+    font-size: 1.2857rem;
     color: var(--color-text);
     margin-bottom: 8px;
 }
@@ -1020,7 +1029,7 @@ a:hover {
     /* Tighten the admin "Users" link. */
     .nav-link {
         padding: 4px 6px;
-        font-size: 13px;
+        font-size: 0.9286rem;
     }
 
     .notification-bell {

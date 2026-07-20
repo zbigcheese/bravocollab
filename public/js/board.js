@@ -871,7 +871,7 @@ const Board = {
         const modal = App.createModal('boardDescModal', 'Board Description', `
             <div class="form-group">
                 <label>Description</label>
-                <textarea id="boardDescInput" rows="4" style="width:100%;padding:8px 12px;border:2px solid var(--color-border);border-radius:4px;font-size:14px;font-family:var(--font-family);resize:vertical;">${App.escapeHtml(this.data.description || '')}</textarea>
+                <textarea id="boardDescInput" rows="4" style="width:100%;padding:8px 12px;border:2px solid var(--color-border);border-radius:4px;font-size: 1rem;font-family:var(--font-family);resize:vertical;">${App.escapeHtml(this.data.description || '')}</textarea>
             </div>
         `, `<button class="btn btn-primary" id="saveBoardDesc">Save</button>`);
 
@@ -902,7 +902,7 @@ const Board = {
                 .bg-color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
                 .bg-color-option { height: 56px; border-radius: 8px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; position: relative; }
                 .bg-color-option:hover { transform: scale(1.05); }
-                .bg-color-option.selected::after { content: '\\2713'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: bold; }
+                .bg-color-option.selected::after { content: '\\2713'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.4286rem; font-weight: bold; }
             </style>
         `);
 
@@ -1024,14 +1024,14 @@ const Board = {
                 return `
                     <label class="board-filter-row" style="display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;">
                         <input type="checkbox" data-label-id="${l.id}" ${checked}>
-                        <span class="card-label" style="background:${l.color};color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;min-width:40px;display:inline-block;">${App.escapeHtml(l.name || ' ')}</span>
+                        <span class="card-label" style="background:${l.color};color:#fff;padding:2px 8px;border-radius:4px;font-size: 0.8571rem;min-width:40px;display:inline-block;">${App.escapeHtml(l.name || ' ')}</span>
                     </label>
                 `;
             }).join('')
-            : '<div style="padding:8px 12px;color:var(--color-text-light);font-size:13px;">No labels defined on this board.</div>';
+            : '<div style="padding:8px 12px;color:var(--color-text-light);font-size: 0.9286rem;">No labels defined on this board.</div>';
 
         menu.innerHTML = `
-            <div style="padding:4px 12px 8px;font-size:12px;color:var(--color-text-light);text-transform:uppercase;letter-spacing:0.04em;">Filter by label</div>
+            <div style="padding:4px 12px 8px;font-size: 0.8571rem;color:var(--color-text-light);text-transform:uppercase;letter-spacing:0.04em;">Filter by label</div>
             <div class="board-filter-mode" style="padding:0 12px 8px;display:flex;gap:6px;">
                 <button type="button" class="btn btn-sm ${this.labelFilterMode==='or' ? 'btn-primary' : 'btn-secondary'}" data-mode="or">Any</button>
                 <button type="button" class="btn btn-sm ${this.labelFilterMode==='and' ? 'btn-primary' : 'btn-secondary'}" data-mode="and">All</button>
@@ -1119,18 +1119,18 @@ const Board = {
                 .label-editor-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--color-bg); }
                 .label-editor-item:last-child { border-bottom:none; }
                 .label-editor-swatch { width:32px; height:24px; border-radius:4px; flex-shrink:0; }
-                .label-editor-name { flex:1; padding:6px 8px; border:1px solid var(--color-border); border-radius:4px; font-size:13px; font-family:var(--font-family); }
+                .label-editor-name { flex:1; padding:6px 8px; border:1px solid var(--color-border); border-radius:4px; font-size: 0.9286rem; font-family:var(--font-family); }
                 .label-editor-name:focus { border-color:var(--color-primary); outline:none; }
                 .label-editor-color-btn { background:none; border:none; cursor:pointer; padding:4px; color:var(--color-text-light); border-radius:4px; }
                 .label-editor-color-btn:hover { background:var(--color-bg); }
-                .label-editor-delete { background:none; border:none; cursor:pointer; font-size:18px; color:var(--color-text-light); padding:4px 6px; border-radius:4px; }
+                .label-editor-delete { background:none; border:none; cursor:pointer; font-size: 1.2857rem; color:var(--color-text-light); padding:4px 6px; border-radius:4px; }
                 .label-editor-delete:hover { background:#FFF4F4; color:var(--color-danger); }
                 .color-palette { display:flex; flex-wrap:wrap; gap:6px; padding:8px 0; }
                 .color-palette-swatch { width:28px; height:28px; border-radius:4px; cursor:pointer; border:2px solid transparent; transition:transform 0.1s; }
                 .color-palette-swatch:hover { transform:scale(1.15); }
                 .color-palette-swatch.selected { border-color:var(--color-text); }
                 .label-editor-add { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--color-border); }
-                .label-editor-add input { flex:1; padding:6px 8px; border:2px solid var(--color-border); border-radius:4px; font-size:13px; }
+                .label-editor-add input { flex:1; padding:6px 8px; border:2px solid var(--color-border); border-radius:4px; font-size: 0.9286rem; }
                 .label-editor-add input:focus { border-color:var(--color-primary); outline:none; }
             </style>
             <div id="labelEditorList">${renderLabelList()}</div>

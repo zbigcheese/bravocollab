@@ -10,7 +10,7 @@
 }
 
 .dashboard-header h1 {
-    font-size: 22px;
+    font-size: 1.5714rem;
 }
 
 .dashboard-header-actions {
@@ -44,7 +44,7 @@
 
 /* Board header archived label (inline with title) */
 .board-archived-label {
-    font-size: 18px;
+    font-size: 1.2857rem;
     font-weight: 700;
     color: inherit;
     opacity: 0.85;
@@ -97,7 +97,7 @@
 }
 
 .board-tile-title {
-    font-size: 16px;
+    font-size: 1.1429rem;
     font-weight: 700;
     position: relative;
     z-index: 1;
@@ -110,7 +110,7 @@
 }
 
 .board-tile-meta {
-    font-size: 12px;
+    font-size: 0.8571rem;
     opacity: 0.8;
     margin-top: 4px;
     position: relative;
@@ -150,7 +150,7 @@
 .board-update {
     display: block;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: 0.8571rem;
     color: var(--color-text);
     text-decoration: none;
     border-bottom: 1px solid var(--color-border);
@@ -206,7 +206,7 @@
 }
 
 .board-update-time {
-    font-size: 11px;
+    font-size: 0.7857rem;
     flex-shrink: 0;
 }
 
@@ -242,7 +242,7 @@
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 16px;
+    font-size: 1.1429rem;
     font-weight: bold;
 }
 
@@ -316,7 +316,7 @@
 }
 
 .board-title {
-    font-size: 18px;
+    font-size: 1.2857rem;
     font-weight: 700;
     cursor: pointer;
     padding: 4px 8px;
@@ -348,7 +348,7 @@
     gap: 8px;
     cursor: pointer;
     user-select: none;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 600;
     color: inherit;
     padding: 4px 8px;
@@ -445,7 +445,7 @@
 
 .board-members-drawer-header {
     padding: 10px 14px 8px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 600;
     color: var(--color-text-light);
     text-transform: uppercase;
@@ -467,7 +467,7 @@
 }
 
 .board-members-drawer-name {
-    font-size: 14px;
+    font-size: 1rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -517,7 +517,7 @@
 }
 
 .list-title {
-    font-size: 14px;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--color-text);
     flex: 1;
@@ -663,12 +663,13 @@
 }
 
 .card-label {
-    height: 20px;
+    /* em so the pill grows with its own text under a raised text-scale. */
+    height: 1.82em;
     min-width: 36px;
     border-radius: 4px;
     padding: 0 8px;
-    font-size: 11px;
-    line-height: 20px;
+    font-size: 0.7857rem;
+    line-height: 1.82em;
     color: white;
     font-weight: 600;
     overflow: hidden;
@@ -678,7 +679,7 @@
 }
 
 .card-title {
-    font-size: 14px;
+    font-size: 1rem;
     line-height: 1.4;
     color: var(--color-text);
     word-break: break-word;
@@ -696,7 +697,7 @@
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     color: var(--color-text-light);
     padding: 2px 4px;
     border-radius: 3px;
@@ -760,7 +761,7 @@
     padding: 8px 12px;
     text-align: left;
     color: var(--color-text-light);
-    font-size: 14px;
+    font-size: 1rem;
     cursor: pointer;
     border-radius: 0 0 var(--radius-md) var(--radius-md);
     transition: background 0.1s, color 0.1s;
@@ -782,7 +783,7 @@
     border: none;
     border-radius: var(--radius-sm);
     resize: none;
-    font-size: 14px;
+    font-size: 1rem;
     font-family: var(--font-family);
     box-shadow: 0 1px 2px rgba(9,30,66,0.12);
 }
@@ -797,7 +798,7 @@
     padding: 8px;
     border: 2px solid var(--color-primary);
     border-radius: var(--radius-sm);
-    font-size: 14px;
+    font-size: 1rem;
     margin-bottom: 8px;
 }
 
@@ -852,7 +853,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     color: var(--color-text);
     transition: background 0.1s;
 }
@@ -902,7 +903,7 @@
 }
 
 .member-list-item .member-email {
-    font-size: 12px;
+    font-size: 0.8571rem;
     color: var(--color-text-light);
 }
 
@@ -940,7 +941,7 @@
     }
 
     .board-title {
-        font-size: 16px;
+        font-size: 1.1429rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1059,7 +1060,7 @@
     }
 
     .board-update {
-        font-size: 11px;
+        font-size: 0.7857rem;
         padding: 5px 8px;
     }
 }
@@ -1089,7 +1090,7 @@
     border-radius: 9px;
     background: var(--color-primary, #0079BF);
     color: #fff;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     line-height: 1;
 }

@@ -414,6 +414,7 @@ CREATE TABLE IF NOT EXISTS `user_preferences` (
     `notify_coordinator_cards` TINYINT(1) NOT NULL DEFAULT 0,
     `email_notifications`      TINYINT(1) NOT NULL DEFAULT 1,
     `daily_recap_email`        TINYINT(1) NOT NULL DEFAULT 1,
+    `text_scale`               DECIMAL(3,2) NOT NULL DEFAULT 1.00,
     `updated_at`               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

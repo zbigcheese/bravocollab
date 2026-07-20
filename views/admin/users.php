@@ -27,7 +27,7 @@
     </div>
 
     <div class="admin-card" style="margin-top:24px;">
-        <h2 style="font-size:16px;margin-bottom:12px;">Pending Invitations</h2>
+        <h2 style="font-size: 1.1429rem;margin-bottom:12px;">Pending Invitations</h2>
         <div id="invitationsList"><div class="spinner"></div></div>
     </div>
 </div>
@@ -36,23 +36,23 @@
 .admin-page { max-width: 960px; margin: 0 auto; }
 .admin-card { background: var(--color-white); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); }
 .admin-table { width: 100%; border-collapse: collapse; }
-.admin-table th, .admin-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--color-border); font-size: 14px; }
-.admin-table th { font-weight: 600; color: var(--color-text-light); font-size: 12px; text-transform: uppercase; }
-.status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.admin-table th, .admin-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--color-border); font-size: 1rem; }
+.admin-table th { font-weight: 600; color: var(--color-text-light); font-size: 0.8571rem; text-transform: uppercase; }
+.status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8571rem; font-weight: 500; }
 .status-active { background: #E3FCEF; color: #006644; }
 .status-inactive { background: #FFF4F4; color: #BF2600; }
-.role-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+.role-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8571rem; font-weight: 500; }
 .role-admin { background: #E4F0F6; color: #0079BF; }
 .role-member { background: var(--color-bg); color: var(--color-text-light); }
-.invite-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-border); font-size: 14px; }
+.invite-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-border); font-size: 1rem; }
 .invite-item:last-child { border-bottom: none; }
 .board-picker-list { display: flex; flex-direction: column; gap: 2px; }
 .board-picker-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.1s; user-select: none; }
 .board-picker-item:hover { background: var(--color-bg); }
 .board-picker-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--color-primary); }
 .board-picker-swatch { width: 24px; height: 18px; border-radius: 3px; flex-shrink: 0; }
-.board-picker-name { font-size: 14px; font-weight: 500; }
-.board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
+.board-picker-name { font-size: 1rem; font-weight: 500; }
+.board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 0.7857rem; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
 
 /* Mobile: stack each user row as a small card so role/status/actions wrap
    to subsequent lines instead of overflowing the viewport. */
@@ -83,7 +83,7 @@
     }
     .admin-table td::before {
         content: attr(data-label);
-        font-size: 11px;
+        font-size: 0.7857rem;
         font-weight: 700;
         text-transform: uppercase;
         color: var(--color-text-light);
@@ -99,7 +99,7 @@
         display: none;
     }
     .admin-table td[data-label="Name"] strong {
-        font-size: 15px;
+        font-size: 1.0714rem;
     }
     .admin-table td[data-label="Email"] {
         word-break: break-all;
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <td data-label="Name"><strong>${App.escapeHtml(u.display_name)}</strong></td>
                 <td data-label="Email">${App.escapeHtml(u.email)}</td>
                 <td data-label="Role">
-                    <select class="role-select" data-user-id="${u.id}" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:4px;font-size:13px;">
+                    <select class="role-select" data-user-id="${u.id}" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:4px;font-size: 0.9286rem;">
                         <option value="member" ${u.role === 'member' ? 'selected' : ''}>Member</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>

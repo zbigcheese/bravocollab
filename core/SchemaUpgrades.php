@@ -29,6 +29,32 @@ class SchemaUpgrades
         try { self::ensureTaskCommentAttachments(); } catch (Throwable $e) {
             error_log('ensureTaskCommentAttachments failed: ' . $e->getMessage());
         }
+        try { self::ensureTextScalePreference(); } catch (Throwable $e) {
+            error_log('ensureTextScalePreference failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Add the accessibility `text_scale` multiplier to user_preferences.
+     * The table itself is created lazily by UserPreferences::ensureSchema(),
+     * so skip when it isn't there yet — that path already emits the column.
+     */
+    public static function ensureTextScalePreference(): void
+    {
+        $db = Database::get();
+
+        $tbl = $db->query("SHOW TABLES LIKE 'user_preferences'")->fetch();
+        if (!$tbl) return;
+
+        $col = $db->query(
+            "SHOW COLUMNS FROM `user_preferences` LIKE 'text_scale'"
+        )->fetch();
+        if (!$col) {
+            $db->exec(
+                "ALTER TABLE `user_preferences`
+                 ADD COLUMN `text_scale` DECIMAL(3,2) NOT NULL DEFAULT 1.00 AFTER `daily_recap_email`"
+            );
+        }
     }
 
     /** Add accepted_at to checklist_items if missing. */

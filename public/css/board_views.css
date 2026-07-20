@@ -23,7 +23,7 @@
     border: 0;
     background: transparent;
     color: #fff;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 700;
     border-radius: 999px;
     cursor: pointer;
@@ -67,7 +67,7 @@
 }
 
 .view-title {
-    font-size: 16px;
+    font-size: 1.1429rem;
     font-weight: 700;
     padding: 0 8px;
     min-width: 160px;
@@ -95,7 +95,7 @@
 }
 .dashboard-cal-header h2 {
     margin: 0;
-    font-size: 18px;
+    font-size: 1.2857rem;
     color: var(--color-text);
 }
 .dashboard-cal-controls {
@@ -107,7 +107,7 @@
     padding: 6px 10px;
     border: 1px solid var(--color-border);
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 0.9286rem;
     background: #fff;
     color: #172b4d;
     font-family: inherit;
@@ -137,7 +137,7 @@
     border: 0;
     background: transparent;
     color: var(--color-text-light);
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 700;
     border-radius: 999px;
     cursor: pointer;
@@ -190,7 +190,7 @@
 @media (max-width: 768px) {
     .dashboard-cal-section { padding: 12px; margin-top: 20px; }
     .dashboard-cal-header { gap: 6px; }
-    .dashboard-cal-header h2 { font-size: 16px; }
+    .dashboard-cal-header h2 { font-size: 1.1429rem; }
 }
 
 /* ============================================================
@@ -217,7 +217,7 @@
 .cal-head {
     background: #f4f5f7;
     padding: 8px 10px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -250,7 +250,7 @@
 
 .cal-date {
     align-self: flex-end;
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 700;
     padding: 2px 7px;
     min-width: 22px;
@@ -267,7 +267,7 @@
     background: #f4f5f7;
     border-left: 3px solid #5bc0de;
     padding: 3px 6px;
-    font-size: 12px;
+    font-size: 0.8571rem;
     border-radius: 3px;
     cursor: pointer;
     overflow: hidden;
@@ -320,7 +320,7 @@
     gap: 5px;
     padding: 2px 4px;
     background: transparent;
-    font-size: 12px;
+    font-size: 0.8571rem;
     color: var(--color-text);
     cursor: pointer;
     overflow: hidden;
@@ -369,7 +369,7 @@
     background: transparent;
     border: 0;
     padding: 3px 6px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     color: var(--color-primary-dark);
     cursor: pointer;
@@ -405,7 +405,7 @@
     width: 220px;
     flex-shrink: 0;
     padding: 8px 12px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -422,7 +422,7 @@
 
 .tl-head-cell {
     padding: 8px 2px;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 600;
     text-align: center;
     color: var(--color-text-light);
@@ -452,7 +452,7 @@
     padding: 24px;
     text-align: center;
     color: var(--color-text-light);
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 .tl-row {
@@ -470,7 +470,7 @@
     width: 220px;
     flex-shrink: 0;
     padding: 8px 12px;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -508,7 +508,7 @@
 
 .tl-bar-title {
     color: #fff;
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -539,7 +539,7 @@
 }
 
 .inline-cal-label {
-    font-size: 12px;
+    font-size: 0.8571rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -550,7 +550,7 @@
 .inline-cal-hint {
     font-weight: 400;
     text-transform: none;
-    font-size: 11px;
+    font-size: 0.7857rem;
     margin-left: 4px;
 }
 
@@ -570,7 +570,7 @@
 }
 
 .inline-cal-title {
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 700;
     color: var(--color-text);
 }
@@ -582,7 +582,7 @@
     border: 1px solid transparent;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1.1429rem;
     line-height: 1;
     color: var(--color-text);
 }
@@ -599,7 +599,7 @@
 
 .inline-cal-dow {
     text-align: center;
-    font-size: 10px;
+    font-size: 0.7143rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -611,7 +611,7 @@
     border: 0;
     background: transparent;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.9286rem;
     font-weight: 500;
     color: var(--color-text);
     cursor: pointer;
@@ -649,7 +649,7 @@
 }
 
 .inline-cal-time-row label {
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -660,7 +660,7 @@
     padding: 6px 8px;
     border: 1px solid var(--color-border);
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 0.9286rem;
 }
 
 /* ============================================================
@@ -670,7 +670,7 @@
    day-strip layout, since the weekday header row is hidden). */
 .cal-cell-weekday {
     display: none;
-    font-size: 11px;
+    font-size: 0.7857rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--color-text-light);
@@ -717,7 +717,7 @@
     /* Date number aligns left next to the weekday on mobile, not floating right. */
     .cal-date {
         align-self: flex-start;
-        font-size: 16px;
+        font-size: 1.1429rem;
         padding: 0;
         min-width: 0;
     }
@@ -730,7 +730,7 @@
 
     .cal-card {
         padding: 4px 6px;
-        font-size: 12px;
+        font-size: 0.8571rem;
         white-space: normal;
         text-overflow: clip;
     }
@@ -740,7 +740,7 @@
     }
 
     .view-title {
-        font-size: 14px;
+        font-size: 1rem;
         min-width: 120px;
     }
 

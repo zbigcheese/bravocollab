@@ -16,7 +16,18 @@ class UserPreferences
         'notify_coordinator_cards' => 0,
         'email_notifications'      => 1,
         'daily_recap_email'        => 1,
+        'text_scale'               => 1.0,
     ];
+
+    /**
+     * Accessibility text size multipliers offered in Settings. Anything else
+     * submitted is snapped to the nearest of these, so a hand-crafted request
+     * can't push the UI to an unusable size.
+     */
+    public const TEXT_SCALES = [1.0, 1.15, 1.3, 1.5];
+
+    /** Keys that hold a float rather than a 0/1 flag. */
+    private const NUMERIC_KEYS = ['text_scale'];
 
     /** Self-heal so deployments without manual schema migration still work. */
     public static function ensureSchema(): void
@@ -29,6 +40,7 @@ class UserPreferences
                 `notify_coordinator_cards` TINYINT(1) NOT NULL DEFAULT 0,
                 `email_notifications`      TINYINT(1) NOT NULL DEFAULT 1,
                 `daily_recap_email`        TINYINT(1) NOT NULL DEFAULT 1,
+                `text_scale`               DECIMAL(3,2) NOT NULL DEFAULT 1.00,
                 `updated_at`               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
@@ -41,7 +53,7 @@ class UserPreferences
     {
         self::ensureSchema();
         $stmt = Database::get()->prepare(
-            'SELECT notify_coordinator_cards, email_notifications, daily_recap_email
+            'SELECT notify_coordinator_cards, email_notifications, daily_recap_email, text_scale
              FROM user_preferences WHERE user_id = :uid LIMIT 1'
         );
         $stmt->execute(['uid' => $userId]);
@@ -51,7 +63,21 @@ class UserPreferences
             'notify_coordinator_cards' => (int) $row['notify_coordinator_cards'],
             'email_notifications'      => (int) $row['email_notifications'],
             'daily_recap_email'        => (int) $row['daily_recap_email'],
+            'text_scale'               => self::snapTextScale($row['text_scale']),
         ];
+    }
+
+    /** Snap an arbitrary value to the nearest offered multiplier. */
+    public static function snapTextScale($value): float
+    {
+        $value = (float) $value;
+        $best  = self::DEFAULTS['text_scale'];
+        foreach (self::TEXT_SCALES as $scale) {
+            if (abs($scale - $value) < abs($best - $value)) {
+                $best = $scale;
+            }
+        }
+        return $best;
     }
 
     /** Update one or more preferences for the user. Unknown keys are ignored. */
@@ -64,23 +90,27 @@ class UserPreferences
         $next = $current;
         foreach ($allowed as $key) {
             if (array_key_exists($key, $changes)) {
-                $next[$key] = $changes[$key] ? 1 : 0;
+                $next[$key] = in_array($key, self::NUMERIC_KEYS, true)
+                    ? self::snapTextScale($changes[$key])
+                    : ($changes[$key] ? 1 : 0);
             }
         }
 
         Database::get()->prepare(
             'INSERT INTO user_preferences
-                (user_id, notify_coordinator_cards, email_notifications, daily_recap_email)
-             VALUES (:uid, :ncc, :en, :dre)
+                (user_id, notify_coordinator_cards, email_notifications, daily_recap_email, text_scale)
+             VALUES (:uid, :ncc, :en, :dre, :ts)
              ON DUPLICATE KEY UPDATE
                 notify_coordinator_cards = VALUES(notify_coordinator_cards),
                 email_notifications      = VALUES(email_notifications),
-                daily_recap_email        = VALUES(daily_recap_email)'
+                daily_recap_email        = VALUES(daily_recap_email),
+                text_scale               = VALUES(text_scale)'
         )->execute([
             'uid' => $userId,
             'ncc' => $next['notify_coordinator_cards'],
             'en'  => $next['email_notifications'],
             'dre' => $next['daily_recap_email'],
+            'ts'  => $next['text_scale'],
         ]);
 
         return $next;

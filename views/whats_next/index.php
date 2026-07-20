@@ -111,21 +111,21 @@ $showingToday = $anchor->format('Y-m-d') === $todayStr;
     background: #fff; border-radius: 8px; padding: 8px 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 14px;
 }
-.wn-title { flex: 1; font-weight: 700; color: #172b4d; text-align: center; font-size: 15px; }
+.wn-title { flex: 1; font-weight: 700; color: #172b4d; text-align: center; font-size: 1.0714rem; }
 .wn-nav, .wn-today {
     text-decoration: none; color: var(--color-text);
     background: var(--color-bg); border-radius: 4px;
-    padding: 4px 12px; font-size: 14px; font-weight: 700;
+    padding: 4px 12px; font-size: 1rem; font-weight: 700;
 }
 .wn-nav:hover, .wn-today:hover { background: var(--color-border); }
-.wn-summary { color: var(--color-text-light); margin: 0 4px 14px; font-size: 14px; }
+.wn-summary { color: var(--color-text-light); margin: 0 4px 14px; font-size: 1rem; }
 .wn-empty { background: #fff; border-radius: 8px; padding: 40px 24px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-.wn-empty h2 { color: #172b4d; font-size: 18px; margin: 0 0 8px; }
+.wn-empty h2 { color: #172b4d; font-size: 1.2857rem; margin: 0 0 8px; }
 .wn-empty p  { color: var(--color-text-light); margin: 0; }
 
 .wn-section { background: #fff; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .wn-section-heading {
-    font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em;
+    font-size: 0.9286rem; text-transform: uppercase; letter-spacing: 0.04em;
     color: #5e6c84; margin: 0 0 8px; font-weight: 700;
 }
 .wn-section-overdue { border-left: 4px solid var(--color-danger); }
@@ -136,6 +136,6 @@ $showingToday = $anchor->format('Y-m-d') === $todayStr;
 .wn-item a { display: block; color: inherit; text-decoration: none; }
 .wn-item a:hover .wn-item-title { color: var(--color-primary-dark); }
 .wn-item-title { font-weight: 600; color: var(--color-text); margin-right: 6px; }
-.wn-item-meta  { color: var(--color-text-light); font-size: 12px; display: block; margin-top: 2px; }
+.wn-item-meta  { color: var(--color-text-light); font-size: 0.8571rem; display: block; margin-top: 2px; }
 .wn-task .wn-item-glyph { color: var(--color-text-light); margin-right: 6px; }
 </style>

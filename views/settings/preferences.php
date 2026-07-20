@@ -14,6 +14,44 @@ $prefs = UserPreferences::get(Auth::userId());
             Saved.
         </div>
 
+        <h2 class="settings-section-heading">Accessibility</h2>
+
+        <div class="pref-row pref-row-stacked">
+            <div class="pref-row-text">
+                <div class="pref-row-title">Text size</div>
+                <div class="pref-row-help">
+                    Makes all text in BravoCollab larger without changing the
+                    layout. Saved to your account, so it follows you to every
+                    device you sign in on.
+                </div>
+
+                <div class="text-scale-control">
+                    <input type="range" id="textScaleRange"
+                           min="0" max="<?php echo count(UserPreferences::TEXT_SCALES) - 1; ?>" step="1"
+                           value="<?php echo (int) array_search(
+                               (float) $prefs['text_scale'],
+                               UserPreferences::TEXT_SCALES,
+                               true
+                           ); ?>"
+                           aria-label="Text size multiplier"
+                           list="textScaleTicks">
+                    <datalist id="textScaleTicks">
+                        <?php foreach (UserPreferences::TEXT_SCALES as $i => $s): ?>
+                            <option value="<?php echo $i; ?>" label="<?php echo rtrim(rtrim(number_format($s, 2), '0'), '.'); ?>x"></option>
+                        <?php endforeach; ?>
+                    </datalist>
+                    <div class="text-scale-ticks" aria-hidden="true">
+                        <?php foreach (UserPreferences::TEXT_SCALES as $s): ?>
+                            <span><?php echo rtrim(rtrim(number_format($s, 2), '0'), '.'); ?>x</span>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="text-scale-preview">
+                        Preview — this is how card titles and comments will read.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <h2 class="settings-section-heading">Notification preferences</h2>
 
         <div class="pref-row">
@@ -104,12 +142,12 @@ $prefs = UserPreferences::get(Auth::userId());
 <style>
 .settings-page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
 .settings-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 28px; }
-.settings-card h1 { margin: 0 0 12px; font-size: 22px; color: #172b4d; }
+.settings-card h1 { margin: 0 0 12px; font-size: 1.5714rem; color: #172b4d; }
 .settings-lede { color: #5e6c84; line-height: 1.5; margin: 0 0 18px; }
-.settings-flash { padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.5; background: #E3FCEF; color: #006644; }
+.settings-flash { padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 1rem; line-height: 1.5; background: #E3FCEF; color: #006644; }
 
 .settings-section-heading {
-    font-size: 13px;
+    font-size: 0.9286rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: #5e6c84;
@@ -124,8 +162,25 @@ $prefs = UserPreferences::get(Auth::userId());
 }
 .pref-row:first-of-type { border-top: 0; padding-top: 4px; }
 .pref-row-text { flex: 1; min-width: 0; }
-.pref-row-title { font-weight: 600; color: var(--color-text); font-size: 14px; margin-bottom: 4px; }
-.pref-row-help  { color: var(--color-text-light); font-size: 13px; line-height: 1.5; }
+.pref-row-title { font-weight: 600; color: var(--color-text); font-size: 1rem; margin-bottom: 4px; }
+.pref-row-help  { color: var(--color-text-light); font-size: 0.9286rem; line-height: 1.5; }
+
+/* Text size slider. The row stacks because the control is full-width rather
+   than a switch sitting to the right of the copy. */
+.pref-row-stacked { display: block; }
+.text-scale-control { margin-top: 14px; }
+.text-scale-control input[type="range"] { width: 100%; max-width: 380px; display: block; accent-color: var(--color-primary); cursor: pointer; }
+.text-scale-ticks {
+    display: flex; justify-content: space-between;
+    width: 100%; max-width: 380px;
+    margin-top: 4px;
+    color: var(--color-text-light); font-size: 0.8571rem;
+}
+.text-scale-preview {
+    margin-top: 14px; padding: 12px 14px;
+    background: var(--color-bg); border-radius: 4px;
+    color: var(--color-text); line-height: 1.5;
+}
 
 /* Toggle switch */
 .pref-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; cursor: pointer; }
@@ -167,6 +222,43 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // ---- Text size ----
+    // The slider carries an index into TEXT_SCALES rather than the multiplier
+    // itself, so the offered steps live in one place (UserPreferences) and the
+    // control can't produce a value the server would reject.
+    const TEXT_SCALES = <?php echo json_encode(UserPreferences::TEXT_SCALES); ?>;
+    const scaleRange  = document.getElementById('textScaleRange');
+
+    if (scaleRange) {
+        let savedIndex = parseInt(scaleRange.value, 10);
+
+        // Applied to <html> inline, which outranks the :root rule that
+        // header.php inlines for the stored value.
+        const applyScale = (i) => {
+            document.documentElement.style.setProperty('--text-scale', TEXT_SCALES[i]);
+        };
+
+        // Live feedback while dragging; only persist once they settle, so a
+        // drag across the track doesn't fire a request per step.
+        scaleRange.addEventListener('input', () => applyScale(parseInt(scaleRange.value, 10)));
+
+        scaleRange.addEventListener('change', async () => {
+            const index = parseInt(scaleRange.value, 10);
+            if (index === savedIndex) return;
+            try {
+                await App.api('users.update_preferences', { text_scale: TEXT_SCALES[index] });
+                savedIndex = index;
+                flash.style.display = 'block';
+                clearTimeout(flashTimer);
+                flashTimer = setTimeout(() => { flash.style.display = 'none'; }, 1800);
+            } catch (e) {
+                scaleRange.value = savedIndex;
+                applyScale(savedIndex);
+                App.showToast(e.message || 'Failed to save', 'error');
+            }
+        });
+    }
 
     // ---- Push notifications toggle ----
     // Two toggles are wired against the same per-device subscription:

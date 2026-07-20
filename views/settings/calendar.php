@@ -74,19 +74,19 @@ $flashOk     = isset($_GET['connected']) ? '1' : (isset($_GET['disconnected']) ?
 <style>
 .settings-page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
 .settings-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 28px; }
-.settings-card h1 { margin: 0 0 12px; font-size: 22px; color: #172b4d; }
+.settings-card h1 { margin: 0 0 12px; font-size: 1.5714rem; color: #172b4d; }
 .settings-lede { color: #5e6c84; line-height: 1.5; margin: 0 0 18px; }
-.settings-flash { padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 14px; line-height: 1.5; }
+.settings-flash { padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 1rem; line-height: 1.5; }
 .settings-flash-error { background: #FFEBE6; color: #BF2600; }
 .settings-flash-warn  { background: #FFFAE6; color: #974F0C; }
 .settings-flash-ok    { background: #E3FCEF; color: #006644; }
 .settings-status { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 6px; margin-bottom: 14px; }
 .settings-status-on  { background: #E3FCEF; }
 .settings-status-off { background: #F4F5F7; }
-.settings-status strong { color: #172b4d; font-size: 16px; }
-.settings-status span { color: #5e6c84; font-size: 13px; }
+.settings-status strong { color: #172b4d; font-size: 1.1429rem; }
+.settings-status span { color: #5e6c84; font-size: 0.9286rem; }
 .settings-actions { display: flex; gap: 10px; margin-bottom: 8px; }
-.settings-fineprint { color: #5e6c84; font-size: 12px; margin: 8px 0 0; line-height: 1.5; }
+.settings-fineprint { color: #5e6c84; font-size: 0.8571rem; margin: 8px 0 0; line-height: 1.5; }
 </style>
 
 <script>
