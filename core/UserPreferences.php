@@ -24,7 +24,7 @@ class UserPreferences
      * submitted is snapped to the nearest of these, so a hand-crafted request
      * can't push the UI to an unusable size.
      */
-    public const TEXT_SCALES = [1.0, 1.15, 1.3, 1.5];
+    public const TEXT_SCALES = [1.0, 1.15, 1.3, 1.5, 2.0, 2.5, 3.0];
 
     /** Keys that hold a float rather than a 0/1 flag. */
     private const NUMERIC_KEYS = ['text_scale'];
