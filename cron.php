@@ -295,11 +295,15 @@ if ($cetHour === 8) {
 }
 echo "Sent {$wnSent} 'what's next' digest emails.\n";
 
-// 7. Google Calendar sync — push assigned cards/items with due dates to
-//    each connected user's dedicated BravoCollab calendar. Cron-driven so
-//    we never block a user-facing action on a Google API call. Failures
-//    per-user are isolated; we log and move on.
+// 7. Google Calendar sync — push assigned cards / checklist items / tasks
+//    with due dates to each connected user's dedicated BravoCollab calendar.
+//    Cron-driven so we never block a user-facing action on a Google API call.
+//    Failures per-user are isolated; we log and move on.
+//    ensureAll() runs here too: the desired-state query reads the tasks tables,
+//    and cron can fire before anyone has hit an authenticated page after a pull.
+require_once __DIR__ . '/core/SchemaUpgrades.php';
 require_once __DIR__ . '/core/GoogleCalendar.php';
+SchemaUpgrades::ensureAll();
 GoogleCalendar::ensureSchema();
 $gcalAccounts = $db->query('SELECT user_id FROM google_calendar_accounts')->fetchAll(PDO::FETCH_COLUMN);
 $gcalSummary = ['users' => 0, 'created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0];

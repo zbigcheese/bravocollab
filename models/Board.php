@@ -194,10 +194,27 @@ class Board extends Model
             ['board_id' => $boardId]
         )->fetchAll();
 
+        // Due-dated tasks / sub-tasks across the whole board. Same contract as
+        // $dueItems above (calendar + timeline render them next to cards) with
+        // the extra `parent_title` so a sub-task can show its parent chain.
+        $dueTasks = $this->query(
+            'SELECT t.id, t.card_id, t.parent_task_id, t.title, t.is_complete, t.due_date,
+                    p.title AS parent_title,
+                    c.is_archived AS card_archived, c.title AS card_title
+             FROM tasks t
+             JOIN cards c       ON t.card_id = c.id
+             JOIN lists l       ON c.list_id = l.id
+             LEFT JOIN tasks p  ON t.parent_task_id = p.id
+             WHERE l.board_id = :board_id AND t.due_date IS NOT NULL
+             ORDER BY t.due_date ASC',
+            ['board_id' => $boardId]
+        )->fetchAll();
+
         $board['lists']     = $lists;
         $board['members']   = $members;
         $board['labels']    = $labels;
         $board['due_items'] = $dueItems;
+        $board['due_tasks'] = $dueTasks;
 
         return $board;
     }

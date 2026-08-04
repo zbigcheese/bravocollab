@@ -63,32 +63,104 @@ const BoardViews = {
         return cards;
     },
 
-    _allDueItems() {
-        return Array.isArray(Board.data?.due_items) ? Board.data.due_items : [];
+    // Due-dated sub-entities of cards — checklist items and tasks/sub-tasks —
+    // flattened into one normalized shape so the calendar and timeline can
+    // render them with a single code path:
+    //   { kind, id, card_id, title, card_title, parent_title, due_date,
+    //     done, card_archived }
+    // Entries on archived cards are kept on purpose: they render dimmed and
+    // struck through rather than vanishing silently.
+    _allDueEntries() {
+        const out = [];
+        for (const it of (Array.isArray(Board.data?.due_items) ? Board.data.due_items : [])) {
+            if (!it.due_date) continue;
+            out.push({
+                kind: 'item',
+                id: parseInt(it.id),
+                card_id: parseInt(it.card_id),
+                title: it.content,
+                card_title: it.card_title,
+                parent_title: null,
+                due_date: it.due_date,
+                done: it.is_checked == 1,
+                card_archived: it.card_archived == 1,
+            });
+        }
+        for (const t of (Array.isArray(Board.data?.due_tasks) ? Board.data.due_tasks : [])) {
+            if (!t.due_date) continue;
+            out.push({
+                kind: 'task',
+                id: parseInt(t.id),
+                card_id: parseInt(t.card_id),
+                title: t.title,
+                card_title: t.card_title,
+                // Only sub-tasks carry a parent; used for the tooltip chain.
+                parent_title: t.parent_title || null,
+                due_date: t.due_date,
+                done: t.is_complete == 1,
+                card_archived: t.card_archived == 1,
+            });
+        }
+        return out;
     },
 
-    // Style for an inline calendar task entry. Same priority logic as cards:
+    // Style for an inline calendar entry. Same priority logic as cards:
     //   completed or on archived card -> dim + strikethrough (no severity)
     //   overdue -> red + bold
     //   due today -> orange + bold
-    _calTaskStateCls(item, todayKey) {
-        if (item.is_checked == 1 || item.card_archived == 1) return ' cal-task-done';
-        const dueKey = item.due_date ? item.due_date.substring(0, 10) : '';
+    _calTaskStateCls(entry, todayKey) {
+        if (entry.done || entry.card_archived) return ' cal-task-done';
+        const dueKey = entry.due_date ? entry.due_date.substring(0, 10) : '';
         if (!dueKey) return '';
         if (dueKey < todayKey) return ' cal-task-overdue';
         if (dueKey === todayKey) return ' cal-task-today';
         return '';
     },
 
-    _renderCalTask(item, todayKey, hidden) {
-        const stateCls = this._calTaskStateCls(item, todayKey);
+    // Checkmark for checklist items, checked square for tasks — so the two
+    // kinds stay tellable apart at a glance inside a dense calendar cell.
+    _entryIcon(kind) {
+        return kind === 'task'
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+    },
+
+    // "Parent task › Sub-task" for nested tasks, plain title otherwise.
+    _entryPath(entry) {
+        return entry.parent_title ? `${entry.parent_title} › ${entry.title}` : entry.title;
+    },
+
+    _renderCalTask(entry, todayKey, hidden) {
+        const stateCls = this._calTaskStateCls(entry, todayKey);
         const hiddenCls = hidden ? ' cal-card-hidden' : '';
+        // Tasks deep-link to their own sub-page; checklist items stop at the card.
+        const taskAttr = entry.kind === 'task' ? ` data-task-id="${entry.id}"` : '';
+        const tip = `${this._entryPath(entry)} — ${entry.card_title}`;
         return `
-            <div class="cal-task${stateCls}${hiddenCls}" data-card-id="${item.card_id}" title="${App.escapeHtml(item.content)} — ${App.escapeHtml(item.card_title)}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
-                <span>${App.escapeHtml(item.content)}</span>
+            <div class="cal-task${stateCls}${hiddenCls}" data-card-id="${entry.card_id}"${taskAttr} title="${App.escapeHtml(tip)}">
+                ${this._entryIcon(entry.kind)}
+                <span>${App.escapeHtml(entry.title)}</span>
             </div>
         `;
+    },
+
+    /**
+     * Open whatever a calendar cell entry / timeline bar points at. Cards open
+     * the modal; tasks pre-set `?card=` AND `?task=` first so CardModal.open
+     * preserves the task param and TaskView.bootstrap lands on the sub-page.
+     */
+    _openEntryEl(el) {
+        const cardId = parseInt(el.dataset.cardId);
+        if (!cardId) return;
+        const taskId = el.dataset.taskId ? parseInt(el.dataset.taskId) : null;
+
+        const u = new URL(window.location);
+        u.searchParams.set('card', cardId);
+        if (taskId) u.searchParams.set('task', taskId);
+        else        u.searchParams.delete('task');
+        history.replaceState(null, '', u);
+
+        CardModal.open(cardId);
     },
 
     _labelColor(card) {
@@ -161,9 +233,9 @@ const BoardViews = {
             (cardsByDate[k] = cardsByDate[k] || []).push(card);
         }
         const itemsByDate = {};
-        for (const item of this._allDueItems()) {
-            const k = item.due_date.substring(0, 10);
-            (itemsByDate[k] = itemsByDate[k] || []).push(item);
+        for (const entry of this._allDueEntries()) {
+            const k = entry.due_date.substring(0, 10);
+            (itemsByDate[k] = itemsByDate[k] || []).push(entry);
         }
         const todayKey = this._dateKey(new Date());
         const title = this._formatWeekRange(ws);
@@ -174,8 +246,9 @@ const BoardViews = {
             const items = itemsByDate[k] || [];
             const total = cards.length + items.length;
             const collapsed = total > 4;
-            // Cards first, then tasks. The +N more accordion cuts at index 3
-            // across the combined sequence, so items can be hidden too.
+            // Cards first, then checklist items / tasks. The +N more accordion
+            // cuts at index 3 across the combined sequence, so entries can be
+            // hidden too.
             let entryIdx = 0;
             const parts = [];
             for (const c of cards) {
@@ -233,7 +306,7 @@ const BoardViews = {
             this._renderCalendarWeek();
         });
         pane.querySelectorAll('.cal-card, .cal-task').forEach(el => {
-            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+            el.addEventListener('click', () => this._openEntryEl(el));
         });
         pane.querySelectorAll('.cal-toggle').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -288,9 +361,9 @@ const BoardViews = {
             (cardsByDate[k] = cardsByDate[k] || []).push(card);
         }
         const itemsByDate = {};
-        for (const item of this._allDueItems()) {
-            const k = item.due_date.substring(0, 10);
-            (itemsByDate[k] = itemsByDate[k] || []).push(item);
+        for (const entry of this._allDueEntries()) {
+            const k = entry.due_date.substring(0, 10);
+            (itemsByDate[k] = itemsByDate[k] || []).push(entry);
         }
 
         const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -311,7 +384,8 @@ const BoardViews = {
                     const items = itemsByDate[k] || [];
                     const total = cards.length + items.length;
                     // Accordion: when more than 4 entries, show only 3 by default and
-                    // reveal the rest behind a "+ N more" toggle. Cards then tasks.
+                    // reveal the rest behind a "+ N more" toggle. Cards then
+                    // checklist items / tasks.
                     const collapsed = total > 4;
                     let entryIdx = 0;
                     const parts = [];
@@ -363,7 +437,7 @@ const BoardViews = {
             this.renderCalendar();
         });
         pane.querySelectorAll('.cal-card, .cal-task').forEach(el => {
-            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+            el.addEventListener('click', () => this._openEntryEl(el));
         });
         pane.querySelectorAll('.cal-toggle').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -377,6 +451,95 @@ const BoardViews = {
     },
 
     // ------------------------- Timeline -------------------------
+
+    /**
+     * Normalized timeline rows intersecting [rangeStart, rangeEnd]:
+     *   - cards      → start_date → due_date span (falls back to a single day)
+     *   - tasks      → single-day marker on their due date
+     *   - checklist  → same
+     * Sorted by start date, then cards before tasks before checklist items,
+     * then title — so a card and its own dated sub-entries cluster together.
+     */
+    _timelineRows(rangeStart, rangeEnd) {
+        const rows = [];
+
+        for (const c of this._allCards()) {
+            if (!c.due_date && !c.start_date) continue;
+            const startStr = c.start_date || (c.due_date ? c.due_date.substring(0, 10) : null);
+            const endStr   = c.due_date ? c.due_date.substring(0, 10) : startStr;
+            if (!startStr || !endStr) continue;
+            rows.push({
+                kind: 'card',
+                label: c.title,
+                tooltip: c.title,
+                cardId: parseInt(c.id),
+                taskId: null,
+                startStr, endStr,
+                color: this._labelColor(c),
+                done: c.due_complete == 1,
+            });
+        }
+
+        for (const e of this._allDueEntries()) {
+            const day = e.due_date.substring(0, 10);
+            rows.push({
+                kind: e.kind,
+                label: this._entryPath(e),
+                tooltip: `${this._entryPath(e)} — ${e.card_title}`,
+                cardId: e.card_id,
+                taskId: e.kind === 'task' ? e.id : null,
+                startStr: day,
+                endStr: day,
+                // Muted greys rather than label colors — sub-entries should
+                // read as secondary to the card bars they hang off.
+                color: e.kind === 'task' ? '#6b778c' : '#97a0af',
+                done: e.done || e.card_archived,
+            });
+        }
+
+        const kindRank = { card: 0, task: 1, item: 2 };
+        return rows
+            .filter(r => {
+                const s = new Date(r.startStr);
+                const e = new Date(r.endStr);
+                return !(e < rangeStart || s > rangeEnd);
+            })
+            .sort((a, b) =>
+                a.startStr.localeCompare(b.startStr)
+                || kindRank[a.kind] - kindRank[b.kind]
+                || (a.label || '').localeCompare(b.label || '')
+            );
+    },
+
+    /** One timeline row, positioned as a percentage of the visible range. */
+    _timelineRowHtml(row, rangeStartMs, rangeEndMs, totalDays) {
+        const msPerDay = 86400000;
+        const spanStartMs = Math.max(new Date(row.startStr).getTime(), rangeStartMs);
+        const spanEndMs   = Math.min(new Date(row.endStr).getTime(),   rangeEndMs);
+        const startDay = Math.round((spanStartMs - rangeStartMs) / msPerDay) + 1;
+        const endDay   = Math.max(startDay, Math.round((spanEndMs - rangeStartMs) / msPerDay) + 1);
+        const left  = ((startDay - 1) / totalDays) * 100;
+        const width = ((endDay - startDay + 1) / totalDays) * 100;
+
+        const done     = row.done ? ' tl-done' : '';
+        const subCls   = row.kind === 'card' ? '' : ' tl-row-sub';
+        const taskAttr = row.taskId ? ` data-task-id="${row.taskId}"` : '';
+        const icon     = row.kind === 'card' ? '' : this._entryIcon(row.kind);
+
+        return `
+            <div class="tl-row">
+                <div class="tl-row-label${subCls}" title="${App.escapeHtml(row.tooltip)}">
+                    ${icon}<span>${App.escapeHtml(row.label)}</span>
+                </div>
+                <div class="tl-row-track">
+                    <div class="tl-bar${done}" data-card-id="${row.cardId}"${taskAttr} style="left:${left}%;width:${width}%;background:${row.color}">
+                        <span class="tl-bar-title">${App.escapeHtml(row.label)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
     renderTimeline() {
         if (this._isMobileView()) this._renderTimelineWeek();
         else this._renderTimelineMonth();
@@ -391,20 +554,8 @@ const BoardViews = {
         const daysInMonth = lastDay.getDate();
         const todayKey = this._dateKey(new Date());
 
-        // Pick cards whose date range intersects this month
-        const msPerDay = 86400000;
-        const visible = this._allCards().filter(c => c.due_date || c.start_date).filter(c => {
-            const startStr = c.start_date || (c.due_date ? c.due_date.substring(0, 10) : null);
-            const endStr   = c.due_date ? c.due_date.substring(0, 10) : startStr;
-            if (!startStr || !endStr) return false;
-            const s = new Date(startStr);
-            const e = new Date(endStr);
-            return !(e < firstDay || s > lastDay);
-        }).sort((a, b) => {
-            const as = a.start_date || (a.due_date ? a.due_date.substring(0, 10) : '');
-            const bs = b.start_date || (b.due_date ? b.due_date.substring(0, 10) : '');
-            return as.localeCompare(bs) || (a.title || '').localeCompare(b.title || '');
-        });
+        // Cards, tasks and checklist items whose dates intersect this month.
+        const visible = this._timelineRows(firstDay, lastDay);
 
         const headCells = Array.from({ length: daysInMonth }, (_, i) => {
             const date = new Date(m.getFullYear(), m.getMonth(), i + 1);
@@ -414,29 +565,9 @@ const BoardViews = {
             return `<div class="tl-head-cell ${k === todayKey ? 'tl-today' : ''} ${weekend}">${i + 1}</div>`;
         }).join('');
 
-        const rowsHtml = visible.map(card => {
-            const startStr = card.start_date || card.due_date.substring(0, 10);
-            const endStr   = card.due_date ? card.due_date.substring(0, 10) : startStr;
-            const start = new Date(startStr);
-            const end   = new Date(endStr);
-            const spanStartMs = Math.max(start.getTime(), firstDay.getTime());
-            const spanEndMs   = Math.min(end.getTime(),   lastDay.getTime());
-            const startDay = Math.round((spanStartMs - firstDay.getTime()) / msPerDay) + 1;
-            const endDay   = Math.max(startDay, Math.round((spanEndMs - firstDay.getTime()) / msPerDay) + 1);
-            const left  = ((startDay - 1) / daysInMonth) * 100;
-            const width = ((endDay - startDay + 1) / daysInMonth) * 100;
-            const done = card.due_complete == 1 ? ' tl-done' : '';
-            return `
-                <div class="tl-row">
-                    <div class="tl-row-label" title="${App.escapeHtml(card.title)}">${App.escapeHtml(card.title)}</div>
-                    <div class="tl-row-track">
-                        <div class="tl-bar${done}" data-card-id="${card.id}" style="left:${left}%;width:${width}%;background:${this._labelColor(card)}">
-                            <span class="tl-bar-title">${App.escapeHtml(card.title)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        const rowsHtml = visible
+            .map(row => this._timelineRowHtml(row, firstDay.getTime(), lastDay.getTime(), daysInMonth))
+            .join('');
 
         pane.innerHTML = `
             <div class="view-toolbar">
@@ -447,12 +578,12 @@ const BoardViews = {
             </div>
             <div class="tl-wrap" style="--tl-days:${daysInMonth};">
                 <div class="tl-head-row">
-                    <div class="tl-head-label">Cards</div>
+                    <div class="tl-head-label">Cards &amp; tasks</div>
                     <div class="tl-head-cells">${headCells}</div>
                 </div>
                 <div class="tl-body">
                     ${visible.length === 0
-                        ? '<div class="tl-empty">No cards with dates in this month. Set a due date (and optional start date) on a card to see it here.</div>'
+                        ? '<div class="tl-empty">Nothing dated in this month. Set a due date on a card, task or checklist item to see it here.</div>'
                         : rowsHtml}
                 </div>
             </div>
@@ -472,7 +603,7 @@ const BoardViews = {
             this.renderTimeline();
         });
         pane.querySelectorAll('.tl-bar').forEach(el => {
-            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+            el.addEventListener('click', () => this._openEntryEl(el));
         });
     },
 
@@ -482,21 +613,9 @@ const BoardViews = {
         const we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6);
         const daysInWeek = 7;
         const todayKey = this._dateKey(new Date());
-        const msPerDay = 86400000;
 
-        // Cards whose date range intersects this week.
-        const visible = this._allCards().filter(c => c.due_date || c.start_date).filter(c => {
-            const startStr = c.start_date || (c.due_date ? c.due_date.substring(0, 10) : null);
-            const endStr   = c.due_date ? c.due_date.substring(0, 10) : startStr;
-            if (!startStr || !endStr) return false;
-            const s = new Date(startStr);
-            const e = new Date(endStr);
-            return !(e < ws || s > we);
-        }).sort((a, b) => {
-            const as = a.start_date || (a.due_date ? a.due_date.substring(0, 10) : '');
-            const bs = b.start_date || (b.due_date ? b.due_date.substring(0, 10) : '');
-            return as.localeCompare(bs) || (a.title || '').localeCompare(b.title || '');
-        });
+        // Cards, tasks and checklist items whose dates intersect this week.
+        const visible = this._timelineRows(ws, we);
 
         const headCells = Array.from({ length: daysInWeek }, (_, i) => {
             const date = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + i);
@@ -507,29 +626,9 @@ const BoardViews = {
             return `<div class="tl-head-cell ${k === todayKey ? 'tl-today' : ''} ${weekend}">${wd} ${date.getDate()}</div>`;
         }).join('');
 
-        const rowsHtml = visible.map(card => {
-            const startStr = card.start_date || card.due_date.substring(0, 10);
-            const endStr   = card.due_date ? card.due_date.substring(0, 10) : startStr;
-            const start = new Date(startStr);
-            const end   = new Date(endStr);
-            const spanStartMs = Math.max(start.getTime(), ws.getTime());
-            const spanEndMs   = Math.min(end.getTime(),   we.getTime());
-            const startDay = Math.round((spanStartMs - ws.getTime()) / msPerDay) + 1;
-            const endDay   = Math.max(startDay, Math.round((spanEndMs - ws.getTime()) / msPerDay) + 1);
-            const left  = ((startDay - 1) / daysInWeek) * 100;
-            const width = ((endDay - startDay + 1) / daysInWeek) * 100;
-            const done = card.due_complete == 1 ? ' tl-done' : '';
-            return `
-                <div class="tl-row">
-                    <div class="tl-row-label" title="${App.escapeHtml(card.title)}">${App.escapeHtml(card.title)}</div>
-                    <div class="tl-row-track">
-                        <div class="tl-bar${done}" data-card-id="${card.id}" style="left:${left}%;width:${width}%;background:${this._labelColor(card)}">
-                            <span class="tl-bar-title">${App.escapeHtml(card.title)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        const rowsHtml = visible
+            .map(row => this._timelineRowHtml(row, ws.getTime(), we.getTime(), daysInWeek))
+            .join('');
 
         const title = this._formatWeekRange(ws);
 
@@ -542,12 +641,12 @@ const BoardViews = {
             </div>
             <div class="tl-wrap" style="--tl-days:${daysInWeek};">
                 <div class="tl-head-row">
-                    <div class="tl-head-label">Cards</div>
+                    <div class="tl-head-label">Cards &amp; tasks</div>
                     <div class="tl-head-cells">${headCells}</div>
                 </div>
                 <div class="tl-body">
                     ${visible.length === 0
-                        ? '<div class="tl-empty">No cards with dates in this week.</div>'
+                        ? '<div class="tl-empty">Nothing dated in this week.</div>'
                         : rowsHtml}
                 </div>
             </div>
@@ -566,7 +665,7 @@ const BoardViews = {
             this._renderTimelineWeek();
         });
         pane.querySelectorAll('.tl-bar').forEach(el => {
-            el.addEventListener('click', () => CardModal.open(parseInt(el.dataset.cardId)));
+            el.addEventListener('click', () => this._openEntryEl(el));
         });
     },
 };

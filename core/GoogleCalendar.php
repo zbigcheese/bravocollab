@@ -48,7 +48,7 @@ class GoogleCalendar
             "CREATE TABLE IF NOT EXISTS `google_calendar_events` (
                 `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 `user_id`         INT UNSIGNED NOT NULL,
-                `entity_type`     ENUM('card', 'item') NOT NULL,
+                `entity_type`     ENUM('card', 'item', 'task') NOT NULL,
                 `entity_id`       INT UNSIGNED NOT NULL,
                 `google_event_id` VARCHAR(255) NOT NULL,
                 `payload_hash`    CHAR(40) DEFAULT NULL,
@@ -58,6 +58,22 @@ class GoogleCalendar
                 FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+
+        // Existing deployments were created with ENUM('card','item') — widen it
+        // so task rows can be mapped. Idempotent: only fires when 'task' is
+        // missing from the column definition.
+        try {
+            $col = $db->query("SHOW COLUMNS FROM `google_calendar_events` LIKE 'entity_type'")->fetch();
+            if ($col && strpos((string) ($col['Type'] ?? ''), "'task'") === false) {
+                $db->exec(
+                    "ALTER TABLE `google_calendar_events`
+                     MODIFY COLUMN `entity_type` ENUM('card', 'item', 'task') NOT NULL"
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('Widening google_calendar_events.entity_type failed: ' . $e->getMessage());
+        }
+
         $checked = true;
     }
 
@@ -386,6 +402,44 @@ class GoogleCalendar
     }
 
     /**
+     * Same shape as syncCardForAll but for a single task / sub-task. Tasks
+     * can carry several assignees (unlike checklist items), so the assignee
+     * arm reads task_assignments rather than a single column.
+     *
+     * Safe to call after the task row is gone (delete flow) — the
+     * google_calendar_events arm still resolves the users that hold a stale
+     * event, and desiredEntityFor() then returns null so the event is removed.
+     */
+    public static function syncTaskForAll(int $taskId): void
+    {
+        self::ensureSchema();
+        $stmt = Database::get()->prepare(
+            'SELECT DISTINCT u.user_id FROM (
+                SELECT ta.user_id FROM task_assignments ta WHERE ta.task_id = :tid_a
+                UNION
+                SELECT b.created_by AS user_id
+                FROM tasks t
+                JOIN cards c ON t.card_id = c.id
+                JOIN lists l ON c.list_id = l.id
+                JOIN boards b ON b.id = l.board_id
+                WHERE t.id = :tid_b AND b.is_personal = 1
+                UNION
+                SELECT user_id FROM google_calendar_events
+                WHERE entity_type = "task" AND entity_id = :tid_e
+             ) u
+             JOIN google_calendar_accounts gca ON gca.user_id = u.user_id'
+        );
+        $stmt->execute(['tid_a' => $taskId, 'tid_b' => $taskId, 'tid_e' => $taskId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            try {
+                self::syncEntityForUser((int) $uid, 'task', $taskId);
+            } catch (Throwable $e) {
+                error_log("Google sync task {$taskId} failed for user {$uid}: " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Reconcile a single entity for a single user. Used by both the cron
      * pass (via syncUser) and the real-time hooks (via syncCardForAll /
      * syncItemForAll). Decides between create / patch / delete / no-op
@@ -509,6 +563,44 @@ class GoogleCalendar
             ];
         }
 
+        if ($type === 'task') {
+            $stmt = $db->prepare(
+                "SELECT t.id, t.title, t.description, t.due_date, t.is_complete,
+                        t.card_id, c.title AS card_title,
+                        l.board_id, b.title AS board_title
+                 FROM tasks t
+                 JOIN cards c ON t.card_id = c.id
+                 JOIN lists l ON c.list_id = l.id
+                 JOIN boards b ON b.id = l.board_id
+                 LEFT JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = :uid_a
+                 WHERE t.id = :tid
+                   AND t.due_date IS NOT NULL
+                   AND c.is_archived = 0
+                   AND b.is_archived = 0
+                   AND (ta.user_id = :uid_a2
+                        OR (b.is_personal = 1 AND b.created_by = :uid_p))
+                 LIMIT 1"
+            );
+            $stmt->execute([
+                'tid' => $entityId, 'uid_a' => $userId,
+                'uid_a2' => $userId, 'uid_p' => $userId,
+            ]);
+            $r = $stmt->fetch();
+            if (!$r) return null;
+            return [
+                'entity_type' => 'task',
+                'entity_id'   => (int) $r['id'],
+                'title'       => $r['title'],
+                'description' => $r['description'] ?? '',
+                'due_date'    => $r['due_date'],
+                'completed'   => (int) $r['is_complete'] === 1,
+                'board_id'    => (int) $r['board_id'],
+                'board_title' => $r['board_title'],
+                'card_id'     => (int) $r['card_id'],
+                'card_title'  => $r['card_title'],
+            ];
+        }
+
         // item
         $stmt = $db->prepare(
             "SELECT ci.id, ci.content, ci.due_date, ci.is_checked,
@@ -622,6 +714,39 @@ class GoogleCalendar
             ];
         }
 
+        // Tasks / sub-tasks: assigned to user (or sitting on personal board).
+        // Tasks allow multiple assignees, hence the join on task_assignments.
+        $taskStmt = $db->prepare(
+            "SELECT DISTINCT t.id, t.title, t.description, t.due_date, t.is_complete,
+                    t.card_id, c.title AS card_title,
+                    l.board_id, b.title AS board_title
+             FROM tasks t
+             JOIN cards c ON t.card_id = c.id
+             JOIN lists l ON c.list_id = l.id
+             JOIN boards b ON b.id = l.board_id
+             LEFT JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = :uid_a
+             WHERE t.due_date IS NOT NULL
+               AND c.is_archived = 0
+               AND b.is_archived = 0
+               AND (ta.user_id = :uid_a2
+                    OR (b.is_personal = 1 AND b.created_by = :uid_p))"
+        );
+        $taskStmt->execute(['uid_a' => $userId, 'uid_a2' => $userId, 'uid_p' => $userId]);
+        foreach ($taskStmt->fetchAll() as $r) {
+            $out[] = [
+                'entity_type'  => 'task',
+                'entity_id'    => (int) $r['id'],
+                'title'        => $r['title'],
+                'description'  => $r['description'] ?? '',
+                'due_date'     => $r['due_date'],
+                'completed'    => (int) $r['is_complete'] === 1,
+                'board_id'     => (int) $r['board_id'],
+                'board_title'  => $r['board_title'],
+                'card_id'      => (int) $r['card_id'],
+                'card_title'   => $r['card_title'],
+            ];
+        }
+
         return $out;
     }
 
@@ -631,6 +756,10 @@ class GoogleCalendar
         $baseUrl = rtrim($config['base_url'], '/');
         $cardUrl = $baseUrl . '/index.php?page=board&id=' . (int) $entity['board_id']
                  . '&card=' . (int) $entity['card_id'];
+        // Tasks deep-link straight to their own sub-page.
+        if ($entity['entity_type'] === 'task') {
+            $cardUrl .= '&task=' . (int) $entity['entity_id'];
+        }
 
         // If the stored due_date carries a non-midnight time component
         // (cards do — the picker defaults to 17:00 and the user can pick
@@ -661,12 +790,16 @@ class GoogleCalendar
 
         $title = $entity['title'];
         if ($entity['entity_type'] === 'item') {
-            $title = '☑ ' . $title; // distinguishes tasks from cards visually
+            $title = '☑ ' . $title; // distinguishes checklist items from cards
+        } elseif ($entity['entity_type'] === 'task') {
+            $title = '▣ ' . $title; // and tasks from both
         }
 
         $description = '';
         if ($entity['entity_type'] === 'item') {
             $description .= "Checklist item on card: " . ($entity['card_title'] ?? '') . "\n";
+        } elseif ($entity['entity_type'] === 'task') {
+            $description .= "Task on card: " . ($entity['card_title'] ?? '') . "\n";
         }
         $description .= "Board: " . $entity['board_title'] . "\n\n";
         if (!empty($entity['description'])) {

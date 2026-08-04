@@ -454,7 +454,7 @@ CREATE TABLE IF NOT EXISTS `google_calendar_accounts` (
 CREATE TABLE IF NOT EXISTS `google_calendar_events` (
     `id`              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `user_id`         INT UNSIGNED NOT NULL,
-    `entity_type`     ENUM('card', 'item') NOT NULL,
+    `entity_type`     ENUM('card', 'item', 'task') NOT NULL,
     `entity_id`       INT UNSIGNED NOT NULL,
     `google_event_id` VARCHAR(255) NOT NULL,
     `payload_hash`    CHAR(40) DEFAULT NULL,

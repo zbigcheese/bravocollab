@@ -339,9 +339,17 @@ class Controller
      * when available so the JSON response goes back to the browser BEFORE
      * we hit Google's API. Failures are isolated and logged; they cannot
      * affect the response the client sees.
+     *
+     * $entityIds accepts a list so one call can reconcile a whole cascade
+     * (e.g. a deleted task plus the sub-tasks the FK removed with it).
+     *
+     * @param int|int[] $entityIds
      */
-    protected function pushGoogleSync(string $type, int $entityId): void
+    protected function pushGoogleSync(string $type, $entityIds): void
     {
+        $ids = array_values(array_unique(array_map('intval', (array) $entityIds)));
+        if (!$ids) return;
+
         if (function_exists('fastcgi_finish_request')) {
             @fastcgi_finish_request();
         } else {
@@ -354,10 +362,14 @@ class Controller
         }
         try {
             require_once __DIR__ . '/GoogleCalendar.php';
-            if ($type === 'card') {
-                GoogleCalendar::syncCardForAll($entityId);
-            } elseif ($type === 'item') {
-                GoogleCalendar::syncItemForAll($entityId);
+            foreach ($ids as $entityId) {
+                if ($type === 'card') {
+                    GoogleCalendar::syncCardForAll($entityId);
+                } elseif ($type === 'item') {
+                    GoogleCalendar::syncItemForAll($entityId);
+                } elseif ($type === 'task') {
+                    GoogleCalendar::syncTaskForAll($entityId);
+                }
             }
         } catch (Throwable $e) {
             error_log("Google {$type} sync failed: " . $e->getMessage());

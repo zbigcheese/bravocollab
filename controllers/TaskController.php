@@ -210,6 +210,9 @@ class TaskController extends Controller
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $task['card_id']]);
 
         $this->json(['success' => true]);
+
+        // Due date / completion / title all feed the Google Calendar event.
+        $this->pushGoogleSync('task', $taskId);
     }
 
     public function delete(): void
@@ -235,12 +238,25 @@ class TaskController extends Controller
             return;
         }
 
+        // Collect sub-task ids before the FK cascade removes them — their
+        // Google events need reconciling too, and afterwards the rows are gone.
+        $childStmt = Database::get()->prepare(
+            'SELECT id FROM tasks WHERE parent_task_id = :pid'
+        );
+        $childStmt->execute(['pid' => $taskId]);
+        $affected = array_map('intval', $childStmt->fetchAll(PDO::FETCH_COLUMN));
+        $affected[] = $taskId;
+
         Database::get()->prepare('DELETE FROM tasks WHERE id = :id')
             ->execute(['id' => $taskId]);
 
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $task['card_id']]);
 
         $this->json(['success' => true]);
+
+        // syncTaskForAll still resolves recipients from the existing event
+        // mappings, so deleted tasks drop out of connected Google calendars.
+        $this->pushGoogleSync('task', $affected);
     }
 
     public function assign(): void
@@ -279,6 +295,9 @@ class TaskController extends Controller
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $task['card_id']]);
 
         $this->json(['success' => true]);
+
+        // New assignee → the task appears in their Google calendar.
+        $this->pushGoogleSync('task', $taskId);
     }
 
     public function unassign(): void
@@ -303,6 +322,9 @@ class TaskController extends Controller
         $this->publishSSE($boardId, SSE_TASK_CHANGED, ['card_id' => (int) $task['card_id']]);
 
         $this->json(['success' => true]);
+
+        // Removed assignee → the event is dropped from their Google calendar.
+        $this->pushGoogleSync('task', $taskId);
     }
 
     /**
