@@ -108,7 +108,8 @@ document.getElementById('syncNowBtn')?.addEventListener('click', async (e) => {
     try {
         const res = await App.api('google_calendar.sync_now', {});
         const r = res.result || {};
-        App.showToast(`Synced: ${r.created||0} created, ${r.updated||0} updated, ${r.deleted||0} removed.`, 'success');
+        const failed = r.failed ? `, ${r.failed} failed` : '';
+        App.showToast(`Synced: ${r.created||0} created, ${r.updated||0} updated, ${r.deleted||0} removed${failed}.`, r.failed ? 'error' : 'success');
     } catch (err) {
         App.showToast(err.message || 'Sync failed', 'error');
     } finally {

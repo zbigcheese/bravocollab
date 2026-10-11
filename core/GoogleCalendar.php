@@ -258,49 +258,23 @@ class GoogleCalendar
             $existing[$key] = $row;
         }
 
-        $created = 0; $updated = 0; $deleted = 0; $unchanged = 0;
+        $created = 0; $updated = 0; $deleted = 0; $unchanged = 0; $failed = 0;
+        $errors = []; // first few failure messages, surfaced in the cron log
 
-        // Push: create or update.
+        // Push: create or update. Each entity is isolated — one event Google
+        // rejects must not abort the run, or everything after it in the list
+        // (tasks come last) would never sync.
         foreach ($desired as $entity) {
             $key = $entity['entity_type'] . ':' . $entity['entity_id'];
-            $hash = self::hashEntity($entity);
-            $eventBody = self::entityToEventBody($entity);
-
-            if (!isset($existing[$key])) {
-                $res = self::apiCallRaw(
-                    $token,
-                    'POST',
-                    '/calendars/' . rawurlencode($calendarId) . '/events',
-                    $eventBody
-                );
-                if (!empty($res['id'])) {
-                    Database::get()->prepare(
-                        'INSERT INTO google_calendar_events
-                            (user_id, entity_type, entity_id, google_event_id, payload_hash)
-                         VALUES (:uid, :et, :eid, :geid, :hash)'
-                    )->execute([
-                        'uid' => $userId, 'et' => $entity['entity_type'],
-                        'eid' => $entity['entity_id'], 'geid' => $res['id'], 'hash' => $hash,
-                    ]);
-                    $created++;
-                }
-            } elseif ($existing[$key]['payload_hash'] !== $hash) {
-                $eventId = $existing[$key]['google_event_id'];
-                $res = self::apiCallRaw(
-                    $token,
-                    'PATCH',
-                    '/calendars/' . rawurlencode($calendarId) . '/events/' . rawurlencode($eventId),
-                    $eventBody
-                );
-                if (!empty($res['id'])) {
-                    Database::get()->prepare(
-                        'UPDATE google_calendar_events
-                         SET payload_hash = :hash WHERE id = :id'
-                    )->execute(['hash' => $hash, 'id' => $existing[$key]['id']]);
-                    $updated++;
-                }
-            } else {
-                $unchanged++;
+            try {
+                $outcome = self::upsertEvent($token, $calendarId, $userId, $entity, $existing[$key] ?? null);
+                if ($outcome === 'created')       $created++;
+                elseif ($outcome === 'updated')   $updated++;
+                elseif ($outcome === 'unchanged') $unchanged++;
+            } catch (Throwable $e) {
+                $failed++;
+                if (count($errors) < 5) $errors[] = "{$key}: " . $e->getMessage();
+                error_log("Google sync {$key} failed for user {$userId}: " . $e->getMessage());
             }
             unset($existing[$key]);
         }
@@ -319,7 +293,7 @@ class GoogleCalendar
             $deleted++;
         }
 
-        return compact('created', 'updated', 'deleted', 'unchanged');
+        return compact('created', 'updated', 'deleted', 'unchanged', 'failed', 'errors');
     }
 
     /**
@@ -478,41 +452,59 @@ class GoogleCalendar
             return;
         }
 
-        $hash = self::hashEntity($desired);
-        $body = self::entityToEventBody($desired);
+        self::upsertEvent($token, $calendarId, $userId, $desired, $existing ?: null);
+    }
 
-        if (!$existing) {
-            $res = self::apiCallRaw(
-                $token, 'POST',
-                '/calendars/' . rawurlencode($calendarId) . '/events',
-                $body
-            );
-            if (!empty($res['id'])) {
-                Database::get()->prepare(
-                    'INSERT INTO google_calendar_events
-                     (user_id, entity_type, entity_id, google_event_id, payload_hash)
-                     VALUES (:uid, :et, :eid, :geid, :hash)'
-                )->execute([
-                    'uid' => $userId, 'et' => $entityType, 'eid' => $entityId,
-                    'geid' => $res['id'], 'hash' => $hash,
-                ]);
+    /**
+     * Create or patch the Google event for one desired entity and keep the
+     * mapping row in step. Shared by syncUser (cron / "Sync now") and
+     * syncEntityForUser (real-time hooks).
+     *
+     * A PATCH answered with 404/410 means Google no longer has the event —
+     * the user deleted it, or Google purged one we'd marked cancelled. Left
+     * alone, that entity would fail on every run forever, so drop the stale
+     * mapping and create a fresh event instead.
+     *
+     * @return string 'created' | 'updated' | 'unchanged' | 'skipped'
+     */
+    private static function upsertEvent(string $token, string $calendarId, int $userId, array $entity, ?array $existing): string
+    {
+        $db   = Database::get();
+        $hash = self::hashEntity($entity);
+        $body = self::entityToEventBody($entity);
+        $eventsPath = '/calendars/' . rawurlencode($calendarId) . '/events';
+
+        if ($existing) {
+            if ($existing['payload_hash'] === $hash) return 'unchanged';
+            try {
+                $res = self::apiCallRaw(
+                    $token, 'PATCH',
+                    $eventsPath . '/' . rawurlencode($existing['google_event_id']),
+                    $body
+                );
+                if (empty($res['id'])) return 'skipped';
+                $db->prepare(
+                    'UPDATE google_calendar_events SET payload_hash = :hash WHERE id = :id'
+                )->execute(['hash' => $hash, 'id' => $existing['id']]);
+                return 'updated';
+            } catch (RuntimeException $e) {
+                if (!in_array($e->getCode(), [404, 410], true)) throw $e;
+                $db->prepare('DELETE FROM google_calendar_events WHERE id = :id')
+                   ->execute(['id' => $existing['id']]);
             }
-            return;
         }
 
-        if ($existing['payload_hash'] === $hash) return; // no-op
-
-        $res = self::apiCallRaw(
-            $token, 'PATCH',
-            '/calendars/' . rawurlencode($calendarId)
-                . '/events/' . rawurlencode($existing['google_event_id']),
-            $body
-        );
-        if (!empty($res['id'])) {
-            Database::get()->prepare(
-                'UPDATE google_calendar_events SET payload_hash = :hash WHERE id = :id'
-            )->execute(['hash' => $hash, 'id' => $existing['id']]);
-        }
+        $res = self::apiCallRaw($token, 'POST', $eventsPath, $body);
+        if (empty($res['id'])) return 'skipped';
+        $db->prepare(
+            'INSERT INTO google_calendar_events
+             (user_id, entity_type, entity_id, google_event_id, payload_hash)
+             VALUES (:uid, :et, :eid, :geid, :hash)'
+        )->execute([
+            'uid' => $userId, 'et' => $entity['entity_type'], 'eid' => $entity['entity_id'],
+            'geid' => $res['id'], 'hash' => $hash,
+        ]);
+        return 'created';
     }
 
     /**
@@ -910,7 +902,8 @@ class GoogleCalendar
             throw new RuntimeException("HTTP error: {$error}");
         }
         if ($code >= 400) {
-            throw new RuntimeException("HTTP {$code}: " . substr($response, 0, 500));
+            // Status as the exception code so callers can react to 404/410.
+            throw new RuntimeException("HTTP {$code}: " . substr($response, 0, 500), $code);
         }
 
         // Some calls (DELETE, calendar deletion) return empty body on success.

@@ -306,7 +306,7 @@ require_once __DIR__ . '/core/GoogleCalendar.php';
 SchemaUpgrades::ensureAll();
 GoogleCalendar::ensureSchema();
 $gcalAccounts = $db->query('SELECT user_id FROM google_calendar_accounts')->fetchAll(PDO::FETCH_COLUMN);
-$gcalSummary = ['users' => 0, 'created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0];
+$gcalSummary = ['users' => 0, 'created' => 0, 'updated' => 0, 'deleted' => 0, 'failed' => 0, 'entity_failed' => 0];
 foreach ($gcalAccounts as $gUid) {
     $gcalSummary['users']++;
     try {
@@ -314,6 +314,10 @@ foreach ($gcalAccounts as $gUid) {
         $gcalSummary['created']  += (int) ($r['created']  ?? 0);
         $gcalSummary['updated']  += (int) ($r['updated']  ?? 0);
         $gcalSummary['deleted']  += (int) ($r['deleted']  ?? 0);
+        $gcalSummary['entity_failed'] += (int) ($r['failed'] ?? 0);
+        foreach ($r['errors'] ?? [] as $msg) {
+            echo "Google sync user {$gUid} — {$msg}\n";
+        }
     } catch (Throwable $e) {
         $gcalSummary['failed']++;
         echo "Google sync failed for user {$gUid}: " . $e->getMessage() . "\n";
@@ -321,7 +325,8 @@ foreach ($gcalAccounts as $gUid) {
 }
 echo "Google Calendar: synced {$gcalSummary['users']} user(s) — "
    . "{$gcalSummary['created']} created, {$gcalSummary['updated']} updated, "
-   . "{$gcalSummary['deleted']} removed, {$gcalSummary['failed']} failed.\n";
+   . "{$gcalSummary['deleted']} removed, {$gcalSummary['failed']} failed, "
+   . "{$gcalSummary['entity_failed']} event(s) rejected.\n";
 
 echo "Cron job complete.\n";
 
