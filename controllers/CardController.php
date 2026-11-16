@@ -680,7 +680,16 @@ class CardController extends Controller
 
         $data = $this->getJSON();
         $cardId = (int) ($data['card_id'] ?? 0);
-        $userId = (int) ($data['user_id'] ?? 0);
+
+        // Accepts a single `user_id` or a `user_ids` array (multi-select picker).
+        $rawIds = (isset($data['user_ids']) && is_array($data['user_ids']))
+            ? $data['user_ids']
+            : [$data['user_id'] ?? 0];
+        $userIds = array_values(array_unique(array_filter(array_map('intval', $rawIds), fn($id) => $id > 0)));
+        if (!$userIds) {
+            $this->json(['error' => 'No users selected'], 400);
+            return;
+        }
 
         $boardId = $this->getBoardIdForCard($cardId);
         if (!$boardId) {
@@ -691,29 +700,35 @@ class CardController extends Controller
 
         $db = Database::get();
 
-        // Check if already assigned
-        $stmt = $db->prepare('SELECT 1 FROM card_assignments WHERE card_id = :cid AND user_id = :uid');
-        $stmt->execute(['cid' => $cardId, 'uid' => $userId]);
-        if ($stmt->fetch()) {
-            $this->json(['error' => 'User already assigned'], 400);
+        // Skip anyone already assigned
+        $stmt = $db->prepare('SELECT user_id FROM card_assignments WHERE card_id = :cid');
+        $stmt->execute(['cid' => $cardId]);
+        $existing = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $toAdd = array_values(array_diff($userIds, $existing));
+        if (!$toAdd) {
+            $this->json(['error' => count($userIds) > 1 ? 'Users already assigned' : 'User already assigned'], 400);
             return;
         }
 
-        $db->prepare('INSERT INTO card_assignments (card_id, user_id) VALUES (:cid, :uid)')
-           ->execute(['cid' => $cardId, 'uid' => $userId]);
+        $insert = $db->prepare('INSERT INTO card_assignments (card_id, user_id) VALUES (:cid, :uid)');
+        foreach ($toAdd as $userId) {
+            $insert->execute(['cid' => $cardId, 'uid' => $userId]);
+        }
 
-        // Notify assigned user
+        // Notify each newly assigned user
         $card = $this->cardModel->find($cardId);
-        $this->createNotification($userId, NOTIF_CARD_ASSIGNED, [
-            'board_id'    => $boardId,
-            'card_id'     => $cardId,
-            'card_title'  => $card['title'],
-            'actor_name'  => Auth::userName(),
-        ]);
+        foreach ($toAdd as $userId) {
+            $this->createNotification($userId, NOTIF_CARD_ASSIGNED, [
+                'board_id'    => $boardId,
+                'card_id'     => $cardId,
+                'card_title'  => $card['title'],
+                'actor_name'  => Auth::userName(),
+            ]);
+        }
 
         $this->publishSSE($boardId, SSE_CARD_UPDATED, ['card' => $this->cardModel->find($cardId)]);
 
-        $this->json(['success' => true]);
+        $this->json(['success' => true, 'assigned' => $toAdd]);
         $this->pushGoogleSync('card', $cardId);
     }
 

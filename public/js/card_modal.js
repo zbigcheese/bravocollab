@@ -1701,30 +1701,55 @@ const CardModal = {
         const available = this.boardMembers.filter(m => !assignedIds.includes(m.id));
         const items = available.length
             ? available.map(m => `
-                <div class="member-picker-item" data-user-id="${m.id}">
+                <label class="member-picker-item member-picker-check">
+                    <input type="checkbox" value="${m.id}">
                     ${App.avatarHtml(m.display_name, 'sm')}
                     <span>${App.escapeHtml(m.display_name)}</span>
-                </div>
+                </label>
             `).join('')
             : '<p class="text-muted text-sm" style="padding:8px 4px;">All board members are already assigned.</p>';
 
-        const modal = App.createModal('memberPickerModal', 'Assign', `<div class="label-picker">${items}</div>`);
+        const footer = `
+            <button class="btn btn-secondary" id="memberPickerCancel">Cancel</button>
+            <button class="btn btn-primary" id="memberPickerAssign" disabled>Assign</button>
+        `;
+        const modal = App.createModal('memberPickerModal', 'Assign', `<div class="label-picker member-picker-list">${items}</div>`, footer);
 
-        modal.querySelectorAll('.member-picker-item').forEach(el => {
-            el.addEventListener('click', async () => {
-                const userId = parseInt(el.dataset.userId);
-                this.suppressSSE();
-                try {
-                    await App.api('cards.assign', { card_id: this.currentCard.id, user_id: userId });
-                    const member = this.boardMembers.find(m => m.id === userId);
-                    if (member) this.currentCard.assignees.push({ id: member.id, display_name: member.display_name });
-                    modal.remove();
-                    this.updateMembersDOM();
-                    this.refreshBoardCard();
-                } catch (e) {
-                    App.showToast(e.message, 'error');
-                }
+        const assignBtn = modal.querySelector('#memberPickerAssign');
+        const checked = () => [...modal.querySelectorAll('.member-picker-check input:checked')].map(cb => parseInt(cb.value));
+
+        modal.querySelectorAll('.member-picker-check input').forEach(cb => {
+            cb.addEventListener('change', () => {
+                cb.closest('.member-picker-item').classList.toggle('selected', cb.checked);
+                const n = checked().length;
+                assignBtn.disabled = n === 0;
+                assignBtn.textContent = n > 1 ? `Assign (${n})` : 'Assign';
             });
+        });
+
+        modal.querySelector('#memberPickerCancel').addEventListener('click', () => modal.remove());
+
+        assignBtn.addEventListener('click', async () => {
+            const userIds = checked();
+            if (!userIds.length) return;
+            assignBtn.disabled = true;
+            this.suppressSSE();
+            try {
+                const res = await App.api('cards.assign', { card_id: this.currentCard.id, user_ids: userIds });
+                const added = (res.assigned || userIds).map(id => parseInt(id));
+                added.forEach(id => {
+                    const member = this.boardMembers.find(m => m.id === id);
+                    if (member && !this.currentCard.assignees.some(a => a.id === id)) {
+                        this.currentCard.assignees.push({ id: member.id, display_name: member.display_name });
+                    }
+                });
+                modal.remove();
+                this.updateMembersDOM();
+                this.refreshBoardCard();
+            } catch (e) {
+                assignBtn.disabled = false;
+                App.showToast(e.message, 'error');
+            }
         });
     },
 

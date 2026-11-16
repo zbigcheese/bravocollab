@@ -839,6 +839,20 @@
     background: var(--color-primary-light);
 }
 
+/* Multi-select assign picker: keep the Assign/Cancel footer on screen */
+.member-picker-list {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.member-picker-check input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
 /* ---- Lightbox ---- */
 .lightbox-overlay {
     position: fixed;
