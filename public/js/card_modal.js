@@ -124,6 +124,8 @@ const CardModal = {
                                 <button class="btn btn-secondary btn-sm" id="sidebarWatch">${c.is_watching ? 'Unfollow' : 'Watch'}</button>
                             `}
                             <button class="btn btn-secondary btn-sm" id="sidebarCloneCard">Clone</button>
+                            ${App.hasFeature('infographic_video') && typeof VideoStudio !== 'undefined'
+                                ? '<button class="btn btn-secondary btn-sm" id="sidebarVideo">Infographic video</button>' : ''}
                             ${c.is_archived == 1
                                 ? '<button class="btn btn-secondary btn-sm" id="sidebarRestore">Restore</button>'
                                 : '<button class="btn btn-secondary btn-sm" id="sidebarMoveToBoard">Move</button><button class="btn btn-secondary btn-sm" id="sidebarArchive">Archive</button>'}
@@ -800,6 +802,7 @@ const CardModal = {
         document.getElementById('sidebarWatch')?.addEventListener('click', () => this.toggleWatch());
         document.getElementById('sidebarMoveToBoard')?.addEventListener('click', () => this.showMoveToBoardDialog());
         document.getElementById('sidebarCloneCard')?.addEventListener('click', () => this.cloneCard());
+        document.getElementById('sidebarVideo')?.addEventListener('click', () => VideoStudio.open(this.currentCard.id));
         document.getElementById('sidebarArchive')?.addEventListener('click', () => this.archiveCard());
         document.getElementById('sidebarRestore')?.addEventListener('click', () => this.restoreCard());
     },

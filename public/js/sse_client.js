@@ -91,6 +91,10 @@ const SSEClient = {
 
         // Board-level label changes (created/updated/deleted) — reload board data
         // so all cards pick up new colors/names without reconnecting SSE.
+        this.source.addEventListener('video_job_changed', (e) => {
+            if (typeof VideoStudio !== 'undefined') VideoStudio.onSSE(JSON.parse(e.data));
+        });
+
         this.source.addEventListener('label_changed', () => {
             Board.refreshBoardData();
         });

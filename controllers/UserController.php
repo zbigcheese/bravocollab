@@ -153,6 +153,40 @@ class UserController extends Controller
         $this->json(['users' => $stmt->fetchAll()]);
     }
 
+    /** Admin: feature catalog + who has what (Admin → Users → Feature access). */
+    public function features(): void
+    {
+        $this->requireAdmin();
+        require_once __DIR__ . '/../core/Features.php';
+        $this->json([
+            'catalog' => Features::CATALOG,
+            'grants'  => (object) Features::allGrants(),
+        ]);
+    }
+
+    /** Admin: POST {user_id, feature, enabled} — grant or revoke one feature. */
+    public function setFeature(): void
+    {
+        $this->requireAdmin();
+        $this->requirePost();
+        $this->validateCSRF();
+        require_once __DIR__ . '/../core/Features.php';
+
+        $data = $this->getJSON();
+        $userId = (int) ($data['user_id'] ?? 0);
+        $feature = (string) ($data['feature'] ?? '');
+        if (!Features::isKnown($feature)) {
+            $this->json(['error' => 'Unknown feature'], 400);
+            return;
+        }
+        if (!$this->userModel->find($userId)) {
+            $this->json(['error' => 'User not found'], 404);
+            return;
+        }
+        Features::set($userId, $feature, !empty($data['enabled']), Auth::userId());
+        $this->json(['success' => true, 'features' => Features::forUser($userId)]);
+    }
+
     public function invite(): void
     {
         $this->requireAdmin();

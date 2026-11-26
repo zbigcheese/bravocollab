@@ -208,6 +208,8 @@ const Notifications = {
             }
             case 'board_invited':
                 return `<strong>${actor}</strong> added you to <strong>${board}</strong>`;
+            case 'video_ready':
+                return `<strong>${actor}</strong> added an infographic video to <strong>${card}</strong>`;
             default:
                 return `New notification`;
         }
@@ -240,6 +242,8 @@ const Notifications = {
             case 'task_accepted':
             case 'checklist_accepted':
                 return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#61BD4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            case 'video_ready':
+                return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F16820" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><polygon points="22 7 17 12 22 17 22 7"/></svg>';
             case 'card_completed':
             case 'item_completed':
                 // Filled checkmark in a circle so completion notifications

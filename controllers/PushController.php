@@ -160,6 +160,7 @@ class PushController extends Controller
             case 'due_soon':        return "Due soon: {$card}";
             case 'due_overdue':     return "Overdue: {$card}";
             case 'board_invited':   return "{$actor} added you to {$board}";
+            case 'video_ready':     return "{$actor} added a video to {$card}";
             case 'whats_next':      return "What's next today";
             default:                return 'BravoCollab';
         }

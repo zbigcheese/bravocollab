@@ -416,6 +416,7 @@ class Mailer
                 break;
             }
             case 'board_invited':   $line = "<strong>{$actor}</strong> added you to <strong>{$board}</strong>"; break;
+            case 'video_ready':     $line = "<strong>{$actor}</strong> added an infographic video to <strong>{$card}</strong>"; break;
             default:                $line = "You have a new notification"; break;
         }
 
@@ -478,6 +479,7 @@ class Mailer
             case 'task_accepted':   return "{$actor} accepted a task on {$card} — {$appName}";
             case 'checklist_accepted': return "{$actor} accepted an item on {$card} — {$appName}";
             case 'board_invited':   return "You were added to {$board} — {$appName}";
+            case 'video_ready':     return "{$actor} added an infographic video to {$card} — {$appName}";
             default:                return "New notification — {$appName}";
         }
     }

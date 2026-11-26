@@ -6,6 +6,9 @@ require_once __DIR__ . '/../../core/UserPreferences.php';
 $_textScale = Auth::isLoggedIn()
     ? UserPreferences::get(Auth::userId())['text_scale']
     : UserPreferences::DEFAULTS['text_scale'];
+// Per-user opt-in features (admin-managed) — read by App.hasFeature().
+require_once __DIR__ . '/../../core/Features.php';
+$_userFeatures = Auth::isLoggedIn() ? Features::forUser((int) Auth::userId()) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -14,6 +17,7 @@ $_textScale = Auth::isLoggedIn()
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php echo CSRF::metaTag(); ?>
     <meta name="user-id" content="<?php echo (int) (Auth::userId() ?? 0); ?>">
+    <meta name="user-features" content="<?php echo htmlspecialchars(implode(',', $_userFeatures), ENT_QUOTES); ?>">
     <meta name="theme-color" content="#F16820">
     <link rel="icon" type="image/png" href="<?php echo asset_url('public/img/favicon.png'); ?>">
     <link rel="manifest" href="<?php echo asset_url('/manifest.json'); ?>">

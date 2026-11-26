@@ -478,4 +478,56 @@ CREATE TABLE IF NOT EXISTS `sse_events` (
     INDEX `idx_board_id` (`board_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- PER-USER FEATURE FLAGS (admin-managed, see core/Features.php)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `user_features` (
+    `user_id`     INT UNSIGNED NOT NULL,
+    `feature_key` VARCHAR(64)  NOT NULL,
+    `granted_by`  INT UNSIGNED DEFAULT NULL,
+    `granted_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`user_id`, `feature_key`),
+    INDEX `idx_feature` (`feature_key`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- INFOGRAPHIC VIDEO JOBS + AI USAGE LOG
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `video_jobs` (
+    `id`                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `card_id`              INT UNSIGNED NOT NULL,
+    `user_id`              INT UNSIGNED NOT NULL,
+    `status`               ENUM('draft','storyboarding','review','rendering','done','failed') NOT NULL DEFAULT 'draft',
+    `topic`                VARCHAR(255) NOT NULL DEFAULT '',
+    `form_json`            MEDIUMTEXT,
+    `dataset_json`         MEDIUMTEXT,
+    `footage_tags_json`    TEXT,
+    `storyboard_json`      MEDIUMTEXT,
+    `output_attachment_id` INT UNSIGNED DEFAULT NULL,
+    `error`                TEXT,
+    `created_at`           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`card_id`) REFERENCES `cards`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_card` (`card_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ai_usage_log` (
+    `id`                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `user_id`            INT UNSIGNED NOT NULL,
+    `video_job_id`       INT UNSIGNED DEFAULT NULL,
+    `kind`               VARCHAR(32) NOT NULL,
+    `model`              VARCHAR(64) NOT NULL,
+    `input_tokens`       INT UNSIGNED NOT NULL DEFAULT 0,
+    `output_tokens`      INT UNSIGNED NOT NULL DEFAULT 0,
+    `cache_read_tokens`  INT UNSIGNED NOT NULL DEFAULT 0,
+    `cache_write_tokens` INT UNSIGNED NOT NULL DEFAULT 0,
+    `created_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    INDEX `idx_user_day` (`user_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

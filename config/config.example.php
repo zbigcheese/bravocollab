@@ -37,5 +37,18 @@ return [
     'google_client_id'     => '',
     'google_client_secret' => '',
 
+    // Anthropic API — powers the per-user "Infographic video" feature
+    // (grant it per user in Admin → Users → Feature access). Create a key at
+    // https://platform.claude.com/settings/keys. Server-side only; never sent
+    // to the browser. Leave empty to disable the AI steps.
+    'anthropic_api_key' => '',
+    // Model + effort for storyboard generation. Cheaper alternatives:
+    // 'claude-sonnet-5-5' ($2/$10 per MTok) or 'claude-haiku-5-5' ($0.10/$0.50).
+    'anthropic_model'   => 'claude-opus-5-5',
+    'anthropic_effort'  => 'low',              // low | medium | high
+    'video_daily_ai_limit'  => 25,             // Claude calls per user per day
+    'video_max_upload_size' => 60 * 1024 * 1024, // rendered MP4 (PHP upload_max_filesize must allow it)
+    'video_brand_domain'    => 'bravo.org.rs',
+
     'debug' => false,
 ];

@@ -23,6 +23,7 @@ define('NOTIF_BOARD_INVITED', 'board_invited');
 define('NOTIF_TASK_ASSIGNED', 'task_assigned');
 define('NOTIF_TASK_ACCEPTED', 'task_accepted');
 define('NOTIF_CHECKLIST_ACCEPTED', 'checklist_accepted');
+define('NOTIF_VIDEO_READY', 'video_ready');
 
 // SSE event types
 define('SSE_CARD_CREATED', 'card_created');
@@ -42,6 +43,7 @@ define('SSE_ATTACHMENT_ADDED', 'attachment_added');
 define('SSE_ATTACHMENT_DELETED', 'attachment_deleted');
 define('SSE_NOTIFICATION', 'notification');
 define('SSE_TASK_CHANGED', 'task_changed');
+define('SSE_VIDEO_JOB_CHANGED', 'video_job_changed');
 
 // Default label colors
 define('DEFAULT_LABEL_COLORS', [
@@ -70,7 +72,8 @@ define('ALLOWED_MIME_TYPES', [
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain', 'text/csv',
+    'text/plain', 'text/csv', 'application/json',
+    'video/mp4',
     'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
 ]);
 

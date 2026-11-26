@@ -17,6 +17,7 @@ class Router
         'push'         => 'PushController',
         'search'       => 'SearchController',
         'tasks'        => 'TaskController',
+        'video'        => 'VideoController',
     ];
 
     public static function dispatch(): void

@@ -96,3 +96,8 @@ $_canAdmin = Auth::isAdmin() || $_isPersonalOwner;
 <script src="<?php echo asset_url('public/js/task_view.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/board_views.js'); ?>"></script>
 <script src="<?php echo asset_url('public/js/sse_client.js'); ?>"></script>
+<?php if (Features::has((int) Auth::userId(), Features::INFOGRAPHIC_VIDEO)): ?>
+<link rel="stylesheet" href="<?php echo asset_url('public/css/video_studio.css'); ?>">
+<script src="<?php echo asset_url('public/js/video_renderer.js'); ?>"></script>
+<script src="<?php echo asset_url('public/js/video_studio.js'); ?>"></script>
+<?php endif; ?>

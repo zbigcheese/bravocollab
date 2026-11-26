@@ -27,6 +27,12 @@
     </div>
 
     <div class="admin-card" style="margin-top:24px;">
+        <h2 style="font-size: 1.1429rem;margin-bottom:4px;">Feature access</h2>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Opt-in features, enabled per user. Admins are not included automatically.</p>
+        <div id="featureAccess"><div class="spinner"></div></div>
+    </div>
+
+    <div class="admin-card" style="margin-top:24px;">
         <h2 style="font-size: 1.1429rem;margin-bottom:12px;">Pending Invitations</h2>
         <div id="invitationsList"><div class="spinner"></div></div>
     </div>
@@ -52,6 +58,9 @@
 .board-picker-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--color-primary); }
 .board-picker-swatch { width: 24px; height: 18px; border-radius: 3px; flex-shrink: 0; }
 .board-picker-name { font-size: 1rem; font-weight: 500; }
+.feature-matrix td:not(:first-child), .feature-matrix th:not(:first-child) { text-align: center; }
+.feature-matrix .feature-desc { display: block; font-weight: 400; text-transform: none; font-size: 0.7857rem; max-width: 220px; margin: 2px auto 0; }
+.feature-matrix input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary); }
 .board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 0.7857rem; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
 
 /* Mobile: stack each user row as a small card so role/status/actions wrap
@@ -171,6 +180,43 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     await loadUsers();
+
+    // Feature access matrix: one row per user, one checkbox per opt-in feature.
+    async function loadFeatureAccess() {
+        const box = document.getElementById('featureAccess');
+        try {
+            const [fRes, uRes] = await Promise.all([App.api('users.features', {}, 'GET'), App.api('users.list', {}, 'GET')]);
+            const catalog = fRes.catalog || {};
+            const grants = fRes.grants || {};
+            const keys = Object.keys(catalog);
+            const users = (uRes.users || []).filter(u => parseInt(u.is_active));
+            if (!keys.length) { box.innerHTML = '<p class="text-muted text-sm">No opt-in features defined.</p>'; return; }
+            box.innerHTML = `
+                <table class="admin-table feature-matrix">
+                    <thead><tr><th>User</th>${keys.map(k => `<th>${App.escapeHtml(catalog[k].label)}<span class="feature-desc">${App.escapeHtml(catalog[k].description)}</span></th>`).join('')}</tr></thead>
+                    <tbody>${users.map(u => `
+                        <tr>
+                            <td data-label="User"><strong>${App.escapeHtml(u.display_name)}</strong> <span class="text-muted text-sm">${App.escapeHtml(u.email)}</span></td>
+                            ${keys.map(k => `<td data-label="${App.escapeHtml(catalog[k].label)}"><input type="checkbox" class="feature-toggle" data-user-id="${u.id}" data-feature="${App.escapeHtml(k)}" ${(grants[u.id] || []).includes(k) ? 'checked' : ''} aria-label="${App.escapeHtml(catalog[k].label)} for ${App.escapeHtml(u.display_name)}"></td>`).join('')}
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+            box.querySelectorAll('.feature-toggle').forEach(cb => cb.addEventListener('change', async () => {
+                cb.disabled = true;
+                try {
+                    await App.api('users.set_feature', { user_id: parseInt(cb.dataset.userId), feature: cb.dataset.feature, enabled: cb.checked });
+                    App.showToast(cb.checked ? 'Feature enabled' : 'Feature disabled', 'success');
+                } catch (e) {
+                    cb.checked = !cb.checked;
+                    App.showToast(e.message, 'error');
+                }
+                cb.disabled = false;
+            }));
+        } catch (e) {
+            box.innerHTML = `<p class="text-muted text-sm">Failed to load features. ${App.escapeHtml(e.message || '')}</p>`;
+        }
+    }
+    loadFeatureAccess();
 
     // Load all boards for pickers
     let allBoards = [];
