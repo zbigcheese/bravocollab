@@ -15,21 +15,16 @@
                     <th>Role</th>
                     <th>Status</th>
                     <th>Last Login</th>
+                    <th title="Opt-in features, enabled per user (admins are not included automatically)">Features</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="usersTableBody">
-                <tr><td colspan="6" style="text-align:center;" data-label="">
+                <tr><td colspan="7" style="text-align:center;" data-label="">
                     <div class="spinner"></div>
                 </td></tr>
             </tbody>
         </table>
-    </div>
-
-    <div class="admin-card" style="margin-top:24px;">
-        <h2 style="font-size: 1.1429rem;margin-bottom:4px;">Feature access</h2>
-        <p class="text-muted text-sm" style="margin-bottom:12px;">Opt-in features, enabled per user. Admins are not included automatically.</p>
-        <div id="featureAccess"><div class="spinner"></div></div>
     </div>
 
     <div class="admin-card" style="margin-top:24px;">
@@ -39,7 +34,7 @@
 </div>
 
 <style>
-.admin-page { max-width: 960px; margin: 0 auto; }
+.admin-page { max-width: 1120px; margin: 0 auto; }
 .admin-card { background: var(--color-white); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); }
 .admin-table { width: 100%; border-collapse: collapse; }
 .admin-table th, .admin-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--color-border); font-size: 1rem; }
@@ -58,9 +53,8 @@
 .board-picker-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--color-primary); }
 .board-picker-swatch { width: 24px; height: 18px; border-radius: 3px; flex-shrink: 0; }
 .board-picker-name { font-size: 1rem; font-weight: 500; }
-.feature-matrix td:not(:first-child), .feature-matrix th:not(:first-child) { text-align: center; }
-.feature-matrix .feature-desc { display: block; font-weight: 400; text-transform: none; font-size: 0.7857rem; max-width: 220px; margin: 2px auto 0; }
-.feature-matrix input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--color-primary); }
+.feature-check { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 0.9286rem; cursor: pointer; }
+.feature-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--color-primary); }
 .board-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 0.7857rem; font-weight: 600; color: white; margin-right: 4px; margin-bottom: 2px; }
 
 /* Mobile: stack each user row as a small card so role/status/actions wrap
@@ -128,8 +122,18 @@
 document.addEventListener('DOMContentLoaded', async function() {
     // Load users
     async function loadUsers() {
-        const res = await App.api('users.list', {}, 'GET');
+        const [res, fRes] = await Promise.all([
+            App.api('users.list', {}, 'GET'),
+            App.api('users.features', {}, 'GET').catch(() => ({ catalog: {}, grants: {} })),
+        ]);
         const users = res.users || [];
+        const catalog = fRes.catalog || {};
+        const grants = fRes.grants || {};
+        const featureCell = (u) => Object.keys(catalog).map(k => `
+            <label class="feature-check" title="${App.escapeHtml(catalog[k].description)}">
+                <input type="checkbox" class="feature-toggle" data-user-id="${u.id}" data-feature="${App.escapeHtml(k)}" ${(grants[u.id] || []).includes(k) ? 'checked' : ''}>
+                ${App.escapeHtml(catalog[k].label)}
+            </label>`).join('') || '<span class="text-muted text-sm">—</span>';
         const tbody = document.getElementById('usersTableBody');
 
         tbody.innerHTML = users.map(u => `
@@ -144,6 +148,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </td>
                 <td data-label="Status"><span class="status-badge ${u.is_active ? 'status-active' : 'status-inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td data-label="Last login">${u.last_login_at ? App.formatDate(u.last_login_at) : 'Never'}</td>
+                <td data-label="Features">${featureCell(u)}</td>
                 <td data-label="Actions">
                     <button class="btn btn-sm btn-secondary toggle-active" data-user-id="${u.id}">
                         ${u.is_active ? 'Deactivate' : 'Activate'}
@@ -165,6 +170,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         });
 
+        // Feature access (per-user opt-in features)
+        tbody.querySelectorAll('.feature-toggle').forEach(cb => cb.addEventListener('change', async () => {
+            cb.disabled = true;
+            try {
+                await App.api('users.set_feature', { user_id: parseInt(cb.dataset.userId), feature: cb.dataset.feature, enabled: cb.checked });
+                App.showToast(cb.checked ? 'Feature enabled' : 'Feature disabled', 'success');
+            } catch (e) {
+                cb.checked = !cb.checked;
+                App.showToast(e.message, 'error');
+            }
+            cb.disabled = false;
+        }));
+
         // Toggle active
         tbody.querySelectorAll('.toggle-active').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -181,42 +199,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     await loadUsers();
 
-    // Feature access matrix: one row per user, one checkbox per opt-in feature.
-    async function loadFeatureAccess() {
-        const box = document.getElementById('featureAccess');
-        try {
-            const [fRes, uRes] = await Promise.all([App.api('users.features', {}, 'GET'), App.api('users.list', {}, 'GET')]);
-            const catalog = fRes.catalog || {};
-            const grants = fRes.grants || {};
-            const keys = Object.keys(catalog);
-            const users = (uRes.users || []).filter(u => parseInt(u.is_active));
-            if (!keys.length) { box.innerHTML = '<p class="text-muted text-sm">No opt-in features defined.</p>'; return; }
-            box.innerHTML = `
-                <table class="admin-table feature-matrix">
-                    <thead><tr><th>User</th>${keys.map(k => `<th>${App.escapeHtml(catalog[k].label)}<span class="feature-desc">${App.escapeHtml(catalog[k].description)}</span></th>`).join('')}</tr></thead>
-                    <tbody>${users.map(u => `
-                        <tr>
-                            <td data-label="User"><strong>${App.escapeHtml(u.display_name)}</strong> <span class="text-muted text-sm">${App.escapeHtml(u.email)}</span></td>
-                            ${keys.map(k => `<td data-label="${App.escapeHtml(catalog[k].label)}"><input type="checkbox" class="feature-toggle" data-user-id="${u.id}" data-feature="${App.escapeHtml(k)}" ${(grants[u.id] || []).includes(k) ? 'checked' : ''} aria-label="${App.escapeHtml(catalog[k].label)} for ${App.escapeHtml(u.display_name)}"></td>`).join('')}
-                        </tr>`).join('')}
-                    </tbody>
-                </table>`;
-            box.querySelectorAll('.feature-toggle').forEach(cb => cb.addEventListener('change', async () => {
-                cb.disabled = true;
-                try {
-                    await App.api('users.set_feature', { user_id: parseInt(cb.dataset.userId), feature: cb.dataset.feature, enabled: cb.checked });
-                    App.showToast(cb.checked ? 'Feature enabled' : 'Feature disabled', 'success');
-                } catch (e) {
-                    cb.checked = !cb.checked;
-                    App.showToast(e.message, 'error');
-                }
-                cb.disabled = false;
-            }));
-        } catch (e) {
-            box.innerHTML = `<p class="text-muted text-sm">Failed to load features. ${App.escapeHtml(e.message || '')}</p>`;
-        }
-    }
-    loadFeatureAccess();
 
     // Load all boards for pickers
     let allBoards = [];

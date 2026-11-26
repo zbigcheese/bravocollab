@@ -38,7 +38,7 @@ return [
     'google_client_secret' => '',
 
     // Anthropic API — powers the per-user "Infographic video" feature
-    // (grant it per user in Admin → Users → Feature access). Create a key at
+    // (grant it per user in the Features column of Admin → Users). Create a key at
     // https://platform.claude.com/settings/keys. Server-side only; never sent
     // to the browser. Leave empty to disable the AI steps.
     'anthropic_api_key' => '',

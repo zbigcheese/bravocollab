@@ -153,7 +153,7 @@ class UserController extends Controller
         $this->json(['users' => $stmt->fetchAll()]);
     }
 
-    /** Admin: feature catalog + who has what (Admin → Users → Feature access). */
+    /** Admin: feature catalog + who has what (Features column in Admin → Users). */
     public function features(): void
     {
         $this->requireAdmin();

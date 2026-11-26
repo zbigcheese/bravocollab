@@ -4,7 +4,7 @@ Status: **MVP built 2026-11-26** (rendering option A, in-browser). This file is 
 Implementation notes live in `.claude/CLAUDE.md` → "Per-user features & infographic video".
 
 Decisions taken while building the MVP:
-- Access is per user via the admin "Feature access" matrix (`infographic_video`), not by role.
+- Access is per user via the Features column in Admin → Users (`infographic_video`), not by role.
 - Steps 2 and 3 of the pipeline run as **one** Claude call (footage tags come back inside the storyboard response;
   thumbnails ≤300 px are sent, and later regenerations reuse the stored tags instead of the images).
 - Storyboard JSON uses `value_ref` / `a_ref` / `b_ref` / `segments_ref` plus `{{key}}` placeholders inside text;
